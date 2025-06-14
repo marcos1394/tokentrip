@@ -14,7 +14,7 @@ import { SuiObjectResponse } from '@mysten/sui/client';
 import { AnimatedBackground } from "@/components/animated-background";
 import { Button } from "@/components/ui/button";
 import { Toaster } from '@/components/ui/toaster';
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft } from 'lucide-react';
 import { StakingHeader } from '@/components/staking/StakingHeader';
 import { PoolStatsCard } from '@/components/staking/PoolStatsCard';
