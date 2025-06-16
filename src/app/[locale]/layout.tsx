@@ -1,21 +1,23 @@
-// app/[locale]/layout.tsx
+// src/app/[locale]/layout.tsx
+
 import { Inter } from "next/font/google";
 import "./globals.css";
 
 // Proveedores
-import DappKitProviders from "@/components/DappKitProviders";
+import I18nProviderClient from "@/components/i18n-provider-client";
+import i18next from "@/i18n";
 import { ThemeProvider } from "@/components/theme-provider";
+import DappKitProviders from "@/components/DappKitProviders";
 
-// Componentes Globales
+// --- NUEVO: Se importan los componentes globales ---
 import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/landing/Footer"; // Asumiendo que lo pusimos en `landing`
-import { Toaster } from "@/components/ui/toaster";
+import { Footer } from "@/components/Footer";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "TokenTrip - Own Your Experience",
-  description: "The future of tokenized real-world assets and experiences.",
+  title: "TokenTrip - Tus Experiencias, Tu Propiedad",
+  description: "El futuro de los viajes y el entretenimiento, tokenizado en la blockchain de Sui.",
 };
 
 export default function RootLayout({
@@ -25,6 +27,10 @@ export default function RootLayout({
   children: React.ReactNode;
   params: { locale: string };
 }) {
+  if (i18next.language !== locale) {
+    i18next.changeLanguage(locale);
+  }
+
   return (
     <html lang={locale} suppressHydrationWarning>
       <body className={inter.className}>
@@ -35,10 +41,19 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange={false}
           >
-            <Navbar />
-            <main>{children}</main>
-            <Footer />
-            <Toaster />
+            <I18nProviderClient locale={locale}>
+              {/* Navbar ahora vive aquí, aparecerá en todas las páginas */}
+              <Navbar />
+              
+              {/* Usamos <main> para el contenido principal de cada página */}
+              <main>
+                {children}
+              </main>
+              
+              {/* Footer ahora vive aquí, aparecerá en todas las páginas */}
+              <Footer />
+              
+            </I18nProviderClient>
           </ThemeProvider>
         </DappKitProviders>
       </body>
