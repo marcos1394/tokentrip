@@ -25,7 +25,7 @@ export default function AdminPage() {
     const [providerAddress, setProviderAddress] = useState('');
     const { mutate: executeTx, isPending } = useSignAndExecuteTransaction();
 
-    const handleVipAction = (action: 'add' | 'remove') => {
+    const handleVipAction = async (action: 'add' | 'remove') => {
         if (!currentAccount || currentAccount.address !== process.env.NEXT_PUBLIC_ADMIN_ADDRESS) {
             toast({ variant: 'destructive', title: 'Acción no autorizada' });
             return;
@@ -48,15 +48,33 @@ export default function AdminPage() {
             ],
         });
 
-        executeTx({ transaction: tx }, {
-            onSuccess: () => {
-                toast({ title: '✅ ¡Éxito!', description: `Proveedor ${action === 'add' ? 'añadido a' : 'eliminado de'} la lista VIP.` });
-                setProviderAddress('');
-            },
-            onError: (error) => {
-                toast({ variant: 'destructive', title: '❌ Error en la operación', description: error.message });
-            }
-        });
+        try {
+  // 1. Llama a la función con 'await'.
+  //    El código se pausará aquí hasta que la transacción termine.
+  await executeTx({
+    transaction: tx,
+  });
+
+  // 2. Si 'await' NO falla, la transacción fue un ÉXITO.
+  //    El código de 'onSuccess' va aquí.
+  toast({
+    title: "✅ ¡Éxito!",
+    description: `Proveedor ${
+      action === "add" ? "añadido a" : "eliminado de"
+    } la lista VIP.`,
+  });
+  setProviderAddress("");
+
+} catch (error: any) {
+  // 3. Si 'await' falla, se captura el ERROR aquí.
+  //    El código de 'onError' va aquí.
+  toast({
+    variant: "destructive",
+    title: "❌ Error en la operación",
+    description: error?.message || "Ocurrió un error desconocido.",
+  })};// La llamada a executeTx ahora recibe un solo objeto.
+    
+
     };
 
     // Renderizado del JSX (sin cambios)
