@@ -1,29 +1,23 @@
 // src/config/sui.ts
 
-const requiredEnv = (key: string): string => {
-  const value = process.env[key];
-  if (!value) {
-    throw new Error(`Missing required environment variable ${key}`);
-  }
-  return value;
-};
+// Se eliminó la dependencia de 'process.env' para depurar.
+// Los valores están directamente "hardcodeados" en el código.
 
-// CORRECCIÓN: Todas las llamadas usan variables que empiezan con NEXT_PUBLIC_
 export const suiConfig = {
   // Marketplace V1/V2
-  packageId: requiredEnv('NEXT_PUBLIC_PACKAGE_ID'),
-  treasuryCapId: requiredEnv('NEXT_PUBLIC_TREASURY_CAP_ID'),
-  stakingPoolId: requiredEnv('NEXT_PUBLIC_STAKING_POOL_ID'),
+  packageId: "0x3087ed992e1acd9fdfd4e57bfebcbc56e6b7b3cc2d7e9feb48e512a49cad539b",
+  treasuryCapId: "0x9e3962843855af3fefbcbb9e43c7a727ed37ec79eed7d5c595f75f00c81fa688",
+  stakingPoolId: "0x6f3495eb15cf6fead11d8fb47fcfff032770e48c776498136731c57469365072",
   
   // Admin & VIP
-  adminCapId: requiredEnv('NEXT_PUBLIC_ADMIN_CAP_ID'),
-  vipRegistryId: requiredEnv('NEXT_PUBLIC_VIP_REGISTRY_ID'),
+  adminCapId: "0x0467acdf72b35ad21dd8bcd3648170db212ccb5a8fcdfa8b2ab811195440d690",
+  vipRegistryId: "0xPLACEHOLDER_VIP_REGISTRY_ID",
 
   // TKT Token
-  tktPackageId: requiredEnv('NEXT_PUBLIC_TKT_PACKAGE_ID'),
+  tktPackageId: "0x3087ed992e1acd9fdfd4e57bfebcbc56e6b7b3cc2d7e9feb48e512a49cad539b",
 
   // DAO
-  daoPackageId: requiredEnv('NEXT_PUBLIC_DAO_PACKAGE_ID'),
-  daoId: requiredEnv('NEXT_PUBLIC_DAO_ID'),
-  daoTreasuryId: requiredEnv('NEXT_PUBLIC_DAO_TREASURY_ID'),
+  daoPackageId: "0x3087ed992e1acd9fdfd4e57bfebcbc56e6b7b3cc2d7e9feb48e512a49cad539b",
+  daoId: "0xPLACEHOLDER_DAO_ID",
+  daoTreasuryId: "0xPLACEHOLDER_DAO_TREASURY_ID",
 };
