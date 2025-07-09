@@ -123,7 +123,7 @@ export default function DashboardPage() {
                                 key={nft.data!.objectId} 
                                 nft={nft.data as any} 
                                 providerProfileId={providerProfile.data!.objectId}
-                                onListingSuccess={handleListingSuccess}
+                                onActionSuccess={handleListingSuccess}
                             />
                         ))}
                     </div>

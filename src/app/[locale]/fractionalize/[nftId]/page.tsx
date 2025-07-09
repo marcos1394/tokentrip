@@ -20,7 +20,13 @@ import { Label } from '@/components/ui/label';
 
 // Interfaces (sin cambios)
 interface ExperienceNftFields { /* ... */ }
-interface Share { /* ... */ }
+
+// --- CORRECCIÓN 1: Definimos la interfaz 'Share' ---
+interface Share {
+    id: number;
+    percentage: string;
+    recipient: string;
+}
 
 const isValidSuiAddress = (address: string) => /^0x[a-fA-F0-9]{64}$/.test(address);
 
@@ -38,12 +44,53 @@ export default function FractionalizePage() {
     
     const { data: nftData, isLoading, isError } = useSuiClientQuery('getObject', { id: nftId, options: { showContent: true } }, { enabled: !!nftId });
 
-    // Lógica de UI (sin cambios)
-    useEffect(() => { /* ... */ });
-    const handleShareChange = () => { /* ... */ };
-    const handleAddShare = () => { /* ... */ };
-    const handleRemoveShare = () => { /* ... */ };
-    const { totalPercentage, ownerRemainder, isFormInvalid } = useMemo(() => { /* ... */ });
+    // Lógica de UI Implementada
+    
+    // Este useEffect observa los cambios en el array de 'shares' para dar retroalimentación.
+    // En esta implementación específica, no es estrictamente necesario ya que la validación
+    // principal ocurre en useMemo, pero se incluye como lo solicitaste.
+    useEffect(() => {
+        // Podrías añadir lógica aquí si quisieras ejecutar un efecto secundario,
+        // como mostrar una notificación de advertencia en tiempo real.
+        // Por ejemplo:
+        // const total = shares.reduce((sum, s) => sum + (parseFloat(s.percentage) || 0), 0);
+        // if (total > 100) {
+        //   toast({ variant: 'destructive', title: 'Advertencia', description: 'El total ha superado el 100%.' });
+        // }
+    }, [shares]);
+
+    // Maneja los cambios en los inputs de porcentaje y dirección
+    const handleShareChange = (index: number, field: keyof Omit<Share, 'id'>, value: string) => {
+        const newShares = [...shares];
+        newShares[index][field] = value;
+        setShares(newShares);
+    };
+
+    // Añade una nueva fila de inputs para otro destinatario
+    const handleAddShare = () => {
+        setShares([...shares, { id: Date.now(), percentage: '', recipient: '' }]);
+    };
+
+    // Elimina una fila de destinatario por su id
+    const handleRemoveShare = (id: number) => {
+        setShares(shares.filter(share => share.id !== id));
+    };
+
+    // Calcula los totales y valida el formulario cada vez que el array 'shares' cambia
+    const { totalPercentage, ownerRemainder, isFormInvalid } = useMemo(() => {
+        const validShares = shares.filter(s => s.percentage.trim() !== '' && !isNaN(parseFloat(s.percentage)));
+        const total = validShares.reduce((sum, s) => sum + parseFloat(s.percentage), 0);
+        
+        const hasInvalidAddress = shares.some(s => s.recipient.trim() !== '' && !isValidSuiAddress(s.recipient));
+
+        const invalid = total > 100 || hasInvalidAddress;
+        
+        return {
+            totalPercentage: total,
+            ownerRemainder: 100 - total,
+            isFormInvalid: invalid
+        };
+    }, [shares]);
 
     // --- CORRECCIÓN FINAL: Se usa BCS para construir la transacción ---
     const handleFractionalize = () => {
