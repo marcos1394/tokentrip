@@ -2,14 +2,14 @@
 
 // Componentes de la página
 import { AnimatedBackground } from "@/components/animated-background";
-import { HeroSection } from "@/components/HeroSection";
-import { MyExperiencesSection } from "@/components/MyExperiencesSection";
-import { ExploreSection } from "@/components/ExploreSection";
-import { FifaSection } from "@/components/FifaSection";
-import { TokenizationSection } from "@/components/TokenizationSection";
-import { StatsSection } from "@/components/StatsSection";
-import { SecuritySection } from "@/components/SecuritySection";
-import { CtaSection } from "@/components/CtaSection";
+import { HeroSection } from "@/components/landing/HeroSection";
+import { MyExperiencesSection } from "@/components/landing/MyExperiencesSection";
+import { ExploreSection } from "@/components/landing/ExploreSection";
+import { FifaSection } from "@/components/landing/FifaSection";
+import { TokenizationSection } from "@/components/landing/TokenizationSection";
+import { StatsSection } from "@/components/landing/StatsSection";
+import { SecuritySection } from "@/components/landing/SecuritySection";
+import { CtaSection } from "@/components/landing/CtaSection";
 import { MyFractionsSection } from "@/components/MyFractionsSection"; // Se importa el nuevo contenedor
 
 export default function HomePage() {
