@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Star, Loader } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 // Interfaces
 interface PurchaseReceiptFields {

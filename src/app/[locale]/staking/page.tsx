@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft } from 'lucide-react';
 import { StakingHeader } from '@/components/staking/StakingHeader';
 import { PoolStatsCard } from '@/components/staking/PoolStatsCard';
-import { WalletBalanceCard } from '@/components/staking/WalletBalanceCard';
+import { WalletBalanceCard } from '@/components/staking/WalletBalancedCard';
 import { StakeFormCard } from '@/components/staking/StakeFormCard';
 import { UserReceiptsCard } from '@/components/staking/UserReceiptsCard';
 
