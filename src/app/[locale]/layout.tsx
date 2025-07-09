@@ -1,7 +1,7 @@
 // src/app/[locale]/layout.tsx
 
 import { Inter } from "next/font/google";
-import "./globals.css";
+import "../globals.css";
 
 // Proveedores
 import I18nProviderClient from "@/components/i18n-provider-client";
