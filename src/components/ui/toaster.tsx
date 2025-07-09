@@ -1,4 +1,6 @@
-import { useToast } from "@/components/hooks/use-toast"
+'use client'; // <-- AÑADE ESTA LÍNEA
+
+import { useToast } from "@/hooks/use-toast"
 import {
   Toast,
   ToastClose,

@@ -1,5 +1,3 @@
-// src/app/[locale]/layout.tsx
-
 import { Inter } from "next/font/google";
 import "../globals.css";
 
@@ -8,8 +6,9 @@ import I18nProviderClient from "@/components/i18n-provider-client";
 import i18next from "@/i18n";
 import { ThemeProvider } from "@/components/theme-provider";
 import DappKitProviders from "@/components/DappKitProviders";
+import { Toaster } from "@/components/ui/toaster"; // Se importa el Toaster
 
-// --- NUEVO: Se importan los componentes globales ---
+// Componentes Globales
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 
@@ -20,13 +19,16 @@ export const metadata = {
   description: "El futuro de los viajes y el entretenimiento, tokenizado en la blockchain de Sui.",
 };
 
-export default function RootLayout({
+// --- CORRECCIÓN PARA NEXT.JS 15 ---
+export default async function RootLayout({
   children,
-  params: { locale },
+  params, // 1. Recibe 'params' como un objeto completo
 }: {
   children: React.ReactNode;
   params: { locale: string };
 }) {
+  const { locale } = params; // 2. Extrae 'locale' aquí adentro
+
   if (i18next.language !== locale) {
     i18next.changeLanguage(locale);
   }
@@ -42,17 +44,12 @@ export default function RootLayout({
             disableTransitionOnChange={false}
           >
             <I18nProviderClient locale={locale}>
-              {/* Navbar ahora vive aquí, aparecerá en todas las páginas */}
               <Navbar />
-              
-              {/* Usamos <main> para el contenido principal de cada página */}
               <main>
                 {children}
               </main>
-              
-              {/* Footer ahora vive aquí, aparecerá en todas las páginas */}
               <Footer />
-              
+              <Toaster /> {/* Se añade el Toaster para las notificaciones */}
             </I18nProviderClient>
           </ThemeProvider>
         </DappKitProviders>

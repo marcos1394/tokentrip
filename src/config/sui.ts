@@ -8,22 +8,22 @@ const requiredEnv = (key: string): string => {
   return value;
 };
 
-// Usamos placeholders. Estos serán reemplazados con los IDs reales después de desplegar.
+// CORRECCIÓN: Todas las llamadas usan variables que empiezan con NEXT_PUBLIC_
 export const suiConfig = {
   // Marketplace V1/V2
-  packageId: requiredEnv('NEXT_PUBLIC_PACKAGE_ID') || "0xPLACEHOLDER",
-  treasuryCapId: requiredEnv('NEXT_PUBLIC_TREASURY_CAP_ID') || "0xPLACEHOLDER",
-  stakingPoolId: requiredEnv('NEXT_PUBLIC_STAKING_POOL_ID') || "0xPLACEHOLDER",
+  packageId: requiredEnv('NEXT_PUBLIC_PACKAGE_ID'),
+  treasuryCapId: requiredEnv('NEXT_PUBLIC_TREASURY_CAP_ID'),
+  stakingPoolId: requiredEnv('NEXT_PUBLIC_STAKING_POOL_ID'),
   
   // Admin & VIP
-  adminCapId: requiredEnv('NEXT_PUBLIC_ADMIN_CAP_ID') || "0xPLACEHOLDER",
-  vipRegistryId: requiredEnv('NEXT_PUBLIC_VIP_REGISTRY_ID') || "0xPLACEHOLDER",
+  adminCapId: requiredEnv('NEXT_PUBLIC_ADMIN_CAP_ID'),
+  vipRegistryId: requiredEnv('NEXT_PUBLIC_VIP_REGISTRY_ID'),
 
   // TKT Token
-  tktPackageId: requiredEnv('TKT_PACKAGE_ID') || "0xPLACEHOLDER",
+  tktPackageId: requiredEnv('NEXT_PUBLIC_TKT_PACKAGE_ID'),
 
   // DAO
-  daoPackageId: requiredEnv('NEXT_PUBLIC_DAO_PACKAGE_ID') || "0xPLACEHOLDER",
-  daoId: requiredEnv('NEXT_PUBLIC_DAO_ID') || "0xPLACEHOLDER",
-  daoTreasuryId: requiredEnv('NEXT_PUBLIC_DAO_TREASURY_ID') || "0xPLACEHOLDER",
+  daoPackageId: requiredEnv('NEXT_PUBLIC_DAO_PACKAGE_ID'),
+  daoId: requiredEnv('NEXT_PUBLIC_DAO_ID'),
+  daoTreasuryId: requiredEnv('NEXT_PUBLIC_DAO_TREASURY_ID'),
 };
