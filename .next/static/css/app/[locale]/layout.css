@@ -728,9 +728,6 @@ html {
 .ml-auto {
   margin-left: auto;
 }
-.mr-1 {
-  margin-right: 0.25rem;
-}
 .mr-2 {
   margin-right: 0.5rem;
 }
@@ -871,6 +868,9 @@ html {
 }
 .h-px {
   height: 1px;
+}
+.h-\[150px\] {
+  height: 150px;
 }
 .max-h-\[--radix-select-content-available-height\] {
   max-height: var(--radix-select-content-available-height);
@@ -1100,9 +1100,6 @@ html {
 .gap-1 {
   gap: 0.25rem;
 }
-.gap-12 {
-  gap: 3rem;
-}
 .gap-16 {
   gap: 4rem;
 }
@@ -1250,9 +1247,6 @@ html {
 .border-amber-500\/50 {
   border-color: rgb(245 158 11 / 0.5);
 }
-.border-border {
-  border-color: hsl(var(--border));
-}
 .border-destructive {
   border-color: hsl(var(--destructive));
 }
@@ -1310,9 +1304,6 @@ html {
 }
 .bg-destructive {
   background-color: hsl(var(--destructive));
-}
-.bg-green-500\/10 {
-  background-color: rgb(34 197 94 / 0.1);
 }
 .bg-green-500\/20 {
   background-color: rgb(34 197 94 / 0.2);
@@ -1465,13 +1456,13 @@ html {
   padding-top: 1.5rem;
   padding-bottom: 1.5rem;
 }
-.py-8 {
-  padding-top: 2rem;
-  padding-bottom: 2rem;
-}
 .py-7 {
   padding-top: 1.75rem;
   padding-bottom: 1.75rem;
+}
+.py-8 {
+  padding-top: 2rem;
+  padding-bottom: 2rem;
 }
 .pb-12 {
   padding-bottom: 3rem;
@@ -2176,6 +2167,9 @@ html {
   --tw-scale-y: 1;
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
 }
+.dark\:border-destructive:is(.dark *) {
+  border-color: hsl(var(--destructive));
+}
 .dark\:border-slate-700:is(.dark *) {
   --tw-border-opacity: 1;
   border-color: rgb(51 65 85 / var(--tw-border-opacity, 1));
@@ -2362,6 +2356,31 @@ html {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
+}
+.\[\&\>svg\+div\]\:translate-y-\[-3px\]>svg+div {
+  --tw-translate-y: -3px;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+.\[\&\>svg\]\:absolute>svg {
+  position: absolute;
+}
+.\[\&\>svg\]\:left-4>svg {
+  left: 1rem;
+}
+.\[\&\>svg\]\:top-4>svg {
+  top: 1rem;
+}
+.\[\&\>svg\]\:text-destructive>svg {
+  color: hsl(var(--destructive));
+}
+.\[\&\>svg\]\:text-foreground>svg {
+  color: hsl(var(--foreground));
+}
+.\[\&\>svg\~\*\]\:pl-7>svg~* {
+  padding-left: 1.75rem;
+}
+.\[\&_p\]\:leading-relaxed p {
+  line-height: 1.625;
 }
 .\[\&_svg\]\:pointer-events-none svg {
   pointer-events: none;

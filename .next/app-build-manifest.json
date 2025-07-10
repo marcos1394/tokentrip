@@ -6,15 +6,10 @@
       "static/css/app/[locale]/layout.css",
       "static/chunks/app/[locale]/layout.js"
     ],
-    "/[locale]/dashboard/page": [
+    "/[locale]/governance/create/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/[locale]/dashboard/page.js"
-    ],
-    "/[locale]/auctions/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/[locale]/auctions/page.js"
+      "static/chunks/app/[locale]/governance/create/page.js"
     ]
   }
 }
