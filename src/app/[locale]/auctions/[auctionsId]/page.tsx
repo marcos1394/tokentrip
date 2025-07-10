@@ -13,10 +13,11 @@ import { AnimatedBackground } from "@/components/animated-background";
 import { Button } from "@/components/ui/button";
 import { Toaster } from '@/components/ui/toaster';
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader, Gavel, User, Timer, CheckCircle, XCircle, Zap } from 'lucide-react';
+import { ArrowLeft, Loader, Gavel, User, Timer, CheckCircle, Info, Zap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Interfaces
 interface NftFields {
@@ -32,16 +33,17 @@ interface AuctionFields {
     is_settled: boolean;
 }
 
-// Componente de Cuenta Regresiva
+// Componente de Cuenta Regresiva (Traducido)
 function Countdown({ endTime }: { endTime: number }) {
     const [timeLeft, setTimeLeft] = useState(endTime - Date.now());
+
     useEffect(() => {
         if (timeLeft <= 0) return;
         const timer = setInterval(() => setTimeLeft(endTime - Date.now()), 1000);
         return () => clearInterval(timer);
     }, [endTime, timeLeft]);
 
-    if (timeLeft <= 0) return <span className="text-destructive font-bold">¡Finalizada!</span>;
+    if (timeLeft <= 0) return <span className="text-destructive font-bold">Ended!</span>;
 
     const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
     const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -55,7 +57,6 @@ export default function AuctionDetailPage() {
     const params = useParams();
     const router = useRouter();
     const auctionId = params.auctionId as string;
-    const locale = params.locale as string;
     
     const currentAccount = useCurrentAccount();
     const { toast } = useToast();
@@ -64,23 +65,21 @@ export default function AuctionDetailPage() {
     
     const [bidAmount, setBidAmount] = useState('');
 
-    const { mutate: executeBid, isPending: isBidPending } = useSignAndExecuteTransaction();
-    // --- NUEVO: Hook de transacción para la liquidación ---
-    const { mutate: executeSettle, isPending: isSettlePending } = useSignAndExecuteTransaction();
+    const { mutateAsync: executeBid, isPending: isBidPending } = useSignAndExecuteTransaction();
+    const { mutateAsync: executeSettle, isPending: isSettlePending } = useSignAndExecuteTransaction();
     
-    const { data: auctionData, isLoading, isError } = useSuiClientQuery(
-        'getObject', { id: auctionId, options: { showContent: true } }, { queryKey: ['auction', auctionId] }
-    );
+    const { data: auctionData, isLoading, isError } = useSuiClientQuery('getObject', { id: auctionId, options: { showContent: true } }, { queryKey: ['auction', auctionId], refetchInterval: 5000 }); // Refresca cada 5s
 
     const auction = auctionData?.data?.content?.dataType === 'moveObject' ? auctionData.data.content.fields as unknown as AuctionFields : null;
 
-    const handlePlaceBid = () => {
+    // --- Lógica de Transacciones Corregida ---
+    const handlePlaceBid = async () => {
         if (!currentAccount?.address || !auction) return;
         const currentHighestBid = BigInt(auction.highest_bid);
         const bidAmountInMist = BigInt(parseFloat(bidAmount) * 1_000_000_000);
 
         if (isNaN(Number(bidAmountInMist)) || bidAmountInMist <= currentHighestBid) {
-            toast({ variant: 'destructive', title: 'Puja inválida', description: `Tu puja debe ser mayor a ${(Number(currentHighestBid) / 1e9).toLocaleString()} SUI.`});
+            toast({ variant: 'destructive', title: 'Invalid bid', description: `Your bid must be higher than ${(Number(currentHighestBid) / 1e9).toLocaleString()} SUI.`});
             return;
         }
 
@@ -92,43 +91,36 @@ export default function AuctionDetailPage() {
             arguments: [ tx.object(auctionId), paymentCoin, tx.object("0x6") ],
         });
 
-        executeBid({ transaction: tx }, {
-            onSuccess: () => {
-                toast({ title: '✅ ¡Puja Realizada!', description: 'Eres el postor más alto.'});
-                setBidAmount('');
-                queryClient.invalidateQueries({ queryKey: ['auction', auctionId] });
-            },
-            onError: (error) => { toast({ variant: 'destructive', title: '❌ Error al Pujar', description: error.message }); }
-        });
+        try {
+            await executeBid({ transaction: tx });
+            toast({ title: '✅ Bid Placed!', description: "You are now the highest bidder."});
+            setBidAmount('');
+            queryClient.invalidateQueries({ queryKey: ['auction', auctionId] });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: '❌ Bid Failed', description: error.message });
+        }
     };
 
-    // --- NUEVO: Lógica para la transacción de Liquidación ---
-    const handleSettleAuction = () => {
+    const handleSettleAuction = async () => {
         if (!auction) return;
         const tx = new Transaction();
         tx.moveCall({
             target: `${suiConfig.packageId}::experience_nft::settle_auction`,
-            arguments: [
-                tx.object(auctionId),
-                tx.object(suiConfig.treasuryCapId),
-                tx.object("0x6") // Clock object
-            ]
+            arguments: [ tx.object(auctionId), tx.object(suiConfig.treasuryCapId), tx.object("0x6") ]
         });
 
-        executeSettle({ transaction: tx }, {
-            onSuccess: () => {
-                toast({ title: '✅ ¡Subasta Liquidada!', description: 'El NFT y los fondos han sido transferidos.' });
-                // Como el objeto Auction se destruye, es buena idea redirigir
-                setTimeout(() => router.push(`/${locale}/auctions`), 2500);
-            },
-            onError: (error) => {
-                toast({ variant: 'destructive', title: '❌ Error al Liquidar', description: error.message });
-            }
-        });
+        try {
+            await executeSettle({ transaction: tx });
+            toast({ title: '✅ Auction Settled!', description: 'The NFT and funds have been transferred.' });
+            setTimeout(() => router.push(`/auctions`), 2500);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: '❌ Settle Failed', description: error.message });
+        }
     }
 
-    if (isLoading) return <div className="min-h-screen flex items-center justify-center"><Loader className="animate-spin" /></div>;
-    if (isError || !auction) return <div className="min-h-screen flex items-center justify-center">Subasta no encontrada o ya liquidada.</div>;
+    // --- Renderizado y Lógica de UI ---
+    if (isLoading) return <div className="min-h-screen flex items-center justify-center"><Loader className="animate-spin h-10 w-10" /></div>;
+    if (isError || !auction) return <div className="min-h-screen flex items-center justify-center text-center p-4">Auction not found or it has been settled.</div>;
     
     const highestBidInSui = Number(auction.highest_bid) / 1_000_000_000;
     const isAuctionOver = new Date() >= new Date(Number(auction.end_timestamp_ms));
@@ -140,68 +132,96 @@ export default function AuctionDetailPage() {
             <div className="container mx-auto px-4 relative z-10">
                 <div className="mb-8">
                     <Button asChild variant="outline" className="glass-card">
-                        <Link href={`/${locale}/auctions`}><ArrowLeft className="w-4 h-4 mr-2" /> Volver a Subastas</Link>
+                        <Link href="/auctions"><ArrowLeft className="w-4 h-4 mr-2" /> Back to Auctions</Link>
                     </Button>
                 </div>
-                <div className="grid lg:grid-cols-5 gap-12">
-                    <div className="lg:col-span-3">
+                <div className="grid lg:grid-cols-5 gap-8 lg:gap-12">
+                    
+                    {/* Columna Izquierda: Imagen y Descripción */}
+                    <div className="lg:col-span-3 space-y-8">
                         <Card className="overflow-hidden shadow-2xl rounded-2xl">
                             <img src={auction.nft.fields.image_url.url} alt={auction.nft.fields.name} className="w-full h-auto object-cover aspect-video" />
                         </Card>
-                         <Card className="glass-card mt-8">
-                            <CardHeader><CardTitle className="text-foreground">Descripción</CardTitle></CardHeader>
-                            <CardContent><p className="text-foreground/80">{auction.nft.fields.description}</p></CardContent>
+                         <Card className="glass-card">
+                            <CardHeader><CardTitle className="text-foreground">Description</CardTitle></CardHeader>
+                            <CardContent><p className="text-foreground/80 whitespace-pre-wrap">{auction.nft.fields.description}</p></CardContent>
                         </Card>
                     </div>
+
+                    {/* Columna Derecha: Detalles y Acciones */}
                     <div className="lg:col-span-2 space-y-6">
                         <Card className="glass-card">
                             <CardHeader>
                                 <CardTitle className="text-3xl font-bold text-foreground">{auction.nft.fields.name}</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="p-4 border rounded-lg bg-background/50">
-                                    <Label className="text-sm text-muted-foreground">Puja Actual</Label>
-                                    <p className="text-4xl font-bold text-primary">{highestBidInSui.toLocaleString()} SUI</p>
+                                <div className="p-4 border rounded-lg bg-background/50 text-center">
+                                    <Label className="text-sm text-muted-foreground">CURRENT BID</Label>
+                                    <p className="text-4xl font-bold text-primary">{highestBidInSui.toLocaleString('en-US')} SUI</p>
                                 </div>
-                                <div className="p-4 border rounded-lg bg-background/50">
-                                    <Label className="text-sm text-muted-foreground">Termina en</Label>
+                                <div className="p-4 border rounded-lg bg-background/50 text-center">
+                                    <Label className="text-sm text-muted-foreground">AUCTION ENDS IN</Label>
                                     <p className="text-2xl font-bold text-foreground"><Countdown endTime={Number(auction.end_timestamp_ms)} /></p>
                                 </div>
-                                {auction.highest_bidder !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
-                                <div className="p-4 border rounded-lg bg-background/50">
-                                    <Label className="text-sm text-muted-foreground">Mejor Postor</Label>
-                                    <p className="font-mono text-xs text-foreground truncate">{auction.highest_bidder}</p>
-                                </div>
-                                )}
                             </CardContent>
                         </Card>
                         
-                        {!isAuctionOver && !auction.is_settled && (
-                            <Card className="glass-card border-primary/50">
-                                <CardHeader><CardTitle className="text-foreground">Realiza tu Puja</CardTitle></CardHeader>
-                                <CardContent className="space-y-4">
-                                    <Input type="number" placeholder={`> ${highestBidInSui.toLocaleString()} SUI`} value={bidAmount} onChange={(e) => setBidAmount(e.target.value)} />
-                                    <Button size="lg" className="w-full btn-sui" onClick={handlePlaceBid} disabled={!currentAccount || isBidPending}>
-                                        {isBidPending ? <Loader className="animate-spin w-5 h-5 mr-2" /> : <Gavel className="w-5 h-5 mr-2" />}
-                                        {currentAccount ? 'Realizar Puja' : 'Conecta tu billetera'}
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                        )}
-                        
-                        {isAuctionOver && (
-                             <Card className={`glass-card text-center p-6 transition-all ${canBeSettled ? 'border-amber-500/50' : (auction.is_settled ? 'border-green-500/30' : '')}`}>
-                                {auction.is_settled ? <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4"/> : <Timer className="w-12 h-12 mx-auto text-amber-500 mb-4"/>}
-                                <CardTitle className="text-foreground">{auction.is_settled ? "Subasta Liquidada" : "Subasta Finalizada"}</CardTitle>
-                                <CardDescription>{auction.is_settled ? "Los activos han sido transferidos." : "Esta subasta ya no acepta más pujas."}</CardDescription>
+                        {/* Pestañas para organizar Acciones y Detalles */}
+                        <Tabs defaultValue="action" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="action" disabled={isAuctionOver}>Bid</TabsTrigger>
+                                <TabsTrigger value="details">Details</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="action" className="mt-4">
+                                {!isAuctionOver && (
+                                    <Card className="glass-card border-primary/50">
+                                        <CardHeader><CardTitle className="text-foreground">Place Your Bid</CardTitle></CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <Input type="number" placeholder={`> ${highestBidInSui.toLocaleString('en-US')} SUI`} value={bidAmount} onChange={(e) => setBidAmount(e.target.value)} />
+                                            <Button size="lg" className="w-full btn-sui" onClick={handlePlaceBid} disabled={!currentAccount || isBidPending}>
+                                                {isBidPending ? <Loader className="animate-spin w-5 h-5 mr-2" /> : <Gavel className="w-5 h-5 mr-2" />}
+                                                {currentAccount ? 'Place Bid' : 'Connect Wallet to Bid'}
+                                            </Button>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                                {isAuctionOver && !auction.is_settled && (
+                                     <Card className="glass-card text-center p-6 border-amber-500/50">
+                                        <Timer className="w-12 h-12 mx-auto text-amber-500 mb-4"/>
+                                        <CardTitle className="text-foreground">Auction Has Ended</CardTitle>
+                                        <CardDescription>Bidding is now closed. This auction can be settled.</CardDescription>
+                                    </Card>
+                                )}
+                            </TabsContent>
+                            <TabsContent value="details" className="mt-4">
+                                 <Card className="glass-card">
+                                    <CardContent className="pt-6">
+                                    {auction.highest_bidder !== '0x0000000000000000000000000000000000000000000000000000000000000000' ? (
+                                        <div>
+                                            <Label className="text-sm text-muted-foreground">Highest Bidder</Label>
+                                            <p className="font-mono text-xs text-foreground break-all">{auction.highest_bidder}</p>
+                                        </div>
+                                    ) : (
+                                        <p className='text-muted-foreground text-sm'>No bids placed yet.</p>
+                                    )}
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        </Tabs>
+
+                        {auction.is_settled && (
+                            <Card className="glass-card text-center p-6 border-green-500/30">
+                                <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4"/>
+                                <CardTitle className="text-foreground">Auction Settled</CardTitle>
+                                <CardDescription>The assets have been transferred.</CardDescription>
                             </Card>
                         )}
 
                         {canBeSettled && (
                             <div className="pt-4">
-                                 <Button size="lg" className="w-full text-lg py-6 btn-sui" onClick={handleSettleAuction} disabled={isSettlePending || !currentAccount}>
+                                <Button size="lg" className="w-full text-lg py-6 btn-sui" onClick={handleSettleAuction} disabled={isSettlePending || !currentAccount}>
                                     <Zap className="w-5 h-5 mr-2" />
-                                    {isSettlePending ? "Liquidando..." : "Liquidar Subasta"}
+                                    {isSettlePending ? "Settling..." : "Settle Auction"}
                                 </Button>
                             </div>
                         )}

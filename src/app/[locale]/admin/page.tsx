@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
-import { suiConfig } from '@/config/sui'; // Ahora importa la config actualizada
+import { suiConfig } from '@/config/sui';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -17,28 +17,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 
 export default function AdminPage() {
-    const params = useParams();
     const currentAccount = useCurrentAccount();
     const { toast } = useToast();
-    const locale = params.locale as string;
-
+    
     const [providerAddress, setProviderAddress] = useState('');
-    const { mutate: executeTx, isPending } = useSignAndExecuteTransaction();
+    // Renombrado a mutateAsync para claridad con async/await
+    const { mutateAsync: executeTx, isPending } = useSignAndExecuteTransaction();
 
     const handleVipAction = async (action: 'add' | 'remove') => {
         if (!currentAccount || currentAccount.address !== process.env.NEXT_PUBLIC_ADMIN_ADDRESS) {
-            toast({ variant: 'destructive', title: 'Acción no autorizada' });
+            toast({ variant: 'destructive', title: 'Unauthorized Action' });
             return;
         }
         if (!providerAddress.trim()) {
-            toast({ variant: 'destructive', title: 'Dirección requerida' });
+            toast({ variant: 'destructive', title: 'Address Required' });
             return;
         }
 
         const tx = new Transaction();
         const functionName = action === 'add' ? 'add_vip' : 'remove_vip';
 
-        // CORRECCIÓN: Ahora lee los IDs desde el objeto suiConfig actualizado
         tx.moveCall({
             target: `${suiConfig.packageId}::experience_nft::${functionName}`,
             arguments: [
@@ -49,57 +47,48 @@ export default function AdminPage() {
         });
 
         try {
-  // 1. Llama a la función con 'await'.
-  //    El código se pausará aquí hasta que la transacción termine.
-  await executeTx({
-    transaction: tx,
-  });
+            await executeTx({
+                transaction: tx,
+            });
 
-  // 2. Si 'await' NO falla, la transacción fue un ÉXITO.
-  //    El código de 'onSuccess' va aquí.
-  toast({
-    title: "✅ ¡Éxito!",
-    description: `Proveedor ${
-      action === "add" ? "añadido a" : "eliminado de"
-    } la lista VIP.`,
-  });
-  setProviderAddress("");
+            toast({
+                title: "✅ Success!",
+                description: `Provider has been successfully ${action === "add" ? "added to" : "removed from"} the VIP list.`,
+            });
+            setProviderAddress("");
 
-} catch (error: any) {
-  // 3. Si 'await' falla, se captura el ERROR aquí.
-  //    El código de 'onError' va aquí.
-  toast({
-    variant: "destructive",
-    title: "❌ Error en la operación",
-    description: error?.message || "Ocurrió un error desconocido.",
-  })};// La llamada a executeTx ahora recibe un solo objeto.
-    
-
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "❌ Operation Failed",
+                description: error?.message || "An unknown error occurred.",
+            });
+        }
     };
 
-    // Renderizado del JSX (sin cambios)
+    // Renderizado del JSX con textos en inglés
     return (
         <div className="min-h-screen pt-24 pb-12 bg-background">
             <AnimatedBackground />
             <div className="container mx-auto px-4 relative z-10">
                 <div className="mb-8">
                     <Button asChild variant="outline" className="glass-card">
-                        <Link href={`/${locale}`}>
-                            <ArrowLeft className="w-4 h-4 mr-2" /> Volver al Inicio
+                        <Link href="/">
+                            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Home
                         </Link>
                     </Button>
                 </div>
                 
                 <div className="max-w-2xl mx-auto">
                     <div className="text-center mb-8">
-                        <h1 className="text-4xl font-bold heading-gradient text-balance">Panel de Administración VIP</h1>
-                        <p className="text-muted-foreground mt-2">Gestiona la lista de proveedores con comisiones reducidas.</p>
+                        <h1 className="text-4xl font-bold heading-gradient text-balance">VIP Admin Panel</h1>
+                        <p className="text-muted-foreground mt-2">Manage the list of providers with reduced platform fees.</p>
                     </div>
 
                     <Card className="glass-card">
                         <CardHeader>
-                            <CardTitle className="text-foreground">Gestionar Proveedor</CardTitle>
-                            <CardDescription>Introduce la dirección de la billetera del proveedor para añadirlo o quitarlo de la lista VIP.</CardDescription>
+                            <CardTitle className="text-foreground">Manage Provider</CardTitle>
+                            <CardDescription>Enter the provider's wallet address to add or remove them from the VIP list.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <Input 
@@ -112,21 +101,21 @@ export default function AdminPage() {
                             <div className="flex gap-4">
                                 <Button className="w-full btn-sui" onClick={() => handleVipAction('add')} disabled={isPending}>
                                     {isPending ? <Loader className="animate-spin w-5 h-5"/> : <UserPlus className="w-5 h-5" />}
-                                    <span className="ml-2">Añadir a VIP</span>
+                                    <span className="ml-2">Add to VIP</span>
                                 </Button>
                                 <Button variant="destructive" className="w-full" onClick={() => handleVipAction('remove')} disabled={isPending}>
-                                     {isPending ? <Loader className="animate-spin w-5 h-5"/> : <UserX className="w-5 h-5" />}
-                                    <span className="ml-2">Quitar de VIP</span>
+                                    {isPending ? <Loader className="animate-spin w-5 h-5"/> : <UserX className="w-5 h-5" />}
+                                    <span className="ml-2">Remove from VIP</span>
                                 </Button>
                             </div>
                         </CardContent>
                     </Card>
                     
                     <div className="mt-8">
-                         <h3 className="text-2xl font-bold text-foreground mb-4">Lista de VIPs Actuales</h3>
+                         <h3 className="text-2xl font-bold text-foreground mb-4">Current VIP List</h3>
                          <div className="p-8 text-center border-2 border-dashed rounded-lg text-muted-foreground">
-                            <ShieldCheck className="mx-auto w-10 h-10 mb-2"/>
-                            Próximamente: Aquí podrás ver la lista completa.
+                             <ShieldCheck className="mx-auto w-10 h-10 mb-2"/>
+                             Coming Soon: The full list will be displayed here.
                          </div>
                     </div>
                 </div>

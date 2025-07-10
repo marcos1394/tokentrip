@@ -1,47 +1,55 @@
+// app/[locale]/governance/create/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { suiConfig } from '@/config/sui';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 // Componentes
 import { AnimatedBackground } from "@/components/animated-background";
 import { Button } from "@/components/ui/button";
 import { Toaster } from '@/components/ui/toaster';
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Lightbulb, Loader } from 'lucide-react';
+import { ArrowLeft, Lightbulb, Loader, Info } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const SUI_SYSTEM_CLOCK_OBJECT_ID = "0x6";
+const isValidSuiAddress = (address: string) => /^0x[a-fA-F0-9]{64}$/.test(address);
 
 export default function CreateProposalPage() {
-    const params = useParams();
     const router = useRouter();
     const { toast } = useToast();
     const currentAccount = useCurrentAccount();
-    const locale = params.locale as string;
 
-    // Estado para el formulario
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [recipient, setRecipient] = useState('');
     const [amount, setAmount] = useState('');
 
-    const { mutate: signAndExecuteTransaction, isPending } = useSignAndExecuteTransaction();
+    const { mutateAsync: signAndExecuteTransaction, isPending } = useSignAndExecuteTransaction();
 
-    const handleCreateProposal = () => {
+    // Validación en tiempo real del formulario
+    const isFormInvalid = useMemo(() => {
+        const isAmountValid = amount.trim() !== '' && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0;
+        const isRecipientValid = recipient.trim() !== '' && isValidSuiAddress(recipient);
+        return !title.trim() || !description.trim() || !isAmountValid || !isRecipientValid;
+    }, [title, description, recipient, amount]);
+
+    // Lógica de transacción corregida y mejorada
+    const handleCreateProposal = async () => {
         if (!currentAccount) {
-            toast({ variant: 'destructive', title: 'Billetera no conectada' });
+            toast({ variant: 'destructive', title: 'Wallet not connected' });
             return;
         }
-        if (!title.trim() || !description.trim() || !recipient.trim() || !amount.trim()) {
-            toast({ variant: 'destructive', title: 'Formulario incompleto' });
+        if (isFormInvalid) {
+            toast({ variant: 'destructive', title: 'Incomplete or Invalid Form', description: 'Please fill out all fields correctly.' });
             return;
         }
         
@@ -60,16 +68,13 @@ export default function CreateProposalPage() {
             ],
         });
 
-        signAndExecuteTransaction({ transaction: tx }, {
-            onSuccess: (result) => {
-                toast({ title: '✅ ¡Propuesta Creada!', description: 'Tu propuesta ha sido publicada en la blockchain.' });
-                // Podríamos redirigir a la lista de propuestas o a la página de la nueva propuesta
-                router.push(`/${locale}/governance`); 
-            },
-            onError: (error) => {
-                toast({ variant: "destructive", title: '❌ Error al Crear Propuesta', description: error.message });
-            }
-        });
+        try {
+            await signAndExecuteTransaction({ transaction: tx });
+            toast({ title: '✅ Proposal Created!', description: 'Your proposal has been published on-chain for voting.' });
+            router.push(`/governance`); 
+        } catch (error: any) {
+            toast({ variant: "destructive", title: '❌ Failed to Create Proposal', description: error.message });
+        }
     };
     
     return (
@@ -78,49 +83,58 @@ export default function CreateProposalPage() {
             <div className="container mx-auto px-4 relative z-10">
                 <div className="mb-8">
                     <Button asChild variant="outline" className="glass-card">
-                        {/* Este enlace debería llevar a la futura página principal de gobernanza */}
-                        <Link href={`/${locale}/governance`}>
-                            <ArrowLeft className="w-4 h-4 mr-2" /> Volver a Gobernanza
+                        <Link href="/governance">
+                            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Governance
                         </Link>
                     </Button>
                 </div>
                 
                 <div className="max-w-3xl mx-auto">
                     <div className="text-center mb-8">
-                        <h1 className="text-4xl font-bold heading-gradient text-balance">Crear Nueva Propuesta</h1>
-                        <p className="text-muted-foreground mt-2">Inicia una votación para la comunidad de TokenTrip.</p>
+                        <h1 className="text-4xl font-bold heading-gradient text-balance">Create New Proposal</h1>
+                        <p className="text-muted-foreground mt-2">Start a new vote for the TokenTrip community.</p>
                     </div>
+
+                    <Alert className="mb-6 glass-card">
+                        <Info className="h-4 w-4" />
+                        <AlertTitle>Proposal Requirements</AlertTitle>
+                        <AlertDescription>
+                            A minimum of <strong>10,000 TKT</strong> is required in your wallet to submit a proposal. This is to prevent spam and is not consumed.
+                        </AlertDescription>
+                    </Alert>
 
                     <Card className="glass-card">
                         <CardHeader>
-                            <CardTitle className="text-2xl text-foreground">Detalles de la Propuesta</CardTitle>
-                            <CardDescription>Describe tu idea claramente. Una vez creada, no podrá ser modificada.</CardDescription>
+                            <CardTitle className="text-2xl text-foreground">Proposal Details</CardTitle>
+                            <CardDescription>Describe your idea clearly. Once created, it cannot be modified.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="space-y-2">
-                                <Label htmlFor="title" className="text-muted-foreground">Título</Label>
-                                <Input id="title" placeholder="Ej: Financiar campaña de marketing en Asia" value={title} onChange={(e) => setTitle(e.target.value)} disabled={isPending} />
+                                <Label htmlFor="title" className="text-muted-foreground">Title</Label>
+                                <Input id="title" placeholder="e.g., Fund marketing campaign in Asia" value={title} onChange={(e) => setTitle(e.target.value)} disabled={isPending} />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="description" className="text-muted-foreground">Descripción</Label>
-                                <Textarea id="description" placeholder="Explica el objetivo, los beneficios y los costos de tu propuesta..." value={description} onChange={(e) => setDescription(e.target.value)} disabled={isPending} rows={6} />
+                                <Label htmlFor="description" className="text-muted-foreground">Description</Label>
+                                <Textarea id="description" placeholder="Explain the objective, benefits, and costs of your proposal..." value={description} onChange={(e) => setDescription(e.target.value)} disabled={isPending} rows={6} />
                             </div>
                             
                             <div className="border-t pt-6 space-y-6">
-                                <h3 className="text-lg font-semibold text-foreground">Acción Propuesta: Transferencia de Fondos</h3>
-                                <div className="space-y-2">
-                                    <Label htmlFor="recipient" className="text-muted-foreground">Dirección del Destinatario</Label>
-                                    <Input id="recipient" placeholder="0x..." value={recipient} onChange={(e) => setRecipient(e.target.value)} disabled={isPending} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="amount" className="text-muted-foreground">Monto de TKT a Transferir</Label>
-                                    <Input id="amount" type="number" placeholder="Ej: 50000" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={isPending} />
+                                <h3 className="text-lg font-semibold text-foreground">Proposed Action: Fund Transfer</h3>
+                                <div className="grid sm:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="recipient" className="text-muted-foreground">Recipient Address</Label>
+                                        <Input id="recipient" placeholder="0x..." value={recipient} onChange={(e) => setRecipient(e.target.value)} disabled={isPending} className={`${recipient && !isValidSuiAddress(recipient) ? 'border-destructive' : ''}`}/>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="amount" className="text-muted-foreground">TKT Amount to Transfer</Label>
+                                        <Input id="amount" type="number" placeholder="e.g., 50000" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={isPending} />
+                                    </div>
                                 </div>
                             </div>
 
-                            <Button size="lg" className="w-full text-lg py-6 btn-sui" onClick={handleCreateProposal} disabled={isPending || !currentAccount}>
+                            <Button size="lg" className="w-full text-lg py-6 btn-sui" onClick={handleCreateProposal} disabled={isPending || !currentAccount || isFormInvalid}>
                                 {isPending ? <Loader className="animate-spin w-5 h-5 mr-2" /> : <Lightbulb className="w-5 h-5 mr-2" />}
-                                {isPending ? "Publicando..." : "Enviar Propuesta a Votación"}
+                                {isPending ? "Submitting..." : "Submit Proposal for Voting"}
                             </Button>
                         </CardContent>
                     </Card>

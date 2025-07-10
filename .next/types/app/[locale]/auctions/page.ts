@@ -1,8 +1,8 @@
-// File: /workspaces/tokentrip/src/app/[locale]/page.tsx
-import * as entry from '../../../../src/app/[locale]/page.js'
+// File: /workspaces/tokentrip/src/app/[locale]/auctions/page.tsx
+import * as entry from '../../../../../src/app/[locale]/auctions/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
-type TEntry = typeof import('../../../../src/app/[locale]/page.js')
+type TEntry = typeof import('../../../../../src/app/[locale]/auctions/page.js')
 
 type SegmentParams<T extends Object = any> = T extends Record<string, any>
   ? { [K in keyof T]: T[K] extends string ? string | string[] | undefined : never }
