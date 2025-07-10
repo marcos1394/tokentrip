@@ -1,5 +1,5 @@
-'use client';
-
+// Se ha eliminado 'use client' porque este componente no tiene interactividad propia.
+// Ahora es un Componente de Servidor más rápido que solo muestra los datos que recibe.
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Wallet } from 'lucide-react';
@@ -16,10 +16,10 @@ export function WalletBalanceCard({
   tokenSymbol,
 }: WalletBalanceCardProps) {
   return (
-    <Card className="glass-card">
+    <Card className="glass-card card-hover">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
-          Balance en tu Billetera
+          Your Wallet Balance
         </CardTitle>
         <Wallet className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
@@ -27,19 +27,18 @@ export function WalletBalanceCard({
         {isLoading ? (
           <>
             <Skeleton className="h-8 w-3/4" />
-            <Skeleton className="mt-1 h-4 w-1/2" />
+            <Skeleton className="mt-2 h-4 w-1/2" />
           </>
         ) : (
           <>
             <div className="text-3xl font-bold text-foreground">
-              {/* Formatea el número para incluir comas como separadores de miles */}
-              {balance.toLocaleString('es-MX', {
+              {balance.toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
             </div>
             <p className="text-xs text-muted-foreground">
-              Total de {tokenSymbol} disponibles para usar.
+              Total {tokenSymbol} available in your wallet.
             </p>
           </>
         )}
