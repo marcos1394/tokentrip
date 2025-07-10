@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { ArrowRightLeft, Loader2 } from 'lucide-react';
-import { useToast } from "@/components/ui/use-toast" // Asumiendo que usas shadcn/ui toast
+import { useToast } from "@/hooks/use-toast";
 
 interface TransferNftModalProps {
     objectId: string; // El ID del NFT a transferir
