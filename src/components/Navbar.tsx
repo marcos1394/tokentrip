@@ -1,38 +1,94 @@
-// src/components/Navbar.tsx
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { Plane } from "lucide-react";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { usePathname } from 'next/navigation';
+import { useState } from 'react';
+import { Plane, Menu, X } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { ConnectButton } from '@mysten/dapp-kit';
+import { Button } from './ui/button';
 
 export function Navbar() {
-  const params = useParams();
-  const locale = params.locale as string;
+  const pathname = usePathname();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const navLinks = [
+    { href: '/#explore', label: 'Explore' },
+    { href: '/staking', label: 'Staking' },
+    { href: '/auctions', label: 'Auctions' },
+    { href: '/governance', label: 'DAO' },
+  ];
 
   return (
-    <nav className="fixed top-0 w-full z-50 glass-effect border-b">
-      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-        <Link href={`/${locale}`} className="flex items-center space-x-3">
-          <div className="w-9 h-9 sui-gradient rounded-lg flex items-center justify-center shadow-lg shadow-primary/30">
-            <Plane className="w-5 h-5 text-white" />
+    <>
+      <nav className="fixed top-0 w-full z-50 glass-effect border-b border-white/10">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          {/* Logo */}
+          <Link href="/" className="flex items-center space-x-3">
+            <div className="w-9 h-9 sui-gradient rounded-lg flex items-center justify-center shadow-lg shadow-primary/30">
+              <Plane className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-2xl font-bold heading-gradient">
+              TokenTrip
+            </span>
+          </Link>
+
+          {/* Navegación para Escritorio */}
+          <div className="hidden md:flex items-center space-x-8">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`text-sm font-medium transition-colors ${
+                  pathname === link.href
+                    ? 'text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
           </div>
-          <span className="text-2xl font-bold heading-gradient">
-            TokenTrip
-          </span>
-        </Link>
-        <div className="hidden md:flex items-center space-x-8">
-          <Link href={`/${locale}#explorar`} className="text-muted-foreground hover:text-foreground transition-colors">Explorar</Link>
-          <Link href={`/${locale}/staking`} className="text-muted-foreground hover:text-foreground transition-colors">Staking</Link>
-          <Link href={`/${locale}/auctions`} className="text-muted-foreground hover:text-foreground transition-colors">Subastas</Link>
-          <Link href={`/${locale}/governance`} className="text-muted-foreground hover:text-foreground transition-colors">DAO</Link>
+
+          {/* Acciones y Menú Móvil */}
+          <div className="flex items-center space-x-2">
+            <div className="hidden sm:block">
+              <ConnectButton />
+            </div>
+            <ThemeToggle />
+            <div className="md:hidden">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+              >
+                {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <ThemeToggle />
-          <ConnectButton />
+      </nav>
+
+      {/* Menú Overlay para Móvil */}
+      {isMenuOpen && (
+        <div className="md:hidden fixed inset-0 top-[61px] z-40 bg-background/95 backdrop-blur-lg">
+           <div className="sm:hidden p-4 border-b border-white/10">
+              <ConnectButton connectText="Connect Wallet" />
+            </div>
+          <div className="container mx-auto px-4 py-8 flex flex-col space-y-6">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-xl font-semibold text-foreground hover:text-primary transition-colors"
+                onClick={() => setIsMenuOpen(false)} // Cierra el menú al hacer clic
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
-    </nav>
+      )}
+    </>
   );
 }

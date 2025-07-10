@@ -34,8 +34,10 @@
     "next-themes": "^0.3.0",
     "path": "^0.12.7",
     "react": "^18.3.1",
+    "react-countup": "^6.5.3",
     "react-dom": "^18.3.1",
     "react-i18next": "^15.5.3",
+    "react-simple-typewriter": "^5.0.1",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
     "ts-node": "^10.9.2"
