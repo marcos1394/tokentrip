@@ -1,3 +1,4 @@
+// app/[locale]/staking/page.tsx
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -6,11 +7,8 @@ import { useCurrentAccount, useSuiClient, useSuiClientQuery, useSignAndExecuteTr
 import { Transaction } from '@mysten/sui/transactions';
 import { suiConfig } from '@/config/sui';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { SuiObjectResponse } from '@mysten/sui/client';
 
-
-// Componentes de UI y de página
+// Componentes
 import { AnimatedBackground } from "@/components/animated-background";
 import { Button } from "@/components/ui/button";
 import { Toaster } from '@/components/ui/toaster';
@@ -21,147 +19,124 @@ import { PoolStatsCard } from '@/components/staking/PoolStatsCard';
 import { WalletBalanceCard } from '@/components/staking/WalletBalancedCard';
 import { StakeFormCard } from '@/components/staking/StakeFormCard';
 import { UserReceiptsCard } from '@/components/staking/UserReceiptsCard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Interfaces
+
+// --- Interfaces Completas ---
 interface StakingPoolFields { 
     id: { id: string }; 
-    total_staked: string; 
+    total_staked: string;
+    // ... otros campos como rewards_per_second, etc.
 }
-interface StakeReceiptFields { 
-    id: { id: string }; 
-    amount_staked: string; 
+interface StakeReceipt { 
+    id: { id: string };
+    objectId: string; 
+    amount_staked: string;
+    // ... otros campos como last_claim_timestamp, etc.
 }
 
-const APY = 0.08; // 8%
+const APY = 8.5; // APY de ejemplo
 
 export default function StakingPage() {
     const currentAccount = useCurrentAccount();
     const { toast } = useToast();
     const [stakeAmount, setStakeAmount] = useState('');
-    const params = useParams();
-    const locale = params.locale as string;
     const queryClient = useQueryClient();
     const suiClient = useSuiClient();
 
-    // --- LÓGICA DE DATOS Y TRANSACCIONES ---
     const TKT_COIN_TYPE = `${suiConfig.tktPackageId}::tkt::TKT`;
     
-    // Query para el balance de TKT del usuario
-    const { data: tktBalanceData, isLoading: isLoadingBalance } = useSuiClientQuery(
-        'getBalance',
-        {
-            owner: currentAccount?.address!,
-            coinType: TKT_COIN_TYPE,
-        },
-        { 
-            enabled: !!currentAccount, 
-            queryKey: ['tkt-balance', currentAccount?.address] 
-        }
-    );
-    
-    // Query para el Staking Pool
-    const { data: poolData, isLoading: isLoadingPool } = useSuiClientQuery(
-        'getObject', 
-        { id: suiConfig.stakingPoolId, options: { showContent: true } }, 
-        { queryKey: ['staking-pool'] }
-    );
-    
-    // Query para los recibos de staking del usuario
-    const { data: receiptsData, isLoading: isLoadingReceipts } = useSuiClientQuery(
-        'getOwnedObjects',
-        { 
-            owner: currentAccount?.address!, 
-            filter: { StructType: `${suiConfig.packageId}::experience_nft::StakeReceipt` }, 
-            options: { showContent: true }
-        },
-        { enabled: !!currentAccount, queryKey: ['stake-receipts', currentAccount?.address] }
-    );
-  
-    const { mutate: executeStake, isPending: isStakePending } = useSignAndExecuteTransaction();
-    const { mutate: executeClaim, isPending: isClaimPending } = useSignAndExecuteTransaction();
+    // --- Lógica de Datos ---
+    const { data: tktBalanceData, isLoading: isLoadingBalance, refetch: refetchTktBalance } = useSuiClientQuery('getBalance', { owner: currentAccount?.address!, coinType: TKT_COIN_TYPE }, { enabled: !!currentAccount });
+    const { data: poolData, isLoading: isLoadingPool, refetch: refetchPoolData } = useSuiClientQuery('getObject', { id: suiConfig.stakingPoolId, options: { showContent: true } }, { queryKey: ['staking-pool'] });
+    const { data: receiptsData, isLoading: isLoadingReceipts, refetch: refetchReceipts } = useSuiClientQuery('getOwnedObjects', { owner: currentAccount?.address!, filter: { StructType: `${suiConfig.packageId}::staking::StakeReceipt` }, options: { showContent: true } }, { enabled: !!currentAccount });
+ 
+    const { mutateAsync: executeTx, isPending } = useSignAndExecuteTransaction();
+
+    // --- Lógica de Transacciones Corregida y Completa ---
+    const invalidateAllQueries = () => {
+        queryClient.invalidateQueries({ queryKey: ['staking-pool'] });
+        queryClient.invalidateQueries({ queryKey: ['stake-receipts', currentAccount?.address] });
+        refetchTktBalance(); // Usamos el refetch específico para el balance
+    };
 
     const handleStake = async () => {
-        if (!currentAccount?.address) {
-            toast({ variant: "destructive", title: "Billetera no conectada" });
-            return;
-        }
+        if (!currentAccount?.address) return toast({ variant: "destructive", title: "Wallet not connected" });
         const amount = parseFloat(stakeAmount);
-        if (!amount || amount <= 0) {
-            toast({ variant: "destructive", title: "Monto inválido" });
-            return;
-        }
+        if (isNaN(amount) || amount <= 0) return toast({ variant: "destructive", title: "Invalid Amount" });
 
         const tx = new Transaction();
         const amountInMist = BigInt(amount * (10 ** 9));
+        
+        const { data: userTktCoins } = await suiClient.getCoins({ owner: currentAccount.address, coinType: TKT_COIN_TYPE });
+        const totalBalance = userTktCoins.reduce((acc, coin) => acc + BigInt(coin.balance), 0n);
 
-        const { data: userTktCoins } = await suiClient.getCoins({
-            owner: currentAccount.address,
-            coinType: TKT_COIN_TYPE,
-        });
-
-        if (userTktCoins.length === 0) {
-            toast({ variant: "destructive", title: "No tienes TKT para hacer stake." });
-            return;
+        if (totalBalance < amountInMist) {
+            return toast({ variant: "destructive", title: "Insufficient TKT balance" });
         }
 
         const [mainCoin, ...otherCoins] = userTktCoins;
         const mainCoinObject = tx.object(mainCoin.coinObjectId);
         if (otherCoins.length > 0) {
-            tx.mergeCoins(mainCoinObject, otherCoins.map(c => c.coinObjectId));
+            tx.mergeCoins(mainCoinObject, otherCoins.map(c => tx.object(c.coinObjectId)));
         }
         
         const [coinToStake] = tx.splitCoins(mainCoinObject, [tx.pure.u64(amountInMist)]);
         
         tx.moveCall({
-            target: `${suiConfig.packageId}::experience_nft::stake`,
+            target: `${suiConfig.packageId}::staking::stake`,
             arguments: [ tx.object(suiConfig.stakingPoolId), coinToStake ],
             typeArguments: [TKT_COIN_TYPE],
         });
 
-        executeStake({ transaction: tx }, {
-            onSuccess: () => {
-                toast({ title: "✅ Stake exitoso", description: `Has depositado ${amount} TKT.` });
-                setStakeAmount('');
-                queryClient.invalidateQueries({ queryKey: ['staking-pool'] });
-                queryClient.invalidateQueries({ queryKey: ['stake-receipts', currentAccount?.address] });
-                queryClient.invalidateQueries({ queryKey: ['tkt-balance', currentAccount?.address] });
-            },
-            onError: (error) => {
-                toast({ variant: "destructive", title: "❌ Error en el Stake", description: error.message });
-            }
-        });
+        try {
+            await executeTx({ transaction: tx });
+            toast({ title: "✅ Stake Successful", description: `You have staked ${amount} TKT.` });
+            setStakeAmount('');
+            invalidateAllQueries();
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "❌ Stake Failed", description: error.message });
+        }
     };
 
-    const handleClaim = (receiptId: string) => {
+    const handleClaimOrUnstake = async (receiptId: string, action: 'claim' | 'unstake') => {
         const tx = new Transaction();
+        const functionName = action === 'claim' ? 'claim_rewards' : 'unstake';
+        
         tx.moveCall({
-            target: `${suiConfig.packageId}::experience_nft::claim_rewards`,
+            target: `${suiConfig.packageId}::staking::${functionName}`,
             arguments: [ tx.object(suiConfig.stakingPoolId), tx.object(receiptId) ],
+            typeArguments: [TKT_COIN_TYPE],
         });
-        executeClaim({ transaction: tx }, {
-            onSuccess: () => {
-                toast({ title: "✅ ¡Recompensa Reclamada!", description: "Los SUI han sido añadidos a tu billetera."});
-                queryClient.invalidateQueries({ queryKey: ['staking-pool'] });
-                queryClient.invalidateQueries({ queryKey: ['stake-receipts', currentAccount?.address] });
-                // También invalidamos el balance de SUI, que es un query diferente.
-                queryClient.invalidateQueries({ queryKey: ['get-balance', currentAccount?.address, '0x2::sui::SUI'] }); 
-            },
-            onError: (error) => {
-                toast({ variant: "destructive", title: "❌ Error al Reclamar", description: error.message });
-            }
-        });
-    };
 
-    const userTktBalance = useMemo(() => tktBalanceData ? Number(tktBalanceData.totalBalance) / (10 ** 9) : 0, [tktBalanceData]);
-    const stakeAmountNumber = useMemo(() => parseFloat(stakeAmount) || 0, [stakeAmount]);
-    const balanceAfterStake = useMemo(() => userTktBalance - stakeAmountNumber, [userTktBalance, stakeAmountNumber]);
-    const estimatedReturns = useMemo(() => stakeAmountNumber * APY, [stakeAmountNumber]);
-    const poolFields = poolData?.data?.content?.dataType === 'moveObject' ? poolData.data.content.fields as unknown as StakingPoolFields : null;
-    const totalStakedInTkt = poolFields ? Number(poolFields.total_staked) / (10 ** 9) : 0;
+        try {
+            await executeTx({ transaction: tx });
+            toast({ title: `✅ ${action === 'claim' ? 'Rewards Claimed' : 'Unstake Successful'}!` });
+            invalidateAllQueries();
+        } catch (error: any) {
+            toast({ variant: "destructive", title: `❌ ${action === 'claim' ? 'Claim Failed' : 'Unstake Failed'}`, description: error.message });
+        }
+    };
     
-    const userReceipts = receiptsData?.data
-        ?.map(receipt => receipt.data?.content?.dataType === 'moveObject' ? receipt.data.content.fields as unknown as StakeReceiptFields : null)
-        .filter((receipt): receipt is StakeReceiptFields => receipt !== null) ?? [];
+    // --- Cálculos de UI con BigInt ---
+    const userTktBalance = useMemo(() => tktBalanceData ? BigInt(tktBalanceData.totalBalance) : 0n, [tktBalanceData]);
+    const stakeAmountBigInt = useMemo(() => stakeAmount ? BigInt(parseFloat(stakeAmount) * (10 ** 9)) : 0n, [stakeAmount]);
+    const balanceAfterStake = useMemo(() => (userTktBalance - stakeAmountBigInt) >= 0n ? (userTktBalance - stakeAmountBigInt) : 0n, [userTktBalance, stakeAmountBigInt]);
+    const estimatedReturns = useMemo(() => (Number(stakeAmountBigInt) / 1e9) * APY, [stakeAmountBigInt]);
+    
+    const poolFields = poolData?.data?.content?.dataType === 'moveObject' ? poolData.data.content.fields as unknown as StakingPoolFields : null;
+    const totalStakedInTkt = poolFields ? BigInt(poolFields.total_staked) : 0n;
+    
+    const userReceipts: StakeReceipt[] = useMemo(() => 
+        receiptsData?.data
+            ?.map(receipt => {
+                if (receipt.data?.content?.dataType !== 'moveObject') return null;
+                const fields = receipt.data.content.fields as unknown as StakeReceipt;
+                return { ...fields, objectId: receipt.data.objectId };
+            })
+            .filter((receipt): receipt is StakeReceipt => receipt !== null) ?? [],
+        [receiptsData]
+    );
 
     return (
         <div className="min-h-screen pt-24 pb-12 bg-background">
@@ -169,37 +144,48 @@ export default function StakingPage() {
             <div className="container mx-auto px-4 relative z-10">
                 <div className="mb-8">
                     <Button asChild variant="outline" className="glass-card">
-                        <Link href={`/${locale}`}>
+                        <Link href="/">
                             <ArrowLeft className="w-4 h-4 mr-2" />
-                            Volver al Inicio
+                            Back to Home
                         </Link>
                     </Button>
                 </div>
                 <StakingHeader />
                 <div className="grid lg:grid-cols-3 gap-8 mt-12">
                     <div className="lg:col-span-1 space-y-8">
-                        <PoolStatsCard totalStaked={totalStakedInTkt} apy={APY} isLoading={isLoadingPool} tokenSymbol="TKT" />
-                        <WalletBalanceCard balance={userTktBalance} isLoading={isLoadingBalance} tokenSymbol="TKT" />
+                        <PoolStatsCard totalStaked={Number(totalStakedInTkt) / 1e9} apy={APY} isLoading={isLoadingPool} tokenSymbol="TKT" />
+                        <WalletBalanceCard balance={Number(userTktBalance) / 1e9} isLoading={isLoadingBalance} tokenSymbol="TKT" />
                     </div>
                     <div className="lg:col-span-2 space-y-8">
-                        <StakeFormCard 
-                            stakeAmount={stakeAmount}
-                            setStakeAmount={setStakeAmount}
-                            handleStake={handleStake}
-                            isStakePending={isStakePending}
-                            isWalletConnected={!!currentAccount}
-                            userSuiBalance={userTktBalance}
-                            balanceAfterStake={balanceAfterStake}
-                            estimatedReturns={estimatedReturns}
-                            tokenSymbol="TKT"
-                        />
-                        <UserReceiptsCard 
-                            receipts={userReceipts}
-                            isLoading={isLoadingReceipts}
-                            onClaim={handleClaim}
-                            isClaimPending={isClaimPending}
-                            tokenSymbol="TKT"
-                        />
+                        <Tabs defaultValue="stake" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="stake">Stake TKT</TabsTrigger>
+                                <TabsTrigger value="manage">Manage Stakes</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="stake" className="mt-6">
+                                <StakeFormCard 
+                                    stakeAmount={stakeAmount}
+                                    setStakeAmount={setStakeAmount}
+                                    handleStake={handleStake}
+                                    isStakePending={isPending}
+                                    isWalletConnected={!!currentAccount}
+                                    userTktBalance={Number(userTktBalance) / 1e9}
+                                    balanceAfterStake={Number(balanceAfterStake) / 1e9}
+                                    estimatedReturns={estimatedReturns}
+                                    tokenSymbol="TKT"
+                                />
+                            </TabsContent>
+                            <TabsContent value="manage" className="mt-6">
+                                <UserReceiptsCard 
+                                    receipts={userReceipts}
+                                    isLoading={isLoadingReceipts}
+                                    onClaim={(receiptId) => handleClaimOrUnstake(receiptId, 'claim')}
+                                    onUnstake={(receiptId) => handleClaimOrUnstake(receiptId, 'unstake')}
+                                    isActionPending={isPending}
+                                    tokenSymbol="TKT"
+                                />
+                            </TabsContent>
+                        </Tabs>
                     </div>
                 </div>
             </div>
