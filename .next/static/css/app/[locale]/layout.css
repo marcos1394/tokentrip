@@ -848,6 +848,9 @@ html {
 .h-\[1\.2rem\] {
   height: 1.2rem;
 }
+.h-\[150px\] {
+  height: 150px;
+}
 .h-\[180px\] {
   height: 180px;
 }
@@ -868,9 +871,6 @@ html {
 }
 .h-px {
   height: 1px;
-}
-.h-\[150px\] {
-  height: 150px;
 }
 .max-h-\[--radix-select-content-available-height\] {
   max-height: var(--radix-select-content-available-height);
@@ -935,9 +935,6 @@ html {
 .w-64 {
   width: 16rem;
 }
-.w-8 {
-  width: 2rem;
-}
 .w-9 {
   width: 2.25rem;
 }
@@ -994,6 +991,9 @@ html {
 }
 .origin-\[--radix-select-content-transform-origin\] {
   transform-origin: var(--radix-select-content-transform-origin);
+}
+.origin-\[--radix-tooltip-content-transform-origin\] {
+  transform-origin: var(--radix-tooltip-content-transform-origin);
 }
 .translate-x-\[-50\%\] {
   --tw-translate-x: -50%;
@@ -1766,6 +1766,21 @@ html {
     opacity: var(--tw-exit-opacity, 1);
     transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1)) rotate(var(--tw-exit-rotate, 0));
   }
+}
+.animate-in {
+  animation-name: enter;
+  animation-duration: 150ms;
+  --tw-enter-opacity: initial;
+  --tw-enter-scale: initial;
+  --tw-enter-rotate: initial;
+  --tw-enter-translate-x: initial;
+  --tw-enter-translate-y: initial;
+}
+.fade-in-0 {
+  --tw-enter-opacity: 0;
+}
+.zoom-in-95 {
+  --tw-enter-scale: .95;
 }
 .duration-200 {
   animation-duration: 200ms;

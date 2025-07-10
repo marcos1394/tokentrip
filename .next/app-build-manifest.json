@@ -6,10 +6,10 @@
       "static/css/app/[locale]/layout.css",
       "static/chunks/app/[locale]/layout.js"
     ],
-    "/[locale]/governance/create/page": [
+    "/[locale]/governance/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/[locale]/governance/create/page.js"
+      "static/chunks/app/[locale]/governance/page.js"
     ]
   }
 }

@@ -5,20 +5,30 @@ import { useQuery } from '@tanstack/react-query';
 import { suiConfig } from '@/config/sui';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, Lock, Gem, UserCheck } from 'lucide-react';
+import { TrendingUp, Lock, DollarSign, UserCheck, Info } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useMemo } from 'react';
 
-// --- Interfaces para los datos que esperamos del contrato ---
+// --- Interfaces Completas para los Datos del Contrato ---
 
-// Suponemos que hay un objeto StakingPool con estos campos
 interface StakingPoolFields {
-    total_staked_tkt: string; // Balance total de TKT en staking
+    id: { id: string };
+    total_staked_tkt: string;   // Balance total de TKT en staking
     rewards_per_second: string; // Tasa de recompensas para calcular el APY
+    reward_token_type: string;  // Tipo del token de recompensa (ej. '0x2::sui::SUI')
+    total_rewards: string;      // Cantidad total de tokens de recompensa en el pool
 }
 
-// Suponemos que cada staker tiene un objeto StakedPosition
 interface StakedPositionFields {
-    staked_amount: string; // Cantidad de TKT que el usuario ha puesto en stake
-    // otros campos como `last_claim_timestamp`, etc.
+    id: { id: string };
+    staked_amount: string;         // Cantidad de TKT que el usuario ha puesto en stake
+    reward_earned: string;         // Recompensas que el usuario ha ganado
+    last_claim_timestamp_ms: string; // Última vez que el usuario reclamó
 }
 
 export function StakingHeader() {
@@ -29,65 +39,80 @@ export function StakingHeader() {
     const { data: poolData, isLoading: isLoadingPool } = useQuery({
         queryKey: ['staking-pool-data', suiConfig.stakingPoolId],
         queryFn: async () => {
-            if (!suiConfig.stakingPoolId) return null;
-
+            if (!suiConfig.stakingPoolId || suiConfig.stakingPoolId.includes('PLACEHOLDER')) return null;
             const response = await suiClient.getObject({
                 id: suiConfig.stakingPoolId,
                 options: { showContent: true }
             });
-
             return response.data?.content?.dataType === 'moveObject'
-    ? response.data.content.fields as unknown as StakingPoolFields // <-- CORRECCIÓN AQUÍ
-    : null;
+                ? response.data.content.fields as unknown as StakingPoolFields
+                : null;
         },
-        // Se re-consulta cada 5 minutos para mantener los datos frescos
-        refetchInterval: 300000, 
+        refetchInterval: 300000,
     });
 
     // === CONSULTA 2: DATOS PERSONALES DE STAKING DEL USUARIO ===
     const { data: userStakeData, isLoading: isLoadingUserStake } = useQuery({
         queryKey: ['user-staked-position', currentAccount?.address],
         queryFn: async () => {
-            if (!currentAccount?.address || !suiConfig.packageId) return null;
-
-            // Buscamos el objeto StakedPosition que le pertenece al usuario actual
+            if (!currentAccount?.address || !suiConfig.packageId || suiConfig.packageId.includes('PLACEHOLDER')) return null;
             const response = await suiClient.getOwnedObjects({
                 owner: currentAccount.address,
                 filter: { StructType: `${suiConfig.packageId}::staking::StakedPosition` },
                 options: { showContent: true },
-                limit: 1, // Un usuario solo debería tener una posición
+                limit: 1,
             });
-            
             if (response.data.length === 0) return null;
-
-           // Dentro de la queryFn de 'user-staked-position'
-
-return response.data[0].data?.content?.dataType === 'moveObject'
-    ? response.data[0].data.content.fields as unknown as StakedPositionFields // <-- CORRECIÓN AQUÍ
-    : null;
+            return response.data[0].data?.content?.dataType === 'moveObject'
+                ? response.data[0].data.content.fields as unknown as StakedPositionFields
+                : null;
         },
         enabled: !!currentAccount,
     });
     
-    // --- Cálculos de las métricas a mostrar ---
-    const totalStaked = poolData ? Number(BigInt(poolData.total_staked_tkt) / BigInt(10**9)) : 0;
-    const userStaked = userStakeData ? Number(BigInt(userStakeData.staked_amount) / BigInt(10**9)) : 0;
-    
-    // Un cálculo de APY de ejemplo. En un caso real, esto dependería
-    // del precio del token TKT y el token de recompensa.
-    const APY = 23.5; 
+    // --- Cálculos de las métricas a mostrar usando useMemo para eficiencia ---
+    const { totalStaked, userStaked, tvl, apy } = useMemo(() => {
+        // Precios de ejemplo para los cálculos
+        const TKT_PRICE_USD = 0.05;
+        const SUI_PRICE_USD = 1.05;
+
+        const totalStakedBigInt = BigInt(poolData?.total_staked_tkt ?? '0');
+        const totalStaked = Number(totalStakedBigInt / BigInt(10**9));
+        
+        const userStakedBigInt = BigInt(userStakeData?.staked_amount ?? '0');
+        const userStaked = Number(userStakedBigInt / BigInt(10**9));
+
+        const tvl = totalStaked * TKT_PRICE_USD;
+        
+        let apy = 0;
+        if (poolData && totalStakedBigInt > 0n) {
+            const rewardsPerSecond = BigInt(poolData.rewards_per_second);
+            const secondsInYear = BigInt(31536000);
+            const rewardsPerYearInSui = rewardsPerSecond * secondsInYear;
+            
+            // Valor de las recompensas anuales en USD
+            const rewardsValuePerYear = (Number(rewardsPerYearInSui) / 1e9) * SUI_PRICE_USD;
+            // Valor total en stake en USD
+            const stakedValue = (Number(totalStakedBigInt) / 1e9) * TKT_PRICE_USD;
+            
+            if (stakedValue > 0) {
+                apy = (rewardsValuePerYear / stakedValue) * 100;
+            }
+        }
+
+        return { totalStaked, userStaked, tvl, apy };
+    }, [poolData, userStakeData]);
 
     return (
-        <div className="text-center mb-16">
+        <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold mb-4 text-foreground text-balance">
-                Gobernanza y Staking
+                Governance & Staking
             </h1>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-10">
-                {/* Métrica 1: Total Staked */}
                 <Card className="glass-card">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total de TKT en Staking</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Total TKT Staked</CardTitle>
                         <Lock className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -95,49 +120,59 @@ return response.data[0].data?.content?.dataType === 'moveObject'
                             <Skeleton className="h-8 w-3/4" />
                         ) : (
                             <div className="text-3xl font-bold text-foreground">
-                                {totalStaked.toLocaleString('es-MX')}
+                                {totalStaked.toLocaleString('en-US')}
                             </div>
                         )}
-                        <p className="text-xs text-muted-foreground">Tokens bloqueados por la comunidad</p>
+                        <p className="text-xs text-muted-foreground">Tokens locked by the community</p>
                     </CardContent>
                 </Card>
 
-                {/* Métrica 2: APY */}
                 <Card className="glass-card">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">APY Actual</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Current APY</CardTitle>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger>
+                                    <Info className="h-4 w-4 text-muted-foreground" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Estimated APY based on current rewards and TVL.</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </CardHeader>
                     <CardContent>
                         {isLoadingPool ? (
                              <Skeleton className="h-8 w-1/2" />
                         ) : (
                             <div className="text-3xl font-bold text-green-500">
-                                {APY.toFixed(1)}%
+                                {apy.toFixed(1)}%
                             </div>
                         )}
-                        <p className="text-xs text-muted-foreground">Rendimiento anual estimado</p>
+                        <p className="text-xs text-muted-foreground">Estimated annual percentage yield</p>
                     </CardContent>
                 </Card>
 
-                {/* Métrica 3: Símbolo del Token */}
                  <Card className="glass-card">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Token de Gobernanza</CardTitle>
-                        <Gem className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Value Locked (TVL)</CardTitle>
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold text-foreground">
-                            TKT
-                        </div>
-                        <p className="text-xs text-muted-foreground">El token que impulsa el ecosistema</p>
+                       {isLoadingPool ? (
+                            <Skeleton className="h-8 w-3/4" />
+                        ) : (
+                            <div className="text-3xl font-bold text-foreground">
+                                ${tvl.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                            </div>
+                        )}
+                        <p className="text-xs text-muted-foreground">Total value of assets in the pool</p>
                     </CardContent>
                 </Card>
 
-                {/* Métrica 4: Tu Staking Personal */}
                 <Card className="glass-card">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Tu Staking (TKT)</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Your Stake (TKT)</CardTitle>
                         <UserCheck className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -145,10 +180,10 @@ return response.data[0].data?.content?.dataType === 'moveObject'
                              <Skeleton className="h-8 w-1/2" />
                         ) : (
                             <div className="text-3xl font-bold text-primary">
-                                {currentAccount ? userStaked.toLocaleString('es-MX') : '---'}
+                                {currentAccount ? userStaked.toLocaleString('en-US') : '---'}
                             </div>
                         )}
-                        <p className="text-xs text-muted-foreground">Tu participación en la gobernanza</p>
+                        <p className="text-xs text-muted-foreground">Your contribution to governance</p>
                     </CardContent>
                 </Card>
             </div>
