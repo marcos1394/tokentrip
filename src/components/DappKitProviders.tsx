@@ -1,31 +1,29 @@
+// src/components/DappKitProviders.tsx
 'use client';
 
-import { SuiClientProvider, WalletProvider } from '@mysten/dapp-kit';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { SuiClientProvider, WalletProvider, createNetworkConfig } from '@mysten/dapp-kit';
 import { getFullnodeUrl } from '@mysten/sui/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '@mysten/dapp-kit/dist/index.css';
+import { ZkLoginProvider } from '@/context/ZkLoginContext'; // <-- Importa nuestro nuevo proveedor
 
-// 1. Configuración de la Red
-const networks = {
-  devnet: { url: getFullnodeUrl('devnet') },
-  // mainnet: { url: getFullnodeUrl('mainnet') }, // Descomentar para producción
-};
-
-// 2. Creación del Cliente de React Query
 const queryClient = new QueryClient();
+const { networkConfig } = createNetworkConfig({
+	testnet: { url: getFullnodeUrl('testnet') },
+	mainnet: { url: getFullnodeUrl('mainnet') },
+});
 
-export default function DappKitProviders({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <SuiClientProvider networks={networks} defaultNetwork="devnet">
-        <WalletProvider autoConnect>
-          {children}
-        </WalletProvider>
-      </SuiClientProvider>
-    </QueryClientProvider>
-  );
+export default function DappKitProviders({ children }: { children: React.ReactNode }) {
+	return (
+		<QueryClientProvider client={queryClient}>
+			<SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
+				<WalletProvider autoConnect>
+                    {/* Envolvemos todo con nuestro ZkLoginProvider */}
+                    <ZkLoginProvider>
+                        {children}
+                    </ZkLoginProvider>
+				</WalletProvider>
+			</SuiClientProvider>
+		</QueryClientProvider>
+	);
 }

@@ -1,116 +1,76 @@
+// src/components/ConnectModal.tsx
 'use client';
 
 import { useState } from 'react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { useZkLogin, ZkLoginProvider } from '@mysten/dapp-kit';
-import { Wallets } from '@mysten/dapp-kit';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { generateNonce, generateRandomness } from '@mysten/sui/zklogin';
+import { useSuiClient } from '@mysten/dapp-kit';
 import { Chrome, Twitch, Facebook, Loader2 } from 'lucide-react';
 
-// Sub-componente para los botones de redes sociales para mantener el código limpio
-function SocialLoginButton({
-  provider,
-  label,
-  icon: Icon,
-  onSelect,
-  isPending,
-}: {
-  provider: ZkLoginProvider;
-  label: string;
-  icon: React.ElementType;
-  onSelect: () => void;
-  isPending: boolean;
-}) {
-  return (
-    <Button
-      className="w-full justify-center gap-3"
-      variant="outline"
-      onClick={onSelect}
-      disabled={isPending}
-    >
-      {isPending ? (
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-      ) : (
-        <Icon className="mr-2 h-5 w-5" />
-      )}
-      {label}
-    </Button>
-  );
-}
-
-
 export function ConnectModal() {
-  const { beginZkLogin, isPending } = useZkLogin({
-    // onSuccess se llama después de que el usuario vuelve de Google/Twitch, etc.
-    onSuccess: (data) => {
-        console.log('OAuth success:', data);
-        // TODO: Enviar 'data' a tu backend para generar la prueba ZK.
-        // Tu backend llamará al Prover de Mysten y te devolverá los datos necesarios
-        // para la transacción final del inicio de sesión.
-        // Ver: https://docs.sui.io/concepts/cryptography/zklogin/zklogin-e2e-tutorial
-    }
-  });
-  
-  // Estado para saber qué proveedor se está procesando
-  const [pendingProvider, setPendingProvider] = useState<ZkLoginProvider | null>(null);
+  const [isPending, setIsPending] = useState(false);
+  const suiClient = useSuiClient();
 
-  const handleLogin = (provider: ZkLoginProvider) => {
-    setPendingProvider(provider);
-    beginZkLogin({ provider });
+  const handleLogin = async (provider: 'google' | 'twitch' | 'facebook') => {
+    setIsPending(true);
+    try {
+      const { epoch } = await suiClient.getLatestSuiSystemState();
+      const maxEpoch = Number(epoch) + 2;
+      const ephemeralKeyPair = new Ed25519Keypair();
+      const randomness = generateRandomness();
+      const nonce = generateNonce(ephemeralKeyPair.getPublicKey(), maxEpoch, randomness);
+      // Guardar datos cruciales en localStorage antes de la redirección
+      const loginData = {
+ephemeralKeyPair: Array.from(ephemeralKeyPair.getSecretKey()),        maxEpoch,
+        randomness,
+      };
+      localStorage.setItem('zk-login-data', JSON.stringify(loginData));
+
+      const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
+      const REDIRECT_URI = process.env.NEXT_PUBLIC_REDIRECT_URI!;
+
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        response_type: 'id_token',
+        scope: 'openid email profile',
+        nonce: nonce,
+      });
+
+      const loginUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+      window.location.href = loginUrl;
+
+    } catch (error) {
+      console.error(error);
+      setIsPending(false);
+    }
   };
 
   return (
-    <Dialog onOpenChange={() => setPendingProvider(null)}>
-      <DialogTrigger asChild>
-        <Button className="btn-sui">Sign In / Connect</Button>
-      </DialogTrigger>
+    <Dialog onOpenChange={() => setIsPending(false)}>
+      <DialogTrigger asChild><Button className="btn-sui">Sign In / Connect</Button></DialogTrigger>
       <DialogContent className="sm:max-w-md glass-effect">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl font-bold">Join TokenTrip</DialogTitle>
-          <DialogDescription className="text-center">
-            Sign in with your social account or connect a wallet to continue.
-          </DialogDescription>
+          <DialogDescription className="text-center">Sign in with your social account or connect a wallet.</DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
-          {/* Opciones de zkLogin */}
           <div className="space-y-3">
-            <SocialLoginButton
-              provider="google"
-              label="Sign In with Google"
-              icon={Chrome}
-              onSelect={() => handleLogin('google')}
-              isPending={isPending && pendingProvider === 'google'}
-            />
-            <SocialLoginButton
-              provider="twitch"
-              label="Sign In with Twitch"
-              icon={Twitch}
-              onSelect={() => handleLogin('twitch')}
-              isPending={isPending && pendingProvider === 'twitch'}
-            />
-             <SocialLoginButton
-              provider="facebook"
-              label="Sign In with Facebook"
-              icon={Facebook}
-              onSelect={() => handleLogin('facebook')}
-              isPending={isPending && pendingProvider === 'facebook'}
-            />
+            <Button className="w-full justify-center gap-3" variant="outline" onClick={() => handleLogin('google')} disabled={isPending}>
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Chrome className="mr-2 h-5 w-5" />}
+              Sign In with Google
+            </Button>
+            {/* Se pueden añadir botones para Twitch y Facebook con una lógica similar */}
           </div>
-
           <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                For advanced users
-              </span>
-            </div>
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or connect with a wallet</span></div>
           </div>
-
-          {/* Selector de Billeteras Tradicionales */}
-          <div className="max-h-[200px] overflow-y-auto px-1">
-            <Wallets />
+          {/* Si <Wallets /> da error, reemplázalo con <ConnectButton /> de una versión anterior */}
+          <div className="max-h-[200px] overflow-y-auto px-1 flex justify-center">
+             <p className="text-xs text-muted-foreground">Connect with a traditional wallet (coming soon).</p>
           </div>
         </div>
       </DialogContent>

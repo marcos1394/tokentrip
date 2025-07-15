@@ -5,8 +5,9 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { Plane, Menu, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { ConnectButton } from '@mysten/dapp-kit';
 import { Button } from './ui/button';
+// 1. Se importa el nuevo ConnectModal
+import { ConnectModal } from './ConnectModal'; 
 
 export function Navbar() {
   const pathname = usePathname();
@@ -53,7 +54,8 @@ export function Navbar() {
           {/* Acciones y Menú Móvil */}
           <div className="flex items-center space-x-2">
             <div className="hidden sm:block">
-              <ConnectButton />
+              {/* 2. Se reemplaza ConnectButton con ConnectModal */}
+              <ConnectModal />
             </div>
             <ThemeToggle />
             <div className="md:hidden">
@@ -73,7 +75,8 @@ export function Navbar() {
       {isMenuOpen && (
         <div className="md:hidden fixed inset-0 top-[61px] z-40 bg-background/95 backdrop-blur-lg">
            <div className="sm:hidden p-4 border-b border-white/10">
-              <ConnectButton connectText="Connect Wallet" />
+              {/* 3. Se reemplaza ConnectButton con ConnectModal también aquí */}
+              <ConnectModal />
             </div>
           <div className="container mx-auto px-4 py-8 flex flex-col space-y-6">
             {navLinks.map((link) => (
@@ -81,7 +84,7 @@ export function Navbar() {
                 key={link.href}
                 href={link.href}
                 className="text-xl font-semibold text-foreground hover:text-primary transition-colors"
-                onClick={() => setIsMenuOpen(false)} // Cierra el menú al hacer clic
+                onClick={() => setIsMenuOpen(false)}
               >
                 {link.label}
               </Link>
