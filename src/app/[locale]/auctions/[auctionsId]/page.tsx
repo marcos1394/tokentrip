@@ -25,12 +25,29 @@ interface NftFields {
     description: string;
     image_url: { url: string };
 }
+
+// Reemplaza esta interfaz en tu archivo
 interface AuctionFields {
-    nft: { fields: NftFields };
+    id: { id: string };
+    nft: { 
+        type: string,
+        fields: { 
+            some?: {
+                fields: {
+                    name: string;
+                    description: string;
+                    image_url: { fields: { url: string } };
+                }
+            }
+        } 
+    };
     highest_bid: string;
-    highest_bidder: string;
+    highest_bidder: { fields: { some?: [string] } };
     end_timestamp_ms: string;
+    start_price: string;
     is_settled: boolean;
+    is_tkt_auction: boolean; // Campo clave que faltaba
+    seller: string; // Campo clave que faltaba
 }
 
 // Componente de Cuenta Regresiva (Traducido)
