@@ -140,23 +140,40 @@ export default function AuctionDetailPage() {
         }
     };
     
+    // Reemplaza esta función completa
     const handleSettleAuction = async () => {
         if (!auction) return;
+
         const tx = new Transaction();
-        tx.moveCall({
-            target: `${suiConfig.packageId}::experience_nft::settle_auction`,
-            arguments: [ tx.object(auctionId), tx.object(suiConfig.treasuryCapId), tx.object("0x6") ]
-        });
+        
+        if (auction.is_tkt_auction) {
+            tx.moveCall({
+                target: `${suiConfig.auctionsPackageId}::auctions::settle_tkt_auction`,
+                arguments: [
+                    tx.object(auctionId),
+                    tx.object(suiConfig.daoTreasuryId),
+                    tx.object(suiConfig.tktTreasuryCapId),
+                    tx.object("0x6")
+                ],
+            });
+        } else {
+            tx.moveCall({
+                target: `${suiConfig.auctionsPackageId}::auctions::settle_sui_auction`,
+                arguments: [
+                    tx.object(auctionId),
+                    tx.object("0x6")
+                ],
+            });
+        }
 
         try {
             await executeSettle({ transaction: tx });
-            toast({ title: '✅ Auction Settled!', description: 'The NFT and funds have been transferred.' });
+            toast({ title: '✅ Auction Settled!', description: 'The assets have been transferred.' });
             setTimeout(() => router.push(`/auctions`), 2500);
         } catch (error: any) {
             toast({ variant: 'destructive', title: '❌ Settle Failed', description: error.message });
         }
     }
-
     // --- Renderizado y Lógica de UI ---
     if (isLoading) return <div className="min-h-screen flex items-center justify-center"><Loader className="animate-spin h-10 w-10" /></div>;
     if (isError || !auction) return <div className="min-h-screen flex items-center justify-center text-center p-4">Auction not found or it has been settled.</div>;
