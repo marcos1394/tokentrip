@@ -275,7 +275,7 @@ export default function AuctionDetailPage() {
                                     <Card className="glass-card border-primary/50">
                                         <CardHeader><CardTitle className="text-foreground">Place Your Bid</CardTitle></CardHeader>
                                         <CardContent className="space-y-4">
-                                            <Input type="number" placeholder={`> ${highestBidInSui.toLocaleString('en-US')} SUI`} value={bidAmount} onChange={(e) => setBidAmount(e.target.value)} />
+                                            <Input type="number" placeholder={`> ${highestBidInSui.toLocaleString('en-US')} ${currencySymbol}`} value={bidAmount} onChange={(e) => setBidAmount(e.target.value)} />
                                             <Button size="lg" className="w-full btn-sui" onClick={handlePlaceBid} disabled={!currentAccount || isBidPending}>
                                                 {isBidPending ? <Loader className="animate-spin w-5 h-5 mr-2" /> : <Gavel className="w-5 h-5 mr-2" />}
                                                 {currentAccount ? 'Place Bid' : 'Connect Wallet to Bid'}
