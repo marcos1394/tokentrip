@@ -212,9 +212,14 @@ export default function AuctionDetailPage() {
     if (isLoading) return <div className="min-h-screen flex items-center justify-center"><Loader className="animate-spin h-10 w-10" /></div>;
     if (isError || !auction) return <div className="min-h-screen flex items-center justify-center text-center p-4">Auction not found or it has been settled.</div>;
     
+    // --- CORRECCIÓN: Se extraen los datos del NFT de forma segura ---
+    const nftData = auction.nft.fields.some?.fields;
+    if (!nftData) return <div className="min-h-screen flex items-center justify-center">Error: NFT data is missing from the auction.</div>;
+    
     const highestBidInSui = Number(auction.highest_bid) / 1_000_000_000;
     const isAuctionOver = new Date() >= new Date(Number(auction.end_timestamp_ms));
     const canBeSettled = isAuctionOver && !auction.is_settled;
+    const currencySymbol = auction.is_tkt_auction ? "TKT" : "SUI";
 
     return (
         <div className="min-h-screen pt-24 pb-12 bg-background">
@@ -230,13 +235,15 @@ export default function AuctionDetailPage() {
                     {/* Columna Izquierda: Imagen y Descripción */}
                     <div className="lg:col-span-3 space-y-8">
                         <Card className="overflow-hidden shadow-2xl rounded-2xl">
-                            <img src={auction.nft.fields.image_url.url} alt={auction.nft.fields.name} className="w-full h-auto object-cover aspect-video" />
+                            {/* --- CORRECCIÓN: Se usa la variable nftData --- */}
+                            <img src={nftData.image_url.fields.url} alt={nftData.name} className="w-full h-auto object-cover aspect-video" />
                         </Card>
-                         <Card className="glass-card">
+                        <Card className="glass-card">
                             <CardHeader><CardTitle className="text-foreground">Description</CardTitle></CardHeader>
-                            <CardContent><p className="text-foreground/80 whitespace-pre-wrap">{auction.nft.fields.description}</p></CardContent>
+                            <CardContent><p className="text-foreground/80 whitespace-pre-wrap">{nftData.description}</p></CardContent>
                         </Card>
                     </div>
+
 
                     {/* Columna Derecha: Detalles y Acciones */}
                     <div className="lg:col-span-2 space-y-6">
