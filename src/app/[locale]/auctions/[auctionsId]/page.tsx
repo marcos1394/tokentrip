@@ -142,7 +142,7 @@ export default function AuctionDetailPage() {
             }
 
             // Prepara la moneda TKT para el pago
-            const [mainCoin, ...otherCoins] = userTktCoins.data;
+            const [mainCoin, ...otherCoins] = userTktCoins;
             const mainCoinObject = tx.object(mainCoin.coinObjectId);
             if (otherCoins.length > 0) {
                 tx.mergeCoins(mainCoinObject, otherCoins.map(c => tx.object(c.coinObjectId)));
