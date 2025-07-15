@@ -52,6 +52,7 @@ export default function ExperienceDetailPage() {
     const fields = listingData?.data?.content?.dataType === 'moveObject' ? listingData.data.content.fields as unknown as ListingFields : null;
 
     // Lógica de Transacción Corregida
+    // Reemplaza esta función completa
     const handlePurchase = async () => {
         if (!currentAccount?.address || !fields) return;
 
@@ -59,28 +60,56 @@ export default function ExperienceDetailPage() {
         const priceInMist = BigInt(fields.price);
 
         if (fields.is_tkt_listing) {
+            // Lógica para TKT (ya era correcta, pero se incluye para que esté completa)
             const TKT_COIN_TYPE = `${suiConfig.tktPackageId}::tkt::TKT`;
             const { data: userTktCoins } = await suiClient.getCoins({ owner: currentAccount.address, coinType: TKT_COIN_TYPE });
             if (!userTktCoins || userTktCoins.length === 0) {
                 toast({ variant: "destructive", title: "Insufficient Funds", description: "You don't have any TKT tokens." });
                 return;
             }
-            const [mainCoin, ...otherCoins] = userTktCoins;
-            const paymentCoin = tx.object(mainCoin.coinObjectId);
-            if (otherCoins.length > 0) {
-                tx.mergeCoins(paymentCoin, otherCoins.map(c => c.coinObjectId));
+            
+            const totalTktBalance = userTktCoins.reduce((acc, coin) => acc + BigInt(coin.balance), 0n);
+            if (totalTktBalance < priceInMist) {
+                toast({ variant: "destructive", title: "Insufficient TKT balance" });
+                return;
             }
+
+            const mainCoin = tx.moveCall({
+                target: '0x2::coin::into_balance',
+                arguments: [tx.object(userTktCoins[0].coinObjectId)],
+                typeArguments: [TKT_COIN_TYPE],
+            });
+
+            if (userTktCoins.length > 1) {
+                tx.mergeCoins(mainCoin, userTktCoins.slice(1).map(c => tx.object(c.coinObjectId)));
+            }
+
+            const paymentCoin = tx.moveCall({
+                target: '0x2::coin::from_balance',
+                arguments: [tx.splitCoins(mainCoin, [tx.pure(priceInMist)])],
+                typeArguments: [TKT_COIN_TYPE],
+            });
+            
             tx.moveCall({
                 target: `${suiConfig.packageId}::experience_nft::purchase_with_tkt`,
-                arguments: [ tx.object(listingId), paymentCoin ],
+                arguments: [ 
+                    tx.object(listingId), 
+                    tx.object(suiConfig.daoTreasuryId),
+                    tx.object(suiConfig.tktTreasuryCapId),
+                    paymentCoin 
+                ],
             });
+
         } else {
+            // --- CORRECCIÓN EN LA LÓGICA PARA SUI ---
             const [paymentCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(priceInMist)]);
             tx.moveCall({
                 target: `${suiConfig.packageId}::experience_nft::purchase`,
+                // Se pasan los argumentos que la función final espera:
                 arguments: [
-                    tx.object(listingId), tx.object(suiConfig.treasuryCapId),
-                    tx.object(suiConfig.vipRegistryId!), tx.object(suiConfig.stakingPoolId),
+                    tx.object(listingId),
+                    tx.object(suiConfig.vipRegistryId),
+                    tx.object(suiConfig.stakingPoolId),
                     paymentCoin,
                 ],
             });
