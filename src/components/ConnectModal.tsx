@@ -1,35 +1,39 @@
-// src/components/ConnectModal.tsx
 'use client';
 
 import { useState } from 'react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { useSuiClient, useWallets, useConnectWallet } from '@mysten/dapp-kit';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { generateNonce, generateRandomness } from '@mysten/sui/zklogin';
-import { useSuiClient } from '@mysten/dapp-kit';
 import { Chrome, Twitch, Facebook, Loader2 } from 'lucide-react';
+import Image from 'next/image';
 
 export function ConnectModal() {
-  const [isPending, setIsPending] = useState(false);
+  const [isZkPending, setIsZkPending] = useState(false);
   const suiClient = useSuiClient();
 
-  const handleLogin = async (provider: 'google' | 'twitch' | 'facebook') => {
-    setIsPending(true);
+  // Hooks para las billeteras tradicionales
+  const wallets = useWallets();
+  const { mutate: connect, isPending: isWalletConnectPending } = useConnectWallet();
+
+  const handleZkLogin = async (provider: 'google' | 'twitch' | 'facebook') => {
+    setIsZkPending(true);
     try {
       const { epoch } = await suiClient.getLatestSuiSystemState();
       const maxEpoch = Number(epoch) + 2;
       const ephemeralKeyPair = new Ed25519Keypair();
       const randomness = generateRandomness();
       const nonce = generateNonce(ephemeralKeyPair.getPublicKey(), maxEpoch, randomness);
-      // Guardar datos cruciales en localStorage antes de la redirección
-      const loginData = {
-ephemeralKeyPair: Array.from(ephemeralKeyPair.getSecretKey()),        maxEpoch,
+
+      localStorage.setItem('zk-login-data', JSON.stringify({
+        ephemeralKeyPair: Array.from(ephemeralKeyPair.getSecretKey()),
+        maxEpoch,
         randomness,
-      };
-      localStorage.setItem('zk-login-data', JSON.stringify(loginData));
+      }));
 
       const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
-      const REDIRECT_URI = process.env.NEXT_PUBLIC_REDIRECT_URI!;
+      const REDIRECT_URI = window.location.origin + "/auth";
 
       const params = new URLSearchParams({
         client_id: GOOGLE_CLIENT_ID,
@@ -44,33 +48,47 @@ ephemeralKeyPair: Array.from(ephemeralKeyPair.getSecretKey()),        maxEpoch,
 
     } catch (error) {
       console.error(error);
-      setIsPending(false);
+      setIsZkPending(false);
     }
   };
 
   return (
-    <Dialog onOpenChange={() => setIsPending(false)}>
-      <DialogTrigger asChild><Button className="btn-sui">Sign In / Connect</Button></DialogTrigger>
+    <Dialog onOpenChange={() => setIsZkPending(false)}>
+      <DialogTrigger asChild>
+        <Button className="btn-sui">Sign In / Connect</Button>
+      </DialogTrigger>
       <DialogContent className="sm:max-w-md glass-effect">
         <DialogHeader>
-          <DialogTitle className="text-center text-2xl font-bold">Join TokenTrip</DialogTitle>
-          <DialogDescription className="text-center">Sign in with your social account or connect a wallet.</DialogDescription>
+            <DialogTitle className="text-center text-2xl font-bold">Join TokenTrip</DialogTitle>
+            <DialogDescription className="text-center">Use your social account or connect a wallet to continue.</DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
           <div className="space-y-3">
-            <Button className="w-full justify-center gap-3" variant="outline" onClick={() => handleLogin('google')} disabled={isPending}>
-              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Chrome className="mr-2 h-5 w-5" />}
+            <Button className="w-full justify-center gap-3" variant="outline" onClick={() => handleZkLogin('google')} disabled={isZkPending}>
+              {isZkPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Chrome className="mr-2 h-5 w-5" />}
               Sign In with Google
             </Button>
-            {/* Se pueden añadir botones para Twitch y Facebook con una lógica similar */}
+            {/* Aquí puedes añadir otros botones de zkLogin si los configuras */}
           </div>
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or connect with a wallet</span></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or connect a wallet</span></div>
           </div>
-          {/* Si <Wallets /> da error, reemplázalo con <ConnectButton /> de una versión anterior */}
-          <div className="max-h-[200px] overflow-y-auto px-1 flex justify-center">
-             <p className="text-xs text-muted-foreground">Connect with a traditional wallet (coming soon).</p>
+          
+          {/* --- CORRECCIÓN: Se renderiza la lista de billeteras --- */}
+          <div className="max-h-[200px] overflow-y-auto px-1 space-y-2">
+            {wallets.map((wallet) => (
+              <Button
+                key={wallet.name}
+                onClick={() => connect({ wallet })}
+                variant="outline"
+                className="w-full justify-start gap-3"
+                disabled={isWalletConnectPending}
+              >
+                <Image src={wallet.icon} alt={wallet.name} width={24} height={24} />
+                Connect {wallet.name}
+              </Button>
+            ))}
           </div>
         </div>
       </DialogContent>
