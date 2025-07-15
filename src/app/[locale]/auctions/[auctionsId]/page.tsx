@@ -294,14 +294,23 @@ export default function AuctionDetailPage() {
                             <TabsContent value="details" className="mt-4">
                                  <Card className="glass-card">
                                     <CardContent className="pt-6">
-                                    {auction.highest_bidder !== '0x0000000000000000000000000000000000000000000000000000000000000000' ? (
-                                        <div>
-                                            <Label className="text-sm text-muted-foreground">Highest Bidder</Label>
-                                            <p className="font-mono text-xs text-foreground break-all">{auction.highest_bidder}</p>
-                                        </div>
-                                    ) : (
-                                        <p className='text-muted-foreground text-sm'>No bids placed yet.</p>
-                                    )}
+                                    {/* --- CORRECCIÓN --- */}
+                                    {/* 1. Se extrae la dirección de forma segura. */}
+                                    {(() => {
+                                        const bidderAddress = auction.highest_bidder?.fields?.some?.[0];
+
+                                        {/* 2. Se comprueba si la dirección existe antes de mostrarla. */}
+                                        if (bidderAddress) {
+                                            return (
+                                                <div>
+                                                    <Label className="text-sm text-muted-foreground">Highest Bidder</Label>
+                                                    <p className="font-mono text-xs text-foreground break-all">{bidderAddress}</p>
+                                                </div>
+                                            );
+                                        } else {
+                                            return <p className='text-muted-foreground text-sm'>No bids placed yet.</p>;
+                                        }
+                                    })()}
                                     </CardContent>
                                 </Card>
                             </TabsContent>
