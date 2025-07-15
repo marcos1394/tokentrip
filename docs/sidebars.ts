@@ -12,12 +12,20 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'For Travelers',
-      items: ['for-travelers/Browse-experiences', 'for-travelers/buying-nfts', 'for-travelers/leaving-a-review'],
+      items: [
+        'for-travelers/Browse-experiences', 
+        'for-travelers/buying_nfts', // <-- CORREGIDO
+        'for-travelers/leaving-a-review'
+      ],
     },
     {
       type: 'category',
       label: 'For Providers',
-      items: ['for-providers/creating-a-profile', 'for-providers/listing-an-experience', 'for-providers/secondary-market-royalties'],
+      items: [
+        'for-providers/creating-a-profile', 
+        'for-providers/listing-a-experience', // <-- CORREGIDO
+        'for-providers/secondary-market-royalties'
+      ],
     },
     {
       type: 'category',
