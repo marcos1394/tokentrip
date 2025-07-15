@@ -135,7 +135,7 @@ export default function AuctionDetailPage() {
                 return;
             }
             
-            const totalTktBalance = userTktCoins.data.reduce((acc, coin) => acc + BigInt(coin.balance), 0n);
+            const totalTktBalance = userTktCoins.reduce((acc, coin) => acc + BigInt(coin.balance), 0n);
             if (totalTktBalance < bidAmountInMist) {
                 toast({ variant: "destructive", title: "Insufficient TKT Balance", description: `You need at least ${bidAmountNum} TKT to place this bid.` });
                 return;
