@@ -89,57 +89,91 @@ export default function AuctionDetailPage() {
 
     const auction = auctionData?.data?.content?.dataType === 'moveObject' ? auctionData.data.content.fields as unknown as AuctionFields : null;
 
-    // --- Lógica de Transacciones Corregida ---
-    // Reemplaza esta función completa
     const handlePlaceBid = async () => {
-        if (!currentAccount?.address || !auction) return;
+        // --- 1. VALIDACIONES INICIALES ---
+        if (!currentAccount?.address || !auction) {
+            toast({ variant: "destructive", title: "Cannot Place Bid", description: "Wallet is not connected or auction data is missing." });
+            return;
+        }
 
-        const bidAmountInMist = BigInt(parseFloat(bidAmount) * 1e9);
+        if (currentAccount.address === auction.seller) {
+            toast({ variant: "destructive", title: "Action Not Allowed", description: "You cannot bid on your own auction." });
+            return;
+        }
 
-        // Lógica de validación (se mantiene) ...
-        // ...
+        const bidAmountNum = parseFloat(bidAmount);
+        if (isNaN(bidAmountNum) || bidAmountNum <= 0) {
+            toast({ variant: "destructive", title: "Invalid Amount", description: "Please enter a positive number to bid." });
+            return;
+        }
 
+        // --- 2. VALIDACIÓN DE MONTO (usando BigInt para precisión) ---
+        const bidAmountInMist = BigInt(Math.floor(bidAmountNum * 1e9));
+        const highestBid = BigInt(auction.highest_bid);
+        const startPrice = BigInt(auction.start_price);
+        
+        const threshold = auction.highest_bidder ? highestBid : startPrice;
+        const currencySymbol = auction.is_tkt_auction ? "TKT" : "SUI";
+
+        if (bidAmountInMist <= threshold) {
+            const requiredAmount = (Number(threshold) / 1e9);
+            toast({ variant: 'destructive', title: 'Bid Too Low', description: `Your bid must be higher than ${requiredAmount.toLocaleString()} ${currencySymbol}.`});
+            return;
+        }
+
+        // --- 3. CONSTRUCCIÓN DE LA TRANSACCIÓN ---
         const tx = new Transaction();
         const isTkt = auction.is_tkt_auction;
-        const functionName = isTkt ? 'place_bid_tkt' : 'place_bid';
-        const coinType = isTkt ? `${suiConfig.tktPackageId}::tkt::TKT` : '0x2::sui::SUI';
 
         if (isTkt) {
-            // Lógica para obtener y preparar la moneda TKT
-            const { data: tktCoins } = await suiClient.getCoins({ owner: currentAccount.address, coinType });
-            if (!tktCoins || tktCoins.data.length === 0) {
-                toast({ variant: 'destructive', title: 'Insufficient TKT' });
+            // --- LÓGICA PARA PUJAS CON TKT ---
+            const tktCoinType = `${suiConfig.tktPackageId}::tkt::TKT`;
+            const { data: userTktCoins } = await suiClient.getCoins({ owner: currentAccount.address, coinType: tktCoinType });
+
+            if (!userTktCoins || userTktCoins.data.length === 0) {
+                toast({ variant: "destructive", title: "Insufficient TKT Balance", description: "You have no TKT coins to use for bidding." });
                 return;
             }
-            const [mainCoin, ...otherCoins] = tktCoins.data;
-            const paymentCoin = tx.object(mainCoin.coinObjectId);
-            if (otherCoins.length > 0) {
-                tx.mergeCoins(paymentCoin, otherCoins.map(c => c.coinObjectId));
+            
+            const totalTktBalance = userTktCoins.data.reduce((acc, coin) => acc + BigInt(coin.balance), 0n);
+            if (totalTktBalance < bidAmountInMist) {
+                toast({ variant: "destructive", title: "Insufficient TKT Balance", description: `You need at least ${bidAmountNum} TKT to place this bid.` });
+                return;
             }
-            const [coinToBid] = tx.splitCoins(paymentCoin, [tx.pure.u64(bidAmountInMist)]);
+
+            // Prepara la moneda TKT para el pago
+            const [mainCoin, ...otherCoins] = userTktCoins.data;
+            const mainCoinObject = tx.object(mainCoin.coinObjectId);
+            if (otherCoins.length > 0) {
+                tx.mergeCoins(mainCoinObject, otherCoins.map(c => tx.object(c.coinObjectId)));
+            }
+            const [paymentCoin] = tx.splitCoins(mainCoinObject, [tx.pure.u64(bidAmountInMist)]);
+            
             tx.moveCall({
-                target: `${suiConfig.auctionsPackageId}::auctions::${functionName}`,
-                arguments: [ tx.object(auctionId), coinToBid, tx.object("0x6") ],
+                target: `${suiConfig.auctionsPackageId}::auctions::place_bid_tkt`,
+                arguments: [ tx.object(auctionId), paymentCoin, tx.object("0x6") ],
             });
+
         } else {
-            // Lógica para SUI
+            // --- LÓGICA PARA PUJAS CON SUI ---
             const [paymentCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(bidAmountInMist)]);
             tx.moveCall({
-                target: `${suiConfig.auctionsPackageId}::auctions::${functionName}`,
+                target: `${suiConfig.auctionsPackageId}::auctions::place_bid`,
                 arguments: [ tx.object(auctionId), paymentCoin, tx.object("0x6") ],
             });
         }
-
+        
+        // --- 4. EJECUCIÓN DE LA TRANSACCIÓN ---
         try {
             await executeBid({ transaction: tx });
-            toast({ title: '✅ Bid Placed!', description: "You are the new highest bidder."});
+            toast({ title: '✅ Bid Placed!', description: "You are now the highest bidder."});
             setBidAmount('');
             queryClient.invalidateQueries({ queryKey: ['auction', auctionId] });
         } catch (error: any) {
-            toast({ variant: 'destructive', title: '❌ Bid Failed', description: error.message });
+            toast({ variant: 'destructive', title: '❌ Bid Failed', description: error.message || "An unknown error occurred." });
         }
     };
-    
+   
     // Reemplaza esta función completa
     const handleSettleAuction = async () => {
         if (!auction) return;
