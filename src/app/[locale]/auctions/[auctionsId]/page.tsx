@@ -249,12 +249,13 @@ export default function AuctionDetailPage() {
                     <div className="lg:col-span-2 space-y-6">
                         <Card className="glass-card">
                             <CardHeader>
-                                <CardTitle className="text-3xl font-bold text-foreground">{auction.nft.fields.name}</CardTitle>
+                                {/* --- CORRECCIÓN: Se usa la variable nftData --- */}
+                                <CardTitle className="text-3xl font-bold text-foreground">{nftData.name}</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="p-4 border rounded-lg bg-background/50 text-center">
                                     <Label className="text-sm text-muted-foreground">CURRENT BID</Label>
-                                    <p className="text-4xl font-bold text-primary">{highestBidInSui.toLocaleString('en-US')} SUI</p>
+                                    <p className="text-4xl font-bold text-primary">{highestBidInSui.toLocaleString('en-US')} {currencySymbol}</p>
                                 </div>
                                 <div className="p-4 border rounded-lg bg-background/50 text-center">
                                     <Label className="text-sm text-muted-foreground">AUCTION ENDS IN</Label>
