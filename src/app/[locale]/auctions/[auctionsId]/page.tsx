@@ -130,7 +130,7 @@ export default function AuctionDetailPage() {
             const tktCoinType = `${suiConfig.tktPackageId}::tkt::TKT`;
             const { data: userTktCoins } = await suiClient.getCoins({ owner: currentAccount.address, coinType: tktCoinType });
 
-            if (!userTktCoins || userTktCoins.data.length === 0) {
+            if (!userTktCoins || userTktCoins.length === 0) {
                 toast({ variant: "destructive", title: "Insufficient TKT Balance", description: "You have no TKT coins to use for bidding." });
                 return;
             }
