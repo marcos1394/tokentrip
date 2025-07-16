@@ -72,7 +72,7 @@ export default function AuthCallbackPage() {
                 const userSignature = getZkLoginSignature({
                     inputs: { ...zkProof },
                     maxEpoch: storedData.maxEpoch,
-                    userSignature: ephemeralKeyPair.signData(new TextEncoder().encode(jwt_token)),
+                    userSignature: ephemeralKeyPair.sign(new TextEncoder().encode(jwt_token)),
                 });
 
                 // 8. Guardar el estado del usuario en nuestro Context y limpiar
