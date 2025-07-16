@@ -18,6 +18,6 @@
     export { connection } from 'next/dist/server/request/connection'
     export type { UnsafeUnwrappedSearchParams } from 'next/dist/server/request/search-params'
     export type { UnsafeUnwrappedParams } from 'next/dist/server/request/params'
-    export function unstable_rootParams(): Promise<{ locale: string }>
+    export function unstable_rootParams(): Promise<{ locale?: string }>
   }
   

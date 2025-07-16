@@ -43,15 +43,7 @@ export default function AuthCallbackPage() {
                 localStorage.removeItem('zk-login-data');
                 localStorage.removeItem('zk-ephemeral-secret');
 
-                 // 1. Reconstruimos el array completo que guardamos.
-                const fullKeyArray = new Uint8Array(storedData.ephemeralKeyPair);
                 
-                // 2. Nos quedamos solo con los primeros 32 bytes, que son la clave secreta.
-                const secretKey = fullKeyArray.slice(0, 32);
-                
-                // 3. Creamos el keypair a partir de esos 32 bytes.
-                const ephemeralKeyPair = Ed25519Keypair.fromExportedKeypair(storedData.ephemeralKeyPair);
-
                 // 3. Reconstruir la llave efímera
                 setLog(prev => [...prev, '✅ Step 3/8: Ephemeral keypair reconstructed.']);
 

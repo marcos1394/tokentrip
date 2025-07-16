@@ -1,1 +1,1 @@
-self.__NEXT_FONT_MANIFEST="{\"pages\":{},\"app\":{\"/workspaces/tokentrip/src/app/[locale]/layout\":[\"static/media/e4af272ccee01ff0-s.p.woff2\"]},\"appUsingSizeAdjust\":true,\"pagesUsingSizeAdjust\":false}"
+self.__NEXT_FONT_MANIFEST="{\"pages\":{},\"app\":{\"/home/marcos1394/tokentrip/src/app/layout\":[\"static/media/6c596dfcddeca1e9-s.p.woff2\"],\"/home/marcos1394/tokentrip/src/app/[locale]/layout\":[\"static/media/6c596dfcddeca1e9-s.p.woff2\"]},\"appUsingSizeAdjust\":true,\"pagesUsingSizeAdjust\":false}"
