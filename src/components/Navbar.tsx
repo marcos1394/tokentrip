@@ -7,8 +7,8 @@ import { Plane, Menu, X, User, LogOut } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from './ui/button';
 import { ConnectModal } from './ConnectModal'; 
-// --- AÑADIDO: Hooks para gestionar el estado de la billetera ---
 import { useCurrentAccount, useDisconnectWallet } from '@mysten/dapp-kit';
+import { useZkLoginState } from '@/context/ZkLoginContext'; // <-- 1. Importamos nuestro hook de zkLogin
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,16 +17,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Avatar, AvatarFallback } from './ui/avatar';
 
 
 export function Navbar() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // --- AÑADIDO: Lógica para el estado de conexión ---
-  const account = useCurrentAccount();
+  // --- LÓGICA DE ESTADO UNIFICADO ---
+  const traditionalAccount = useCurrentAccount();
+  const { user: zkLoginUser, logout: zkLogout } = useZkLoginState();
   const { mutate: disconnect } = useDisconnectWallet();
+
+  // La cuenta actual puede venir de CUALQUIERA de las dos fuentes.
+  const currentAccount = traditionalAccount || zkLoginUser;
+
+  const handleLogout = () => {
+    if (traditionalAccount) {
+        disconnect();
+    }
+    if (zkLoginUser) {
+        zkLogout();
+    }
+  }
+  // --- FIN LÓGICA ---
 
   const navLinks = [
     { href: '/#explore', label: 'Explore' },
@@ -35,12 +49,12 @@ export function Navbar() {
     { href: '/governance', label: 'DAO' },
   ];
 
+  // Componente interno para mostrar el estado conectado
   const UserButton = () => (
     <DropdownMenu>
         <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-10 w-10">
-                    {/* En un futuro, el avatar podría venir del perfil del usuario */}
                     <AvatarFallback><User /></AvatarFallback>
                 </Avatar>
             </Button>
@@ -50,12 +64,12 @@ export function Navbar() {
                 <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">Connected</p>
                     <p className="text-xs leading-none text-muted-foreground truncate">
-                        {account?.address}
+                        {currentAccount?.address}
                     </p>
                 </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => disconnect()}>
+            <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
             </DropdownMenuItem>
@@ -84,8 +98,8 @@ export function Navbar() {
 
           <div className="flex items-center space-x-2">
             <div className="hidden sm:block">
-              {/* --- CORRECCIÓN: Renderizado condicional --- */}
-              {account ? <UserButton /> : <ConnectModal />}
+              {/* Renderizado condicional unificado */}
+              {currentAccount ? <UserButton /> : <ConnectModal />}
             </div>
             <ThemeToggle />
             <div className="md:hidden">
@@ -97,12 +111,11 @@ export function Navbar() {
         </div>
       </nav>
 
-      {/* Menú Overlay para Móvil */}
       {isMenuOpen && (
         <div className="md:hidden fixed inset-0 top-[61px] z-40 bg-background/95 backdrop-blur-lg">
-           <div className="sm:hidden p-4 border-b border-white/10">
-              {/* --- CORRECCIÓN: Renderizado condicional también en móvil --- */}
-              {account ? <UserButton /> : <ConnectModal />}
+           <div className="sm:hidden p-4 border-b border-white/10 flex justify-center">
+              {/* Renderizado condicional unificado también en móvil */}
+              {currentAccount ? <UserButton /> : <ConnectModal />}
             </div>
           <div className="container mx-auto px-4 py-8 flex flex-col space-y-6">
             {navLinks.map((link) => (
