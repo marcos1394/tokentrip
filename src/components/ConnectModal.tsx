@@ -33,10 +33,10 @@ export function ConnectModal() {
       console.log("Generated Nonce:", nonce);
       console.log("---------------------------------");
 
-      localStorage.setItem('zk-login-data', JSON.stringify({
-    ephemeralKeyPair: Array.from(ephemeralKeyPair.getSecretKey()),
-        maxEpoch,
-        randomness,
+    localStorage.setItem('zk-login-data', JSON.stringify({
+          ephemeralKeyPair: ephemeralKeyPair.export(), // Usamos el método oficial
+          maxEpoch,
+          randomness,
       }));
 
       const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
