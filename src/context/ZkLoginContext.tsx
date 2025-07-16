@@ -7,10 +7,9 @@ import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 // Define el tipo de datos que guardaremos para nuestro usuario zkLogin
 interface ZkLoginState {
   address: string;
-  proof: any; // Aquí guardaremos la prueba ZKP del backend
+  userSignature: string; // <-- Nombre corregido y tipo específico
   ephemeralKeyPair: Ed25519Keypair;
 }
-
 // Define el tipo del contexto
 interface ZkLoginContextType {
   user: ZkLoginState | null;
