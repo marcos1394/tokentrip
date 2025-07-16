@@ -60,9 +60,10 @@ export default function ExperienceDetailPage() {
         const priceInMist = BigInt(fields.price);
 
         if (fields.is_tkt_listing) {
-            // Lógica para TKT (ya era correcta, pero se incluye para que esté completa)
+            // --- LÓGICA CORREGIDA Y SIMPLIFICADA PARA TKT ---
             const TKT_COIN_TYPE = `${suiConfig.tktPackageId}::tkt::TKT`;
             const { data: userTktCoins } = await suiClient.getCoins({ owner: currentAccount.address, coinType: TKT_COIN_TYPE });
+            
             if (!userTktCoins || userTktCoins.length === 0) {
                 toast({ variant: "destructive", title: "Insufficient Funds", description: "You don't have any TKT tokens." });
                 return;
@@ -74,22 +75,19 @@ export default function ExperienceDetailPage() {
                 return;
             }
 
-            const mainCoin = tx.moveCall({
-                target: '0x2::coin::into_balance',
-                arguments: [tx.object(userTktCoins[0].coinObjectId)],
-                typeArguments: [TKT_COIN_TYPE],
-            });
-
-            if (userTktCoins.length > 1) {
-                tx.mergeCoins(mainCoin, userTktCoins.slice(1).map(c => tx.object(c.coinObjectId)));
+            // Se unen todas las monedas TKT en una sola para asegurar que haya fondos suficientes
+            const [mainCoin, ...otherCoins] = userTktCoins;
+            const mainCoinObject = tx.object(mainCoin.coinObjectId);
+            if (otherCoins.length > 0) {
+                tx.mergeCoins(mainCoinObject, otherCoins.map(c => tx.object(c.coinObjectId)));
             }
 
-            const paymentCoin = tx.moveCall({
-                target: '0x2::coin::from_balance',
-                arguments: [tx.splitCoins(mainCoin, [tx.pure(priceInMist)])],
-                typeArguments: [TKT_COIN_TYPE],
-            });
-            
+            // Se separa la cantidad exacta para el pago de la moneda principal
+            const [paymentCoin] = tx.splitCoins(mainCoinObject, [
+                // --- CORRECCIÓN AQUÍ ---
+                tx.pure.u64(priceInMist.toString()) 
+            ]);
+
             tx.moveCall({
                 target: `${suiConfig.packageId}::experience_nft::purchase_with_tkt`,
                 arguments: [ 
@@ -99,13 +97,15 @@ export default function ExperienceDetailPage() {
                     paymentCoin 
                 ],
             });
-
         } else {
-            // --- CORRECCIÓN EN LA LÓGICA PARA SUI ---
-            const [paymentCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(priceInMist)]);
+            // --- LÓGICA CORREGIDA PARA SUI ---
+            const [paymentCoin] = tx.splitCoins(tx.gas, [
+                // --- CORRECCIÓN AQUÍ ---
+                tx.pure.u64(priceInMist.toString())
+            ]);
+            
             tx.moveCall({
                 target: `${suiConfig.packageId}::experience_nft::purchase`,
-                // Se pasan los argumentos que la función final espera:
                 arguments: [
                     tx.object(listingId),
                     tx.object(suiConfig.vipRegistryId),
@@ -124,7 +124,6 @@ export default function ExperienceDetailPage() {
             toast({ variant: "destructive", title: "❌ Purchase Failed", description: error.message });
         }
     };
-
     const isResale = useMemo(() => fields ? fields.seller !== fields.nft.fields.provider_address : false, [fields]);
     const isOwner = useMemo(() => fields ? fields.seller === currentAccount?.address : false, [fields, currentAccount]);
 
