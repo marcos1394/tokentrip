@@ -35,8 +35,16 @@ export default function AuthCallbackPage() {
                 if (!storedData.ephemeralKeyPair) throw new Error("Ephemeral key pair missing from storage.");
                 setLog(prev => [...prev, '✅ Step 2/8: Ephemeral data retrieved.']);
 
+                 // 1. Reconstruimos el array completo que guardamos.
+                const fullKeyArray = new Uint8Array(storedData.ephemeralKeyPair);
+                
+                // 2. Nos quedamos solo con los primeros 32 bytes, que son la clave secreta.
+                const secretKey = fullKeyArray.slice(0, 32);
+                
+                // 3. Creamos el keypair a partir de esos 32 bytes.
+                const ephemeralKeyPair = Ed25519Keypair.fromSecretKey(secretKey);
+
                 // 3. Reconstruir la llave efímera
-                const ephemeralKeyPair = Ed25519Keypair.fromExportedKeypair(storedData.ephemeralKeyPair);
                 setLog(prev => [...prev, '✅ Step 3/8: Ephemeral keypair reconstructed.']);
 
                 // 4. Obtener el "salt"
