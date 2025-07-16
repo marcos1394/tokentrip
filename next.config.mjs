@@ -2,7 +2,9 @@ import 'dotenv/config';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Puedes añadir configuraciones específicas aquí si es necesario
+experimental: {
+    scrollRestoration: true,
+  },
 };
 
 export default nextConfig;
