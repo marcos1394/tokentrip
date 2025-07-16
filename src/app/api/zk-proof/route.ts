@@ -1,7 +1,7 @@
 // src/app/api/zk-proof/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-const ZKP_PROVER_URL = 'https://prover.mystenlabs.com/v1';
+const ZKP_PROVER_URL = 'https://prover-dev.mystenlabs.com/v1';
 
 export async function POST(req: NextRequest) {
   try {
