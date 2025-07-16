@@ -27,7 +27,7 @@ export function ConnectModal() {
       const nonce = generateNonce(ephemeralKeyPair.getPublicKey(), maxEpoch, randomness);
 
       localStorage.setItem('zk-login-data', JSON.stringify({
-        ephemeralKeyPair: ephemeralKeyPair.export(),
+    ephemeralKeyPair: Array.from(ephemeralKeyPair.getSecretKey()),
         maxEpoch,
         randomness,
       }));
