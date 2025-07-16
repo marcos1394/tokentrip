@@ -68,11 +68,14 @@ export default function AuthCallbackPage() {
                     throw new Error(`Failed to get ZK Proof: ${zkProof.details || 'Unknown error'}`);
                 }
 
-                // 7. Construir la firma final de zkLogin
+                // 1. Se espera a que la firma se genere y se guarda en una variable.
+                const userSignatureBytes = await ephemeralKeyPair.sign(new TextEncoder().encode(jwt_token));
+
+                // 2. Ahora se usa el resultado (que ya no es una promesa) para construir la firma final.
                 const userSignature = getZkLoginSignature({
                     inputs: { ...zkProof },
                     maxEpoch: storedData.maxEpoch,
-                    userSignature: ephemeralKeyPair.sign(new TextEncoder().encode(jwt_token)),
+                    userSignature: userSignatureBytes,
                 });
 
                 // 8. Guardar el estado del usuario en nuestro Context y limpiar
