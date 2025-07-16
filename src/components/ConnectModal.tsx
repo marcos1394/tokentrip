@@ -27,7 +27,7 @@ export function ConnectModal() {
       const nonce = generateNonce(ephemeralKeyPair.getPublicKey(), maxEpoch, randomness);
 
        // --- AÑADIDO: Log para depuración ---
-      console.log("--- zkLogin Data to be Saved ---");
+      console.log("--- zkLogin Data to be Saved .---");
       console.log("maxEpoch:", maxEpoch);
       console.log("randomness:", randomness);
       console.log("Generated Nonce:", nonce);
