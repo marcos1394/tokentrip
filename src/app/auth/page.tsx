@@ -32,8 +32,16 @@ export default function AuthCallbackPage() {
                 const storedDataJSON = localStorage.getItem('zk-login-data');
                 if (!storedDataJSON) throw new Error("Ephemeral data not found in storage.");
                 const storedData = JSON.parse(storedDataJSON);
-                if (!storedData.ephemeralKeyPair) throw new Error("Ephemeral key pair missing from storage.");
-                setLog(prev => [...prev, '✅ Step 2/8: Ephemeral data retrieved.']);
+               // --- CORRECCIÓN: Se recupera la llave desde su propio item ---
+                const secretKey = localStorage.getItem('zk-ephemeral-secret');
+                if (!secretKey) throw new Error("Ephemeral secret key not found.");
+
+                // Se reconstruye el keypair directamente desde el string
+                const ephemeralKeyPair = Ed25519Keypair.fromSecretKey(secretKey);
+
+                // Se limpian ambos items de localStorage
+                localStorage.removeItem('zk-login-data');
+                localStorage.removeItem('zk-ephemeral-secret');
 
                  // 1. Reconstruimos el array completo que guardamos.
                 const fullKeyArray = new Uint8Array(storedData.ephemeralKeyPair);
