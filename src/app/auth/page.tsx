@@ -65,10 +65,17 @@ export default function AuthCallbackPage() {
                 
                 // 6. Obtener la prueba ZKP
                 setLog(prev => [...prev, '⏳ Step 6/8: Requesting ZK Proof...']);
-                const proofResponse = await fetch('/api/zk-proof', {
+               const proofResponse = await fetch('/api/zk-proof', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ jwt: jwt_token })
+                    body: JSON.stringify({
+                        jwt: jwt_token,
+                        // --- LÍNEA AÑADIDA Y CRUCIAL ---
+                        extendedEphemeralPublicKey: ephemeralKeyPair.getPublicKey().toSuiPublicKey(),
+                        maxEpoch: storedData.maxEpoch,
+                        jwtRandomness: storedData.randomness,
+                        keyClaimName: "sub", // "sub" es el estándar para el ID de usuario de Google
+                    })
                 });
                 if (!proofResponse.ok) throw new Error(`ZK Proof service error: ${await proofResponse.text()}`);
                 const zkProof = await proofResponse.json();
