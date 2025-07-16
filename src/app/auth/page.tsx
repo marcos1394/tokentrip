@@ -36,7 +36,7 @@ export default function AuthCallbackPage() {
                 setLog(prev => [...prev, '✅ Step 2/8: Ephemeral data retrieved.']);
 
                 // 3. Reconstruir la llave efímera
-                const ephemeralKeyPair = Ed25519Keypair.fromSecretKey(new Uint8Array(storedData.ephemeralKeyPair));
+                const ephemeralKeyPair = Ed25519Keypair.fromExportedKeypair(storedData.ephemeralKeyPair);
                 setLog(prev => [...prev, '✅ Step 3/8: Ephemeral keypair reconstructed.']);
 
                 // 4. Obtener el "salt"
