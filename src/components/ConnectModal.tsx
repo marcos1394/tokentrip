@@ -33,11 +33,9 @@ export function ConnectModal() {
       console.log("Generated Nonce:", nonce);
       console.log("---------------------------------");
 
-    localStorage.setItem('zk-login-data', JSON.stringify({
-          ephemeralKeyPair: ephemeralKeyPair.export(), // Usamos el método oficial
-          maxEpoch,
-          randomness,
-      }));
+     localStorage.setItem('zk-ephemeral-secret', ephemeralKeyPair.getSecretKey());
+      localStorage.setItem('zk-login-data', JSON.stringify({ maxEpoch, randomness }));
+
 
       const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
       const REDIRECT_URI = window.location.origin + "/auth";
