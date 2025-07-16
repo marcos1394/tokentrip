@@ -43,9 +43,9 @@ export const NotificationEmail = ({
           {mainText}
         </Text>
         <Section style={{ textAlign: 'center' }}>
-          <Button pX={20} pY={12} style={button} href={ctaUrl}>
-            {ctaText}
-          </Button>
+        <Button style={button} href={ctaUrl}>
+  {ctaText}
+</Button>
         </Section>
         <Text style={text}>
           Best,<br/>
