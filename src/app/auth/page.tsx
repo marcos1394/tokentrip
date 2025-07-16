@@ -42,7 +42,7 @@ export default function AuthCallbackPage() {
                 const secretKey = fullKeyArray.slice(0, 32);
                 
                 // 3. Creamos el keypair a partir de esos 32 bytes.
-                const ephemeralKeyPair = Ed25519Keypair.fromSecretKey(secretKey);
+                const ephemeralKeyPair = Ed25519Keypair.fromExportedKeypair(storedData.ephemeralKeyPair);
 
                 // 3. Reconstruir la llave efímera
                 setLog(prev => [...prev, '✅ Step 3/8: Ephemeral keypair reconstructed.']);
