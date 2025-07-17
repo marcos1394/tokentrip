@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useZkLoginState } from '@/context/ZkLoginContext';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
-import { getZkLoginSignature, jwtToAddress, getExtendedEphemeralPublicKey } from '@mysten/sui/zklogin';
+import { getZkLoginSignature, jwtToAddress, getExtendedEphemeralPublicKey, genAddressSeed } from '@mysten/sui/zklogin';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { decodeJwt } from 'jose';
 
 export default function AuthCallbackPage() {
     const router = useRouter();
