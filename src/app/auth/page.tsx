@@ -86,20 +86,42 @@ export default function AuthCallbackPage() {
                 if (!zkProof) throw new Error('Failed to get ZK Proof.');
                 setLog(prev => [...prev, '✅ Step 6/8: ZK Proof received.']);
 
-                // 7. Construir la firma final
+                   // 7. Calcular el 'addressSeed' como lo requiere la documentación
+                const jwtPayload = decodeJwt(jwt_token);
+                const aud = Array.isArray(jwtPayload.aud) ? jwtPayload.aud[0] : jwtPayload.aud;
+                if (!jwtPayload.sub || !aud) {
+                    throw new Error("Missing 'sub' or 'aud' in JWT payload.");
+                }
+
+                const addressSeed = genAddressSeed(
+                    BigInt(salt),
+                    'sub',
+                    jwtPayload.sub,
+                    aud,
+                ).toString();
+                setLog(prev => [...prev, '✅ Step 7/8: Address seed calculated.']);
+                
+
+               // 8. Construir la firma final, AHORA incluyendo el addressSeed
                 const userSignatureBytes = await ephemeralKeyPair.sign(new TextEncoder().encode(jwt_token));
                 const userSignature = getZkLoginSignature({
-                    inputs: { ...zkProof },
+                    inputs: { 
+                        ...zkProof,
+                        addressSeed: addressSeed, // <-- SE AÑADE AQUÍ
+                    },
                     maxEpoch: storedData.maxEpoch,
                     userSignature: userSignatureBytes,
                 });
-                setLog(prev => [...prev, '✅ Step 7/8: Final signature constructed.']);
+                setLog(prev => [...prev, '✅ Step 8/8: Final signature constructed.']);
                 
-                // 8. Guardar el estado del usuario y redirigir
+                // 9. Guardar el estado del usuario y redirigir
                 login({ address, userSignature, ephemeralKeyPair });
                 localStorage.removeItem('zk-login-data');
-                setLog(prev => [...prev, '🚀 Step 8/8: Login successful! Redirecting...']);
+                localStorage.removeItem('zk-ephemeral-secret'); // Limpieza adicional
+                setLog(prev => [...prev, '🚀 Login successful! Redirecting...']);
+                
                 router.push('/dashboard');
+
 
             } catch (err: any) {
                 setError(err.message);
