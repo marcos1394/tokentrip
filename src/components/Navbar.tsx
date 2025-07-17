@@ -49,7 +49,7 @@ export function Navbar() {
   const navLinks = [
     { href: `/${locale}/auctions`, label: 'Auctions' },
     { href: `/${locale}/governance`, label: 'DAO' },
-    { href: `/${locale}/provider/register`, label: 'For Providers' },
+    { href: `/${locale}/provider/register-provider`, label: 'For Providers' },
   ];
 
   const UserButton = () => (

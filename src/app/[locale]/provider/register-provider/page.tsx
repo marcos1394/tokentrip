@@ -19,6 +19,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ProviderInfoCard } from '@/components/provider/ProviderInfoCard';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 const isValidUrl = (urlString: string) => {
     try { 
@@ -36,6 +38,7 @@ export default function RegisterProviderPage() {
     const [name, setName] = useState('');
     const [bio, setBio] = useState('');
     const [imageUrl, setImageUrl] = useState('');
+    const [category, setCategory] = useState('');
 
     const { mutateAsync: signAndExecuteTransaction, isPending } = useSignAndExecuteTransaction();
 
@@ -53,8 +56,8 @@ export default function RegisterProviderPage() {
     const isAlreadyProvider = useMemo(() => existingProfile && existingProfile.data.length > 0, [existingProfile]);
     
     const isFormInvalid = useMemo(() => {
-        return !name.trim() || !bio.trim() || !isValidUrl(imageUrl);
-    }, [name, bio, imageUrl]);
+        return !name.trim() || !bio.trim() || !isValidUrl(imageUrl) || !category;
+    }, [name, bio, imageUrl, category]);
 
     const handleRegister = async () => {
         if (!currentAccount) {
@@ -73,6 +76,7 @@ export default function RegisterProviderPage() {
                 tx.pure.string(name),
                 tx.pure.string(bio),
                 tx.pure.string(imageUrl),
+                tx.pure.string(category), // Se envía la categoría
             ],
         });
 
@@ -141,6 +145,21 @@ export default function RegisterProviderPage() {
                                     <Label htmlFor="name" className="text-muted-foreground">Store or Brand Name</Label>
                                     <Input id="name" placeholder="e.g., Mayan Adventures" value={name} onChange={(e) => setName(e.target.value)} disabled={isPending} />
                                 </div>
+                                   {/* --- AÑADIDO: Selector de Categoría --- */}
+                            <div className="space-y-2">
+                                <Label htmlFor="category">Provider Category</Label>
+                                <Select onValueChange={setCategory} defaultValue={category}>
+                                    <SelectTrigger id="category" disabled={isPending}>
+                                        <SelectValue placeholder="Select your primary category..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Events">🎟️ Event Organizers & Venues</SelectItem>
+                                        <SelectItem value="Hospitality">🏨 Hospitality & Lodging</SelectItem>
+                                        <SelectItem value="Tours">🗺️ Tour & Activity Operators</SelectItem>
+                                        <SelectItem value="Digital">🖥️ Digital Content & Media</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="bio" className="text-muted-foreground">Short Bio</Label>
                                     <Textarea id="bio" placeholder="Describe what you offer in one or two sentences..." value={bio} onChange={(e) => setBio(e.target.value)} disabled={isPending} />
