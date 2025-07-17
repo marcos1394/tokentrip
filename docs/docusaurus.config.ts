@@ -13,10 +13,7 @@ const config: Config = {
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
 
-  i18n: {
-    defaultLocale: 'en',
-    locales: ['en'],
-  },
+ 
 
   plugins: [
     async function myPlugin(context, options) {
@@ -104,7 +101,7 @@ const config: Config = {
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
-      additionalLanguages: ['move'],
+      additionalLanguages: ['rust'],
     },
   } satisfies Preset.ThemeConfig,
 };
