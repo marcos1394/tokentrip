@@ -100,8 +100,7 @@ export async function GET(req: NextRequest) {
             const providerProfile = await suiClient.getObject({ id: parsedData.provider_id, options: { showContent: true }});
             
             if (providerProfile.data?.content?.dataType === 'moveObject') {
-                const fields = providerProfile.data.content.fields as ProviderProfileFields;
-                const { data: providerData } = await supabase.from('notification_settings').select('email').eq('sui_address', fields.owner).single();
+                const fields = providerProfile.data.content.fields as unknown as ProviderProfileFields;                const { data: providerData } = await supabase.from('notification_settings').select('email').eq('sui_address', fields.owner).single();
 
                 if (providerData?.email) {
                     await resend.emails.send({
