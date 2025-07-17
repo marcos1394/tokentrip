@@ -121,7 +121,7 @@ export default function AuthCallbackPage() {
                 localStorage.removeItem('zk-ephemeral-secret'); // Limpieza adicional
                 setLog(prev => [...prev, '🚀 Login successful! Redirecting...']);
                 
-                router.push('/dashboard');
+                router.push('/es');
 
 
             } catch (err: any) {
