@@ -206,7 +206,6 @@ export default function RegisterProviderPage() {
                                     <Label htmlFor="bio" className="text-muted-foreground">Short Bio</Label>
                                     <Textarea id="bio" placeholder="Describe what you offer in one or two sentences..." value={bio} onChange={(e) => setBio(e.target.value)} disabled={isPending} />
                                 </div>
-                                // Reemplaza el Input de la imagen con este
 <div className="space-y-2">
     <Label htmlFor="imageFile" className="text-muted-foreground">Logo or Profile Image</Label>
     <Input 
