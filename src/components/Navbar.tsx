@@ -1,14 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+// --- CORRECCIÓN: Se importa useParams ---
+import { usePathname, useParams } from 'next/navigation';
 import { useState } from 'react';
-import { Plane, Menu, X, User, LogOut } from 'lucide-react';
+import { Plane, Menu, X, User, LogOut, LayoutDashboard, Settings, HandCoins } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from './ui/button';
 import { ConnectModal } from './ConnectModal'; 
 import { useCurrentAccount, useDisconnectWallet } from '@mysten/dapp-kit';
-import { useZkLoginState } from '@/context/ZkLoginContext'; // <-- 1. Importamos nuestro hook de zkLogin
+import { useZkLoginState } from '@/context/ZkLoginContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuGroup
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from './ui/avatar';
 
@@ -24,12 +26,14 @@ export function Navbar() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // --- LÓGICA DE ESTADO UNIFICADO ---
+  // --- CORRECCIÓN: Se obtiene el locale actual de la URL ---
+  const params = useParams();
+  const locale = params.locale;
+
   const traditionalAccount = useCurrentAccount();
   const { user: zkLoginUser, logout: zkLogout } = useZkLoginState();
   const { mutate: disconnect } = useDisconnectWallet();
 
-  // La cuenta actual puede venir de CUALQUIERA de las dos fuentes.
   const currentAccount = traditionalAccount || zkLoginUser;
 
   const handleLogout = () => {
@@ -40,21 +44,19 @@ export function Navbar() {
         zkLogout();
     }
   }
-  // --- FIN LÓGICA ---
 
+  // --- CORRECCIÓN: Los enlaces ahora son dinámicos ---
   const navLinks = [
-    { href: '/#explore', label: 'Explore' },
-    { href: '/staking', label: 'Staking' },
-    { href: '/auctions', label: 'Auctions' },
-    { href: '/governance', label: 'DAO' },
+    { href: `/${locale}/auctions`, label: 'Auctions' },
+    { href: `/${locale}/governance`, label: 'DAO' },
+    { href: `/${locale}/provider/register`, label: 'For Providers' },
   ];
 
-  // Componente interno para mostrar el estado conectado
   const UserButton = () => (
     <DropdownMenu>
         <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                <Avatar className="h-10 w-10">
+                <Avatar className="h-10 w-10 border-2 border-primary/50">
                     <AvatarFallback><User /></AvatarFallback>
                 </Avatar>
             </Button>
@@ -69,6 +71,28 @@ export function Navbar() {
                 </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              {/* --- CORRECCIÓN: Los enlaces ahora son dinámicos --- */}
+              <Link href={`/${locale}/dashboard`}>
+                <DropdownMenuItem>
+                  <LayoutDashboard className="mr-2 h-4 w-4" />
+                  <span>My Dashboard</span>
+                </DropdownMenuItem>
+              </Link>
+              <Link href={`/${locale}/staking`}>
+                <DropdownMenuItem>
+                  <HandCoins className="mr-2 h-4 w-4" />
+                  <span>Staking</span>
+                </DropdownMenuItem>
+              </Link>
+              <Link href={`/${locale}/dashboard/notifications`}>
+                <DropdownMenuItem>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+              </Link>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
@@ -81,14 +105,15 @@ export function Navbar() {
     <>
       <nav className="fixed top-0 w-full z-50 glass-effect border-b border-white/10">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-3">
+          {/* --- CORRECCIÓN: El enlace del logo ahora es dinámico --- */}
+          <Link href={`/${locale}`} className="flex items-center space-x-3">
             <div className="w-9 h-9 sui-gradient rounded-lg flex items-center justify-center shadow-lg shadow-primary/30">
               <Plane className="w-5 h-5 text-white" />
             </div>
             <span className="text-2xl font-bold heading-gradient">TokenTrip</span>
           </Link>
 
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-6">
             {navLinks.map((link) => (
               <Link key={link.href} href={link.href} className={`text-sm font-medium transition-colors ${ pathname === link.href ? 'text-foreground' : 'text-muted-foreground hover:text-foreground' }`}>
                 {link.label}
@@ -98,7 +123,6 @@ export function Navbar() {
 
           <div className="flex items-center space-x-2">
             <div className="hidden sm:block">
-              {/* Renderizado condicional unificado */}
               {currentAccount ? <UserButton /> : <ConnectModal />}
             </div>
             <ThemeToggle />
@@ -114,7 +138,6 @@ export function Navbar() {
       {isMenuOpen && (
         <div className="md:hidden fixed inset-0 top-[61px] z-40 bg-background/95 backdrop-blur-lg">
            <div className="sm:hidden p-4 border-b border-white/10 flex justify-center">
-              {/* Renderizado condicional unificado también en móvil */}
               {currentAccount ? <UserButton /> : <ConnectModal />}
             </div>
           <div className="container mx-auto px-4 py-8 flex flex-col space-y-6">

@@ -40,7 +40,6 @@ export default async function RootLayout({
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"
-            enableSystem
             disableTransitionOnChange={false}
           >
             <I18nProviderClient locale={locale}>
