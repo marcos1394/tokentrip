@@ -9,3 +9,24 @@
   height: 200px;
   width: 200px;
 }
+
+.featureLink {
+  display: block;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+  height: 100%;
+}
+
+.featureLink:hover {
+  text-decoration: none;
+  border-color: var(--ifm-color-primary-light);
+  background-color: var(--ifm-card-background-color);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-5px);
+}
+
+[data-theme='dark'] .featureLink:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
