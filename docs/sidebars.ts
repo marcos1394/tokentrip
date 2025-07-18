@@ -11,6 +11,12 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Auctions',
+      items: ['auctions/introduction', 'auctions/for-sellers', 'auctions/for-bidders'],
+    },
+    
+    {
+      type: 'category',
       label: 'For Travelers',
       items: [
         'for-travelers/Browse-experiences', 
