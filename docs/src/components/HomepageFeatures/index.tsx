@@ -1,62 +1,70 @@
-import type {ReactNode} from 'react';
+import React from 'react';
 import clsx from 'clsx';
+import Link from '@docusaurus/Link';
 import Heading from '@theme/Heading';
 import styles from './styles.module.css';
 
 type FeatureItem = {
   title: string;
   Svg: React.ComponentType<React.ComponentProps<'svg'>>;
-  description: ReactNode;
+  description: JSX.Element;
+  link: string;
 };
 
+// Define el contenido de las tarjetas de características
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Easy to Use',
+    title: 'Getting Started',
     Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
+    link: '/docs/intro',
     description: (
       <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
+        Learn the vision behind TokenTrip and follow our simple guides to connect
+        your wallet and start exploring the decentralized experience economy.
       </>
     ),
   },
   {
-    title: 'Focus on What Matters',
+    title: 'Tokenomics & DAO',
     Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
+    link: '/docs/tokenomics/what-is-tkt',
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        Discover the TKT token, our economic flywheel model, and how you can 
+        participate in the governance that shapes the future of the platform.
       </>
     ),
   },
   {
-    title: 'Powered by React',
+    title: 'For Developers',
     Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
+    link: '/docs/for-developers/introduction',
     description: (
       <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
+        Explore our smart contract architecture, learn how to build on the TokenTrip
+        protocol, and integrate your own dApps with our ecosystem.
       </>
     ),
   },
 ];
 
-function Feature({title, Svg, description}: FeatureItem) {
+function Feature({title, Svg, description, link}: FeatureItem) {
   return (
     <div className={clsx('col col--4')}>
-      <div className="text--center">
-        <Svg className={styles.featureSvg} role="img" />
-      </div>
-      <div className="text--center padding-horiz--md">
-        <Heading as="h3">{title}</Heading>
-        <p>{description}</p>
-      </div>
+      <Link to={link} className={styles.featureLink}>
+        <div className="text--center">
+          <Svg className={styles.featureSvg} role="img" />
+        </div>
+        <div className="text--center padding-horiz--md">
+          <Heading as="h3">{title}</Heading>
+          <p>{description}</p>
+        </div>
+      </Link>
     </div>
   );
 }
 
-export default function HomepageFeatures(): ReactNode {
+export default function HomepageFeatures(): JSX.Element {
   return (
     <section className={styles.features}>
       <div className="container">
