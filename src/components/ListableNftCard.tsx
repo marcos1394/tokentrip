@@ -30,7 +30,7 @@ interface ListableNftCardProps {
             }
         }
     };
-    providerProfileId: string;
+    providerProfileId?: string;
     onActionSuccess: () => void; 
 }
 
