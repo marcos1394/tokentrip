@@ -47,6 +47,8 @@
     "react-i18next": "^15.5.3",
     "react-simple-typewriter": "^5.0.1",
     "resend": "^4.6.0",
+    "react-qr-scanner": "^1.0.0-alpha.11", // <-- Se añade aquí
+    "qrcode.react": "^4.2.0" , 
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
     "ts-node": "^10.9.2"
