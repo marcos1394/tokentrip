@@ -13,7 +13,10 @@ const config: Config = {
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
 
- 
+  i18n: {
+    defaultLocale: 'en',
+    locales: ['en'],
+  },
 
   plugins: [
     async function myPlugin(context, options) {
@@ -34,11 +37,13 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/your-username/tokentrip/tree/main/docs/',
+          editUrl: 'https://github.com/marcos1394/tokentrip/tree/main/docs/',
         },
         blog: {
           showReadingTime: true,
-          editUrl: 'https://github.com/your-username/tokentrip/tree/main/docs/',
+          editUrl: 'https://github.com/marcos1394/tokentrip/tree/main/docs/',
+          // --- AÑADIDO: Se enlaza el archivo de autores ---
+          authorsMapPath: 'authors.yml',
         },
         theme: {
           customCss: './src/css/custom.css',
@@ -64,7 +69,7 @@ const config: Config = {
         },
         {to: '/blog', label: 'Blog', position: 'left'},
         {
-          href: 'https://github.com/your-username/tokentrip', // TU REPO
+          href: 'https://github.com/marcos1394/tokentrip',
           label: 'GitHub',
           position: 'right',
         },
@@ -76,23 +81,24 @@ const config: Config = {
         {
           title: 'Docs',
           items: [
-            { label: 'Getting Started', to: '/docs/intro' },
-            { label: 'Tokenomics', to: '/docs/category/tkt-tokenomics' },
-            { label: 'Governance', to: '/docs/category/dao--governance' },
+            { label: 'Introduction', to: '/docs/intro' },
+            // --- CORRECCIÓN: Se enlaza al primer documento de cada categoría ---
+            { label: 'Tokenomics', to: '/docs/tokenomics/what-is-tkt' },
+            { label: 'Governance', to: '/docs/governance/intro-to-dao' },
           ],
         },
         {
           title: 'Community',
           items: [
-            { label: 'Discord', href: '#' },
-            { label: 'Twitter', href: '#' },
+            { label: 'Discord', href: '#' }, // Reemplazar con tu enlace real
+            { label: 'Twitter', href: '#' }, // Reemplazar con tu enlace real
           ],
         },
         {
           title: 'More',
           items: [
             { label: 'Blog', to: '/blog' },
-            { label: 'GitHub', href: 'https://github.com/your-username/tokentrip' },
+            { label: 'GitHub', href: 'https://github.com/marcos1394/tokentrip' },
           ],
         },
       ],
