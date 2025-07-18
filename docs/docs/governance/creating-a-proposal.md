@@ -26,4 +26,4 @@ Our DAO supports several types of on-chain actions:
     * Quorum percentage
     * Approval threshold
 
-To create a proposal, navigate to the **[Create Proposal page](/governance/create)** on our platform.
+To create a proposal, navigate to the [Create Proposal page](https://tokentrip-3cri.vercel.app/es/governance/create) on our platform.
