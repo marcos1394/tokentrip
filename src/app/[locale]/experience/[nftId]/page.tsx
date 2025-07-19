@@ -54,22 +54,24 @@ export default function ExperienceDetailPage() {
     const suiClient = useSuiClient();
     const queryClient = useQueryClient();
     const { mutateAsync: signAndExecuteTransaction, isPending } = useSignAndExecuteTransaction();
-    // Dentro del componente, junto a tus otras queries
-    const providerId = fields?.provider_id;
-    const { data: providerData, isLoading: isLoadingProvider } = useSuiClientQuery(
-        'getObject',
-        { id: providerId!, options: { showContent: true } },
-        { enabled: !!providerId }
-    );
-    const providerProfile = providerData?.data || null;
 
-    const { data: listingData, isLoading, isError } = useSuiClientQuery('getObject', {
-        id: listingId,
-        options: { showContent: true }
-    });
+// 1. Primero obtenemos los datos del listing
+const { data: listingData, isLoading, isError } = useSuiClientQuery('getObject', {
+    id: listingId,
+    options: { showContent: true }
+});
 
-    const fields = listingData?.data?.content?.dataType === 'moveObject' ? listingData.data.content.fields as unknown as ListingFields : null;
+// 2. A partir de los datos, extraemos los 'fields'
+const fields = listingData?.data?.content?.dataType === 'moveObject' ? listingData.data.content.fields as unknown as ListingFields : null;
 
+// 3. AHORA que 'fields' existe, podemos usarlo para obtener el providerId
+const providerId = fields?.provider_id;
+const { data: providerData, isLoading: isLoadingProvider } = useSuiClientQuery(
+    'getObject',
+    { id: providerId!, options: { showContent: true } },
+    { enabled: !!providerId }
+);
+const providerProfile = providerData?.data || null;
     // Lógica de Transacción Corregida
     // Reemplaza esta función completa
     const handlePurchase = async () => {
