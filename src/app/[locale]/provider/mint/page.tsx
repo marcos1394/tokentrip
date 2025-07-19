@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction, useSuiClientQuery } from '@mysten/dapp-kit';
-import { Transaction, bcs } from '@mysten/sui/transactions';
+import { Transaction } from '@mysten/sui/transactions';
+import { bcs } from '@mysten/sui/bcs';
 import { suiConfig } from '@/config/sui';
 import { useToast } from "@/hooks/use-toast";
 import { useWalrus } from "@/hooks/useWalrus";
