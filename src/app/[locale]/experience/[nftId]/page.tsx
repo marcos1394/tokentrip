@@ -174,7 +174,7 @@ const providerProfile = providerData?.data || null;
                 <div className="grid lg:grid-cols-5 gap-8 lg:gap-12">
                     <div className="lg:col-span-3">
                         <Card className="overflow-hidden shadow-2xl rounded-2xl">
-                            <img src={fields.nft.fields.image_url.url} alt={fields.nft.fields.name} className="w-full h-auto object-cover aspect-video" />
+                        <img src={fields.nft.fields.image_url.fields.url} alt={fields.nft.fields.name} className="w-full h-auto object-cover aspect-video" />
                         </Card>
                     </div>
                     <div className="lg:col-span-2 space-y-6">
