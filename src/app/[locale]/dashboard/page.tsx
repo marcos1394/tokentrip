@@ -142,7 +142,7 @@ export default function DashboardPage() {
     const { data: poesData, isLoading: isLoadingPoes } = useSuiClientQuery('getOwnedObjects', { owner: account?.address!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ProofOfExperience` }, options: { showContent: true } }, { enabled: !!account });
     const { data: receiptsData, isLoading: isLoadingReceipts } = useSuiClientQuery('getOwnedObjects', { owner: account?.address!, filter: { StructType: `${suiConfig.packageId}::experience_nft::PurchaseReceipt` }, options: { showContent: true } }, { enabled: !!account });
 
-    const isProvider = useMemo(() => providerData?.data?.length > 0, [providerData]);
+    const isProvider = useMemo(() => !!providerData?.data && providerData.data.length > 0, [providerData]);    
     const providerProfile = providerData?.data?.[0] as ProviderProfile;
     const nfts = (nftsData?.data as ExperienceNFT[]) ?? [];
     const poes = (poesData?.data as ProofOfExperience[]) ?? [];
