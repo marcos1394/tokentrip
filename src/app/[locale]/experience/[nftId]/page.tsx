@@ -17,13 +17,24 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, ArrowLeft, ShoppingCart, Loader, Store, BadgeCheck, ShieldCheck, Zap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+// Al principio del archivo
+import { EvolutionCard } from '@/components/EvolutionCard';
 
+interface EvolutionRule {
+    trigger_type: number;
+    trigger_value: string;
+    new_image_url: { fields: { url: string } };
+    new_description: string;
+    is_triggered: boolean;
+}
 // Interfaces
 interface NftFields {
     name: string;
     description: string;
-    image_url: { url: string };
+    image_url: { fields: { url: string } };
     provider_address: string;
+    provider_id: string;
+    evolution_rules: EvolutionRule[]; // <-- AÑADIDO
 }
 interface ListingFields {
     price: string;
@@ -43,6 +54,14 @@ export default function ExperienceDetailPage() {
     const suiClient = useSuiClient();
     const queryClient = useQueryClient();
     const { mutateAsync: signAndExecuteTransaction, isPending } = useSignAndExecuteTransaction();
+    // Dentro del componente, junto a tus otras queries
+    const providerId = fields?.provider_id;
+    const { data: providerData, isLoading: isLoadingProvider } = useSuiClientQuery(
+        'getObject',
+        { id: providerId!, options: { showContent: true } },
+        { enabled: !!providerId }
+    );
+    const providerProfile = providerData?.data || null;
 
     const { data: listingData, isLoading, isError } = useSuiClientQuery('getObject', {
         id: listingId,
@@ -203,6 +222,22 @@ export default function ExperienceDetailPage() {
                                 <div className="flex items-center gap-3"><Store className="w-5 h-5 text-purple-500" /><span className="text-muted-foreground">Supports secondary market royalties</span></div>
                             </CardContent>
                         </Card>
+                        {/* --- AÑADIDO: Sección de Evoluciones --- */}
+                        {fields.nft.fields.evolution_rules && fields.nft.fields.evolution_rules.length > 0 && (
+                            <div className="space-y-4">
+                                <h3 className="text-xl font-bold text-foreground">Evolutions</h3>
+                                {fields.nft.fields.evolution_rules.map((rule, index) => (
+                                    <EvolutionCard 
+                                        key={index}
+                                        rule={rule}
+                                        nftId={fields.nft.fields.id.id} // Asumiendo que el ID del NFT está aquí
+                                        providerProfile={providerProfile as any}
+                                        currentImageUrl={fields.nft.fields.image_url.fields.url}
+                                        onEvolveSuccess={() => queryClient.invalidateQueries({ queryKey: ['getObject', listingId]})}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
