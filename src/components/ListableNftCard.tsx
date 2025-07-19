@@ -90,12 +90,28 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess }: Lis
         }
     }
 
-    const handleUpdateDescription = async () => {
-        if (!newDescription.trim()) { toast({ variant: 'destructive', title: 'Description cannot be empty.' }); return; }
+   const handleUpdateDescription = async () => {
+        // --- CORRECCIÓN: Se añade esta verificación al principio ---
+        if (!providerProfileId) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Provider profile ID is missing.' });
+            return;
+        }
+
+        if (!newDescription.trim()) { 
+            toast({ variant: 'destructive', title: 'Description cannot be empty.' }); 
+            return; 
+        }
+
         const tx = new Transaction();
+        // Ahora TypeScript sabe que `providerProfileId` es un string y no dará error.
         tx.moveCall({
             target: `${suiConfig.packageId}::experience_nft::update_nft_description`,
-            arguments: [ tx.object(providerProfileId), tx.object(nft.objectId), tx.pure.string(newDescription) ]
+            arguments: [ 
+                tx.object(providerProfileId), 
+                tx.object(nft.objectId), 
+                tx.pure.string(newDescription),
+                tx.object("0x6") // La función necesita el Clock
+            ]
         });
 
         try {
