@@ -55,14 +55,29 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess }: Lis
     const { mutateAsync: execute, isPending } = useSignAndExecuteTransaction();
 
     const handleListForSale = async () => {
+        // --- CORRECCIÓN: Se añade esta verificación al principio ---
+        if (!providerProfileId) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Provider profile ID is missing. Cannot list item.' });
+            return;
+        }
+
         const priceAsNumber = parseFloat(price);
-        if (isNaN(priceAsNumber) || priceAsNumber <= 0) { toast({ variant: 'destructive', title: 'Invalid Price' }); return; }
+        if (isNaN(priceAsNumber) || priceAsNumber <= 0) { 
+            toast({ variant: 'destructive', title: 'Invalid Price' }); 
+            return; 
+        }
         
         const tx = new Transaction();
         const functionName = currency === 'TKT' ? 'list_for_sale_with_tkt' : 'list_for_sale';
+        
+        // Ahora TypeScript sabe que providerProfileId es un string.
         tx.moveCall({
             target: `${suiConfig.packageId}::experience_nft::${functionName}`,
-            arguments: [tx.object(providerProfileId), tx.object(nft.objectId), tx.pure.u64(BigInt(priceAsNumber * (10 ** 9)))]
+            arguments: [
+                tx.object(providerProfileId), 
+                tx.object(nft.objectId), 
+                tx.pure.u64(BigInt(priceAsNumber * (10 ** 9)).toString())
+            ]
         });
 
         try {
