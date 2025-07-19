@@ -155,7 +155,7 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess }: Lis
             await execute({ transaction: tx });
             toast({ title: '✅ Auction Created!', description: 'Your experience is now up for auction.'});
             setIsAuctionOpen(false);
-            onAction-success();
+            onActionSuccess();
         } catch (err: any) {
             toast({ variant: 'destructive', title: '❌ Failed to Create Auction', description: err.message });
         }
