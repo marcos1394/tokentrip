@@ -125,17 +125,28 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess }: Lis
     }
 
     const handleCreateAuction = async () => {
+        // --- CORRECCIÓN: Se añade esta verificación al principio ---
+        if (!providerProfileId) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Provider profile ID is missing for this action.' });
+            return;
+        }
+
         const startPriceNum = parseFloat(startPrice);
-        if (isNaN(startPriceNum) || startPriceNum <= 0) { toast({ variant: 'destructive', title: 'Invalid start price' }); return; }
+        if (isNaN(startPriceNum) || startPriceNum <= 0) { 
+            toast({ variant: 'destructive', title: 'Invalid start price' }); 
+            return; 
+        }
 
         const tx = new Transaction();
+
+        // Ahora TypeScript sabe que providerProfileId es un string
         tx.moveCall({
-            target: `${suiConfig.packageId}::experience_nft::create_auction`,
+            target: `${suiConfig.auctionsPackageId}::auctions::create_auction`,
             arguments: [
-                tx.object(providerProfileId),
                 tx.object(nft.objectId),
-                tx.pure.u64(BigInt(startPriceNum * 1_000_000_000)),
-                tx.pure.u64(BigInt(duration)),
+                tx.pure.u64(BigInt(startPriceNum * 1_000_000_000).toString()),
+                tx.pure.u64(0), // Reserve price (0 for now)
+                tx.pure.u64(BigInt(duration).toString()),
                 tx.object(SUI_SYSTEM_CLOCK_OBJECT_ID)
             ]
         });
@@ -144,12 +155,12 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess }: Lis
             await execute({ transaction: tx });
             toast({ title: '✅ Auction Created!', description: 'Your experience is now up for auction.'});
             setIsAuctionOpen(false);
-            onActionSuccess();
+            onAction-success();
         } catch (err: any) {
             toast({ variant: 'destructive', title: '❌ Failed to Create Auction', description: err.message });
         }
     }
-
+    
     const { name, image_url } = nft.display.data;
 
     return (
