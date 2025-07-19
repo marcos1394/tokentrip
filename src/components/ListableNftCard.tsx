@@ -31,7 +31,11 @@ interface ListableNftCardProps {
         }
     };
     providerProfileId?: string;
-    onActionSuccess: () => void; 
+    onActionSuccess: () => void;
+    
+    // --- LÍNEAS AÑADIDAS ---
+    isListing?: boolean;      // Opcional: true si el NFT ya está listado
+    listingData?: any;        // Opcional: para pasar los datos del objeto Listing
 }
 
 const SUI_SYSTEM_CLOCK_OBJECT_ID = "0x6";
