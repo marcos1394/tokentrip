@@ -36,6 +36,8 @@ interface ListableNftCardProps {
     // --- LÍNEAS AÑADIDAS ---
     isListing?: boolean;      // Opcional: true si el NFT ya está listado
     listingData?: any;        // Opcional: para pasar los datos del objeto Listing
+    isFraction?: boolean; // <-- AÑADIDO: Para saber si es una fracción
+
 }
 
 const SUI_SYSTEM_CLOCK_OBJECT_ID = "0x6";
@@ -44,6 +46,12 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess }: Lis
     const [isListOpen, setIsListOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isAuctionOpen, setIsAuctionOpen] = useState(false);
+     // --- ESTADOS PARA EL MODAL DE ALQUILER ---
+    const [isRentOpen, setIsRentOpen] = useState(false);
+    const [rentPrice, setRentPrice] = useState('');
+    const [rentCurrency, setRentCurrency] = useState<'SUI' | 'TKT'>('SUI');
+    const [rentStartDate, setRentStartDate] = useState<Date>();
+    const [rentEndDate, setRentEndDate] = useState<Date>();
     
     const [price, setPrice] = useState('');
     const [currency, setCurrency] = useState<'SUI' | 'TKT'>('SUI');
@@ -53,6 +61,48 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess }: Lis
 
     const { toast } = useToast();
     const { mutateAsync: execute, isPending } = useSignAndExecuteTransaction();
+
+     // --- FUNCIÓN PARA LISTAR EN ALQUILER ---
+    const handleListForRent = async () => {
+        const rentPriceNum = parseFloat(rentPrice);
+        if (isNaN(rentPriceNum) || rentPriceNum <= 0) {
+             toast({ variant: 'destructive', title: 'Invalid Price' }); return;
+        }
+        if (!rentStartDate || !rentEndDate || rentEndDate <= rentStartDate) {
+             toast({ variant: 'destructive', title: 'Invalid Dates', description: 'Please select a valid start and end date for the rental.' }); return;
+        }
+
+        const tx = new Transaction();
+        const functionPrefix = isFraction ? 'list_fraction_for_rent' : 'list_nft_for_rent';
+        const functionName = rentCurrency === 'TKT' ? `${functionPrefix}_tkt` : functionPrefix;
+
+        const args = [
+            tx.object(nft.objectId),
+            tx.pure.u64(BigInt(rentPriceNum * 1e9).toString()),
+            tx.pure.u64(rentStartDate.getTime().toString()),
+            tx.pure.u64(rentEndDate.getTime().toString()),
+        ];
+        
+        // Los listados de NFTs completos necesitan el Clock para la verificación de expiración
+        if (!isFraction) {
+            args.push(tx.object(SUI_SYSTEM_CLOCK_OBJECT_ID));
+        }
+
+        tx.moveCall({
+            target: `${suiConfig.rentalPackageId}::rental_market::${functionName}`,
+            arguments: args,
+        });
+
+        try {
+            await execute({ transaction: tx });
+            toast({ title: '✅ Success!', description: `Your asset has been listed for rent in ${rentCurrency}.` });
+            setIsRentOpen(false);
+            onActionSuccess();
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: '❌ Rental Listing Failed', description: error.message });
+        }
+    }
+
 
     const handleListForSale = async () => {
         // --- CORRECCIÓN: Se añade esta verificación al principio ---
@@ -211,6 +261,45 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess }: Lis
                                     </div>
                                 </div>
                                 <DialogFooter><Button onClick={handleCreateAuction} disabled={isPending} className="w-full btn-sui">Start Auction</Button></DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                        {/* --- AÑADIDO: Diálogo para Alquiler --- */}
+                        <Dialog open={isRentOpen} onOpenChange={setIsRentOpen}>
+                            <DialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                    <Key className="mr-2 h-4 w-4" /> List for Rent
+                                </DropdownMenuItem>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>List Asset for Rent</DialogTitle>
+                                    <DialogDescription>Set the price and duration for the rental period.</DialogDescription>
+                                </DialogHeader>
+                                <div className="py-4 space-y-4">
+                                    <RadioGroup defaultValue="SUI" value={rentCurrency} onValueChange={(value: 'SUI' | 'TKT') => setRentCurrency(value)}>
+                                        <div className="flex items-center space-x-2"><RadioGroupItem value="SUI" id="r-sui-rent"/><Label htmlFor="r-sui-rent">Rent in SUI</Label></div>
+                                        <div className="flex items-center space-x-2"><RadioGroupItem value="TKT" id="r-tkt-rent"/><Label htmlFor="r-tkt-rent">Rent in TKT</Label></div>
+                                    </RadioGroup>
+                                    <div>
+                                        <Label htmlFor="rent-price">Price ({rentCurrency})</Label>
+                                        <Input id="rent-price" type="number" placeholder="e.g., 10" value={rentPrice} onChange={(e) => setRentPrice(e.target.value)} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Rental Start Date</Label>
+                                            <DatePicker date={rentStartDate} setDate={setRentStartDate} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Rental End Date</Label>
+                                            <DatePicker date={rentEndDate} setDate={setRentEndDate} />
+                                        </div>
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button onClick={handleListForRent} disabled={isPending} className="w-full btn-sui">
+                                        Confirm Rental Listing
+                                    </Button>
+                                </DialogFooter>
                             </DialogContent>
                         </Dialog>
                         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
