@@ -54,8 +54,20 @@ function UserDashboard({ nfts, poes, receipts, rentedReceipts }: { nfts: Experie
                     <TabsTrigger value="rentals">My Rentals</TabsTrigger>
                     <TabsTrigger value="reviews">Pending Reviews</TabsTrigger>
                 </TabsList>
-                <TabsContent value="collection" className="mt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{nfts.map((nft) => (nft.data?.display && <ListableNftCard key={nft.data.objectId} nft={nft.data} onActionSuccess={() => {}} isFraction={false} />))}</div> 
+               <TabsContent value="collection" className="mt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {nfts
+                            .filter(nft => nft.data?.display) // 1. Filtra solo los NFTs que tienen datos de display
+                            .map((nft) => (                   // 2. Ahora mapea sobre la lista filtrada y segura
+                                <ListableNftCard 
+                                    key={nft.data.objectId} 
+                                    nft={nft.data} 
+                                    onActionSuccess={() => {}} 
+                                    isFraction={false} 
+                                />
+                            ))
+                        }
+                    </div>
                     {nfts.length === 0 && <EmptyState icon={Inbox} title="Your Collection is Empty" description="Purchase an experience NFT from the marketplace to see it here." />}
                 </TabsContent>
                 <TabsContent value="memories" className="mt-6">
@@ -113,9 +125,26 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
                     {activeListings && activeListings.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{activeListings.map((listing: any) => (listing.data && <ListableNftCard key={listing.data.objectId} nft={listing.data.content.fields.nft} listingData={listing.data} onActionSuccess={handleActionSuccess} isListing /> ))}</div>
                     ) : (!isLoadingActiveListings && <EmptyState icon={PackageOpen} title="You have no active listings" description="List an item from your inventory to get started!" />)}
                 </TabsContent>
-                <TabsContent value="inventory" className="mt-6">
-                    {nfts.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"> {nfts.map((nft) => (nft.data?.display && <ListableNftCard key={nft.data.objectId} nft={nft.data} onActionSuccess={handleActionSuccess} providerProfileId={providerProfile.data.objectId} isFraction={false} />))}</div>
-                    ) : (<EmptyState icon={Inbox} title="Your inventory is empty" description="As an admin, mint a new experience to this address to see it here." />)}
+              <TabsContent value="inventory" className="mt-6">
+                    {(() => {
+                        // Se crea una variable con los NFTs ya filtrados
+                        const filteredNfts = nfts.filter(nft => nft.data?.display);
+                        return filteredNfts.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {filteredNfts.map((nft) => (
+                                    <ListableNftCard 
+                                        key={nft.data.objectId} 
+                                        nft={nft.data} 
+                                        onActionSuccess={handleActionSuccess} 
+                                        providerProfileId={providerProfile.data.objectId}
+                                        isFraction={false}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <EmptyState icon={Inbox} title="Your inventory is empty" description="As an admin, mint a new experience to this address to see it here." />
+                        )
+                    })()}
                 </TabsContent>
                 <TabsContent value="rentals" className="mt-6">
                     <div className="space-y-8">
