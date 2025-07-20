@@ -2,9 +2,8 @@
 'use client';
 
 import { useGetLoanRequests } from "@/hooks/useGetLoanRequests";
-import { Loader2, ServerCrash } from "lucide-react";
-// En el futuro, crearemos un componente <LoanRequestCard />
-// import { LoanRequestCard } from "@/components/LoanRequestCard"; 
+import { LoanRequestCard } from "@/components/LoanRequestCard"; 
+import { Loader2, ServerCrash, PiggyBank } from "lucide-react";
 
 export default function LendingPage() {
     const { data: requests, isLoading, isError } = useGetLoanRequests();
@@ -16,28 +15,37 @@ export default function LendingPage() {
                     P2P Lending Marketplace
                 </h1>
                 <p className="text-lg text-muted-foreground max-w-2xl mx-auto text-balance mt-4">
-                    Earn yield by lending SUI or TKT, or borrow against your Experience NFTs.
+                    Earn yield by lending SUI or TKT, or unlock liquidity by borrowing against your Experience NFTs.
                 </p>
             </div>
 
-            {isLoading && <div className="flex justify-center py-24"><Loader2 className="w-12 h-12 animate-spin text-primary" /></div>}
-            {isError && <div className="text-center py-24 text-destructive">Failed to load loan requests.</div>}
+            {isLoading && (
+                <div className="flex justify-center py-24">
+                    <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                </div>
+            )}
+            
+            {isError && (
+                <div className="text-center py-24 text-destructive space-y-4">
+                    <ServerCrash className="w-12 h-12 mx-auto" />
+                    <h2 className="text-2xl font-bold">Failed to Load Loan Requests</h2>
+                    <p>There was an error fetching data from the network. Please try again later.</p>
+                </div>
+            )}
 
             {!isLoading && requests && (
                 requests.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {/* Aquí mapearíamos los `requests` y renderizaríamos un <LoanRequestCard /> para cada uno */}
                         {requests.map(req => (
-                           <div key={req.requestId} className="p-4 border rounded-lg glass-card">
-                               <img src={req.nft.imageUrl} alt={req.nft.name} className="w-full h-40 object-cover rounded-md mb-2"/>
-                               <h3 className="font-bold truncate">{req.nft.name}</h3>
-                               <p>Borrow {req.principal} {req.currency}</p>
-                               <p>Repay {req.repayment} {req.currency} in {req.durationDays} days</p>
-                           </div>
+                           <LoanRequestCard key={req.requestId} request={req} />
                         ))}
                     </div>
                 ) : (
-                    <div className="text-center py-24 text-muted-foreground">No loan requests available at the moment.</div>
+                    <div className="text-center py-24 text-muted-foreground space-y-4">
+                        <PiggyBank className="w-12 h-12 mx-auto" />
+                        <h2 className="text-2xl font-bold">No Loan Requests Available</h2>
+                        <p>Be the first to create or fund a loan on TokenTrip!</p>
+                    </div>
                 )
             )}
         </div>
