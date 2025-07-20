@@ -1,7 +1,7 @@
 // src/app/[locale]/lending/page.tsx
 'use client';
 
-import { useGetLoanRequests } from "@/hooks/useGetLoanRequests";
+import { useGetLoanRequests } from "@/hooks/useGetLoanRequest";
 import { LoanRequestCard } from "@/components/LoanRequestCard"; 
 import { Loader2, ServerCrash, PiggyBank } from "lucide-react";
 
