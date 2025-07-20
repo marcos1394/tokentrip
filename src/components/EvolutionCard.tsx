@@ -19,6 +19,7 @@ interface EvolutionRule {
     is_triggered: boolean;
 }
 interface ProviderProfile {
+    objectId: string; // <-- Se añade el objectId
     content: { fields: { total_reviews: string } };
 }
 
