@@ -22,6 +22,8 @@ interface ProviderProfile { data: { objectId: string; content: { fields: { id: {
 interface ExperienceNFT { data: { objectId: string; content: { fields: any }, display: any } }
 interface PurchaseReceipt { data: { objectId: string; content: { fields: any } } }
 interface ProofOfExperience { data: { objectId: string; content: { fields: any } } }
+interface RentalListing { data: { objectId: string; content: { fields: any } } }
+interface RentalReceipt { data: { objectId: string; content: { fields: any } } }
 
 // Sub-componentes
 function StatCard({ title, value, icon: Icon }: { title: string, value: string | number, icon: React.ElementType }) {
@@ -141,9 +143,20 @@ export default function DashboardPage() {
     const { data: nftsData, isLoading: isLoadingNfts } = useSuiClientQuery('getOwnedObjects', { owner: account?.address!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ExperienceNFT` }, options: { showContent: true, showDisplay: true } }, { enabled: !!account });
     const { data: poesData, isLoading: isLoadingPoes } = useSuiClientQuery('getOwnedObjects', { owner: account?.address!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ProofOfExperience` }, options: { showContent: true } }, { enabled: !!account });
     const { data: receiptsData, isLoading: isLoadingReceipts } = useSuiClientQuery('getOwnedObjects', { owner: account?.address!, filter: { StructType: `${suiConfig.packageId}::experience_nft::PurchaseReceipt` }, options: { showContent: true } }, { enabled: !!account });
+    const { data: rentalListingsData, isLoading: isLoadingListings } = useSuiClientQuery(
+        'getOwnedObjects', 
+        { owner: account?.address!, filter: { StructType: `${suiConfig.rentalPackageId}::rental_market::RentalListing` }, options: { showContent: true } },
+        { enabled: !!account }
+    );
+    const { data: rentedReceiptsData, isLoading: isLoadingReceiptsRental } = useSuiClientQuery(
+        'getOwnedObjects', 
+        { owner: account?.address!, filter: { StructType: `${suiConfig.rentalPackageId}::rental_market::RentalReceipt` }, options: { showContent: true } },
+        { enabled: !!account }
+    );
 
-    const isProvider = useMemo(() => !!providerData?.data && providerData.data.length > 0, [providerData]);    
-    const providerProfile = providerData?.data?.[0] as unknown as ProviderProfile;
+    const rentalListings = (rentalListingsData?.data as RentalListing[]) ?? [];
+    const rentedReceipts = (rentedReceiptsData?.data as RentalReceipt[]) ?? [];
+    const isLoading = isLoadingProfile || isLoadingNfts || isLoadingPoes || isLoadingReceipts || isLoadingListings || isLoadingReceiptsRental;
     const nfts = (nftsData?.data as ExperienceNFT[]) ?? [];
     const poes = (poesData?.data as ProofOfExperience[]) ?? [];
     const receipts = (receiptsData?.data as PurchaseReceipt[]) ?? [];
@@ -155,9 +168,9 @@ export default function DashboardPage() {
                 {isLoading ? (
                     <div className="flex items-center justify-center pt-24"><Loader2 className="animate-spin h-10 w-10" /></div>
                 ) : (
-                    isProvider ? 
-                        <ProviderDashboard providerProfile={providerProfile} nfts={nfts} poes={poes} receipts={receipts} /> : 
-                        <UserDashboard nfts={nfts} poes={poes} receipts={receipts} />
+                   isProvider ? 
+        <ProviderDashboard providerProfile={providerProfile} nfts={nfts} poes={poes} receipts={receipts} rentalListings={rentalListings} rentedReceipts={rentedReceipts} /> : 
+        <UserDashboard nfts={nfts} poes={poes} receipts={receipts} rentedReceipts={rentedReceipts} />
                 )}
             </div>
         </div>
