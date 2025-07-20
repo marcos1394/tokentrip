@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 interface ListableNftCardProps {
     nft: {
         objectId: string;
-        display: {
+        display?: {
             data: {
                 name: string;
                 image_url: string;
@@ -211,7 +211,9 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess }: Lis
         }
     }
     
-    const { name, image_url } = nft.display.data;
+     const name = nft.display?.data?.name ?? 'Untitled Experience';
+    const imageUrl = nft.display?.data?.image_url ?? 'https://placehold.co/400x400?text=No+Image';
+
 
     return (
         <Card className="glass-card card-hover flex flex-col group">
