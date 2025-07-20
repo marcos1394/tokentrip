@@ -29,6 +29,7 @@ interface EvolutionRule {
 }
 // Interfaces
 interface NftFields {
+    id: { id: string }; // <-- AÑADE ESTA LÍNEA
     name: string;
     description: string;
     image_url: { fields: { url: string } };
