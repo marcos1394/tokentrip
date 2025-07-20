@@ -55,7 +55,7 @@ function UserDashboard({ nfts, poes, receipts, rentedReceipts }: { nfts: Experie
                     <TabsTrigger value="reviews">Pending Reviews</TabsTrigger>
                 </TabsList>
                 <TabsContent value="collection" className="mt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{nfts.map((nft) => ( <ListableNftCard key={nft.data.objectId} nft={nft.data} onActionSuccess={() => {}}  isFraction={false} /> ))}</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{nfts.map((nft) => (nft.data?.display && <ListableNftCard key={nft.data.objectId} nft={nft.data} onActionSuccess={() => {}} isFraction={false} />))}</div> 
                     {nfts.length === 0 && <EmptyState icon={Inbox} title="Your Collection is Empty" description="Purchase an experience NFT from the marketplace to see it here." />}
                 </TabsContent>
                 <TabsContent value="memories" className="mt-6">
@@ -114,7 +114,7 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
                     ) : (!isLoadingActiveListings && <EmptyState icon={PackageOpen} title="You have no active listings" description="List an item from your inventory to get started!" />)}
                 </TabsContent>
                 <TabsContent value="inventory" className="mt-6">
-                    {nfts.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{nfts.map((nft) => (<ListableNftCard key={nft.data.objectId} nft={nft.data} onActionSuccess={handleActionSuccess} providerProfileId={providerProfile.data.objectId} isFraction={false} />))}</div>
+                    {nfts.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"> {nfts.map((nft) => (nft.data?.display && <ListableNftCard key={nft.data.objectId} nft={nft.data} onActionSuccess={handleActionSuccess} providerProfileId={providerProfile.data.objectId} isFraction={false} />))}</div>
                     ) : (<EmptyState icon={Inbox} title="Your inventory is empty" description="As an admin, mint a new experience to this address to see it here." />)}
                 </TabsContent>
                 <TabsContent value="rentals" className="mt-6">
