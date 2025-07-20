@@ -99,14 +99,28 @@ export function useGetRentalListings() {
             
             if (!fields || fields.is_rented) return null;
 
+            // --- INICIA CORRECCIÓN ---
+            let assetId: string, name: string, imageUrl: string;
             const isFraction = !!fields.fraction.fields.some;
-            const assetData = isFraction 
-                ? fields.fraction.fields.some!.fields 
-                : fields.experience_nft.fields.some!.fields;
-            const imageUrl = isFraction 
-                ? assetData.parent_image_url.fields.url
-                : assetData.image_url.fields.url;
-            const name = isFraction ? assetData.parent_name : assetData.name;
+
+            if (isFraction) {
+                // TypeScript ahora sabe que aquí solo trabajamos con la estructura de una Fracción
+                const fractionData = fields.fraction.fields.some!.fields;
+                assetId = fractionData.id.id;
+                name = fractionData.parent_name;
+                imageUrl = fractionData.parent_image_url.fields.url;
+            } else {
+                // Si no es una fracción, debe ser un NFT completo.
+                const nftData = fields.experience_nft.fields.some?.fields;
+                // Verificación extra por si el NFT no estuviera presente
+                if (!nftData) return null;
+
+                // TypeScript ahora sabe que aquí solo trabajamos con la estructura de un ExperienceNFT
+                assetId = nftData.id.id;
+                name = nftData.name;
+                imageUrl = nftData.image_url.fields.url;
+            }
+            // --- FIN CORRECCIÓN ---
 
             return {
               listingId: node.objectId,
@@ -117,7 +131,7 @@ export function useGetRentalListings() {
               endTime: fields.end_timestamp_ms,
               isRented: fields.is_rented,
               asset: {
-                id: assetData.id.id,
+                id: assetId,
                 name: name,
                 imageUrl: imageUrl,
                 isFraction: isFraction,
