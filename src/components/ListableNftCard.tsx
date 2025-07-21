@@ -42,8 +42,7 @@ interface ListableNftCardProps {
 
 const SUI_SYSTEM_CLOCK_OBJECT_ID = "0x6";
 
-export function ListableNftCard({ nft, providerProfileId, onActionSuccess }: ListableNftCardProps) {
-    const [isListOpen, setIsListOpen] = useState(false);
+export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isListing, listingData, isFraction }: ListableNftCardProps) {    
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isAuctionOpen, setIsAuctionOpen] = useState(false);
      // --- ESTADOS PARA EL MODAL DE ALQUILER ---
