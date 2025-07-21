@@ -14,6 +14,31 @@ const sidebars: SidebarsConfig = {
       label: 'Auctions',
       items: ['auctions/introduction', 'auctions/for-sellers', 'auctions/for-bidders'],
     },
+
+    {
+      type: 'category',
+      label: 'Advanced Features',
+      items: [
+        {
+          type: 'category',
+          label: 'Evolving NFTs',
+          link: { type: 'doc', id: 'advanced/evolving-nfts/introduction' },
+          items: ['advanced/evolving-nfts/for-creators', 'advanced/evolving-nfts/for-collectors'],
+        },
+        {
+          type: 'category',
+          label: 'Rental Marketplace',
+          link: { type: 'doc', id: 'advanced/rentals/introduction' },
+          items: ['advanced/rentals/for-owners', 'advanced/rentals/for-renters'],
+        },
+        {
+          type: 'category',
+          label: 'P2P Lending',
+          link: { type: 'doc', id: 'advanced/lending/introduction' },
+          items: ['advanced/lending/for-borrowers', 'advanced/lending/for-lenders'],
+        },
+      ],
+    },
     
     {
       type: 'category',
