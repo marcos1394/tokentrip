@@ -305,6 +305,52 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isLis
                                 <DialogFooter><Button onClick={handleCreateAuction} disabled={isPending} className="w-full btn-sui">Start Auction</Button></DialogFooter>
                             </DialogContent>
                         </Dialog>
+                        {/* --- AÑADIDO: Diálogo para Solicitud de Préstamo --- */}
+                        <Dialog open={isLoanRequestOpen} onOpenChange={setIsLoanRequestOpen}>
+                            <DialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                    <Landmark className="mr-2 h-4 w-4" /> Request Loan
+                                </DropdownMenuItem>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Request a P2P Loan</DialogTitle>
+                                    <DialogDescription>Use this NFT as collateral to request a loan from other users.</DialogDescription>
+                                </DialogHeader>
+                                <div className="py-4 space-y-4">
+                                    <RadioGroup defaultValue="SUI" value={loanCurrency} onValueChange={(value: 'SUI' | 'TKT') => setLoanCurrency(value)}>
+                                        <div className="flex items-center space-x-2"><RadioGroupItem value="SUI" id="r-sui-loan"/><Label htmlFor="r-sui-loan">Request in SUI</Label></div>
+                                        <div className="flex items-center space-x-2"><RadioGroupItem value="TKT" id="r-tkt-loan"/><Label htmlFor="r-tkt-loan">Request in TKT</Label></div>
+                                    </RadioGroup>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="principal">Borrow Amount</Label>
+                                            <Input id="principal" type="number" placeholder="e.g., 100" value={principalAmount} onChange={(e) => setPrincipalAmount(e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="repayment">Repayment Amount</Label>
+                                            <Input id="repayment" type="number" placeholder="e.g., 110" value={repaymentAmount} onChange={(e) => setRepaymentAmount(e.target.value)} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="duration-loan">Loan Duration</Label>
+                                        <Select onValueChange={setLoanDuration} defaultValue={loanDuration}>
+                                            <SelectTrigger><SelectValue placeholder="Select duration" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="604800000">7 Days</SelectItem>
+                                                <SelectItem value="1209600000">14 Days</SelectItem>
+                                                <SelectItem value="2592000000">30 Days</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button onClick={handleCreateLoanRequest} disabled={isPending} className="w-full btn-sui">
+                                        Create Loan Request
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                         {/* --- AÑADIDO: Diálogo para Alquiler --- */}
                         <Dialog open={isRentOpen} onOpenChange={setIsRentOpen}>
                             <DialogTrigger asChild>
