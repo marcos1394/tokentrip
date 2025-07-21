@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { suiConfig } from '@/config/sui';
 import { useQueryClient } from '@tanstack/react-query';
+import { AnimatedBackground } from "@/components/animated-background";
 
 // Componentes
 import { Button } from '@/components/ui/button';
