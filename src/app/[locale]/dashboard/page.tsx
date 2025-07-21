@@ -19,6 +19,11 @@ import { RentedReceiptCard } from '@/components/dashboard/RentedReceiptCard';
 import { Loader2, Store, PackageOpen, Inbox, History, Edit, Star, BarChart2, Coins, Key } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
+// --- HOOKS Y COMPONENTES PARA PRÉSTAMOS ---
+import { useGetLoanRequests, LoanRequest } from '@/hooks/useGetLoanRequests';
+import { useGetActiveLoans, ActiveLoan } from '@/hooks/useGetActiveLoans';
+import { LoanRequestManagementCard } from '@/components/dashboard/LoanRequestManagementCard';
+import { ActiveLoanCard } from '@/components/dashboard/ActiveLoanCard';
 
 // Interfaces
 interface SuiObject { data: { objectId: string; content: { fields: any; }; display?: any; }; }
