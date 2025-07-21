@@ -109,6 +109,40 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isLis
         }
     }
 
+    const handleCreateLoanRequest = async () => {
+        const principalNum = parseFloat(principalAmount);
+        const repaymentNum = parseFloat(repaymentAmount);
+
+        if (isNaN(principalNum) || principalNum <= 0 || isNaN(repaymentNum) || repaymentNum <= principalNum) {
+            toast({ variant: 'destructive', title: 'Invalid Loan Terms', description: 'Please enter valid numbers. Repayment must be greater than the principal.' });
+            return;
+        }
+
+        const tx = new Transaction();
+        const functionPrefix = isFraction ? 'create_fraction_loan_request' : 'create_nft_loan_request';
+        const isTktLoan = loanCurrency === 'TKT';
+
+        tx.moveCall({
+            target: `${suiConfig.lendingPackageId}::lending_market::${functionPrefix}`,
+            arguments: [
+                tx.object(nft.objectId),
+                tx.pure.u64(BigInt(principalNum * 1e9).toString()),
+                tx.pure.u64(BigInt(repaymentNum * 1e9).toString()),
+                tx.pure.u64(loanDuration),
+                tx.pure.bool(isTktLoan),
+            ],
+        });
+
+        try {
+            await execute({ transaction: tx });
+            toast({ title: '✅ Loan Request Created!', description: 'Your request is now live on the lending marketplace.' });
+            setIsLoanRequestOpen(false);
+            onActionSuccess();
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: '❌ Request Failed', description: error.message });
+        }
+    };
+
 
     const handleListForSale = async () => {
         // --- CORRECCIÓN: Se añade esta verificación al principio ---
