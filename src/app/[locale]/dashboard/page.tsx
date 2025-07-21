@@ -33,6 +33,33 @@ interface PurchaseReceipt extends SuiObject {}
 interface ProofOfExperience extends SuiObject {}
 interface RentalListing extends SuiObject {}
 interface RentalReceipt extends SuiObject {}
+interface LoanRequest {
+    requestId: string;
+    borrower: string;
+    principal: number;
+    repayment: number;
+    durationDays: number;
+    currency: 'SUI' | 'TKT';
+    nft: {
+        id: string;
+        name: string;
+        imageUrl: string;
+    }
+}
+
+interface ActiveLoan {
+    loanId: string;
+    borrower: string;
+    lender: string;
+    repayment: number;
+    dueDate: number; // en milisegundos
+    currency: 'SUI' | 'TKT';
+    nft: {
+        id: string;
+        name: string;
+        imageUrl: string;
+    }
+}
 
 // Sub-componentes
 function StatCard({ title, value, icon: Icon }: { title: string, value: string | number, icon: React.ElementType }) {
