@@ -55,7 +55,7 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess }: Lis
     
     const [price, setPrice] = useState('');
     const [currency, setCurrency] = useState<'SUI' | 'TKT'>('SUI');
-    const [newDescription, setNewDescription] = useState(nft.display.data.description || '');
+    const [newDescription, setNewDescription] = useState(nft.display?.data?.description || '');
     const [startPrice, setStartPrice] = useState('');
     const [duration, setDuration] = useState('86400000'); // 1 day in ms
 
