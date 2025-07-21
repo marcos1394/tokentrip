@@ -33,7 +33,7 @@ export function ActiveLoanCard({ loan, role, onActionSuccess }: ActiveLoanCardPr
                 const { data: tktCoins } = await suiClient.getCoins({ owner: account.address, coinType: tktCoinType });
                 if (!tktCoins || tktCoins.length === 0) throw new Error("You have no TKT coins.");
                 
-                const mainCoin = tx.object(tktCoins.[0].coinObjectId);
+                const mainCoin = tx.object(tktCoins[0].coinObjectId);
                 if (tktCoins.length > 1) tx.mergeCoins(mainCoin, tktCoins.slice(1).map(c => tx.object(c.coinObjectId)));
                 
                 const [paymentCoin] = tx.splitCoins(mainCoin, [tx.pure.u64(repaymentInMist.toString())]);
