@@ -58,6 +58,12 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isLis
     const [newDescription, setNewDescription] = useState(nft.display?.data?.description || '');
     const [startPrice, setStartPrice] = useState('');
     const [duration, setDuration] = useState('86400000'); // 1 day in ms
+    // --- AÑADIR ESTOS ESTADOS PARA EL MODAL DE SOLICITUD DE PRÉSTAMO ---
+    const [isLoanRequestOpen, setIsLoanRequestOpen] = useState(false);
+    const [principalAmount, setPrincipalAmount] = useState('');
+    const [repaymentAmount, setRepaymentAmount] = useState('');
+    const [loanDuration, setLoanDuration] = useState('2592000000'); // 30 días en ms
+    const [loanCurrency, setLoanCurrency] = useState<'SUI' | 'TKT'>('SUI');
 
     const { toast } = useToast();
     const { mutateAsync: execute, isPending } = useSignAndExecuteTransaction();
