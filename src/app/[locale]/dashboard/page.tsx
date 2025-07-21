@@ -85,6 +85,7 @@ function UserDashboard({ nfts, poes, receipts, rentedReceipts }: { nfts: Experie
                     <TabsTrigger value="collection">My Collection</TabsTrigger>
                     <TabsTrigger value="memories">My Memories</TabsTrigger>
                     <TabsTrigger value="rentals">My Rentals</TabsTrigger>
+                    <TabsTrigger value="loans">My Loans</TabsTrigger>
                     <TabsTrigger value="reviews">Pending Reviews</TabsTrigger>
                 </TabsList>
                <TabsContent value="collection" className="mt-6">
@@ -112,6 +113,33 @@ function UserDashboard({ nfts, poes, receipts, rentedReceipts }: { nfts: Experie
                         {rentedReceipts.map((receipt) => ( <RentedReceiptCard key={receipt.data.objectId} receipt={receipt.data} /> ))}
                     </div>
                     {rentedReceipts.length === 0 && <EmptyState icon={Key} title="You haven't rented any items" description="Rented items will appear here." />}
+                </TabsContent>
+                <TabsContent value="loans" className="mt-6">
+                    <div className="space-y-8">
+                        <div>
+                            <h3 className="text-2xl font-bold mb-4">My Loan Requests</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {myLoanRequests.map(req => <LoanRequestManagementCard key={req.requestId} request={req} onActionSuccess={handleActionSuccess} />)}
+                            </div>
+                            {myLoanRequests.length === 0 && <EmptyState icon={Landmark} title="No Active Loan Requests" description="You can request a loan from your collection." />}
+                        </div>
+                        
+                        <div>
+                            <h3 className="text-2xl font-bold mt-8 mb-4">Loans I've Borrowed</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {myBorrowedLoans.map(loan => <ActiveLoanCard key={loan.loanId} loan={loan} role="borrower" onActionSuccess={handleActionSuccess} />)}
+                            </div>
+                            {myBorrowedLoans.length === 0 && <EmptyState icon={Landmark} title="No Active Borrows" description="Loans you take will appear here." />}
+                        </div>
+                        
+                        <div>
+                            <h3 className="text-2xl font-bold mt-8 mb-4">Loans I've Lended</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {myLendedLoans.map(loan => <ActiveLoanCard key={loan.loanId} loan={loan} role="lender" onActionSuccess={handleActionSuccess} />)}
+                            </div>
+                            {myLendedLoans.length === 0 && <EmptyState icon={Landmark} title="No Active Loans" description="Loans you fund will appear here." />}
+                        </div>
+                    </div>
                 </TabsContent>
                 <TabsContent value="reviews" className="mt-6">
                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{receipts.map((receipt) => ( <PurchaseReceiptCard key={receipt.data.objectId} receipt={receipt.data} /> ))}</div>
