@@ -31,10 +31,10 @@ export function ActiveLoanCard({ loan, role, onActionSuccess }: ActiveLoanCardPr
             if (loan.currency === 'TKT') {
                 const tktCoinType = `${suiConfig.tktPackageId}::tkt::TKT`;
                 const { data: tktCoins } = await suiClient.getCoins({ owner: account.address, coinType: tktCoinType });
-                if (!tktCoins || tktCoins.data.length === 0) throw new Error("You have no TKT coins.");
+                if (!tktCoins || tktCoins.length === 0) throw new Error("You have no TKT coins.");
                 
-                const mainCoin = tx.object(tktCoins.data[0].coinObjectId);
-                if (tktCoins.data.length > 1) tx.mergeCoins(mainCoin, tktCoins.data.slice(1).map(c => tx.object(c.coinObjectId)));
+                const mainCoin = tx.object(tktCoins.[0].coinObjectId);
+                if (tktCoins.length > 1) tx.mergeCoins(mainCoin, tktCoins.slice(1).map(c => tx.object(c.coinObjectId)));
                 
                 const [paymentCoin] = tx.splitCoins(mainCoin, [tx.pure.u64(repaymentInMist.toString())]);
 
