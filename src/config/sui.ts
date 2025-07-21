@@ -25,5 +25,7 @@ export const suiConfig = {
   tktTreasuryCapId: "0xfb377f4ddcc768ebe6b6086af681737500a560819efbbaa35ae964e7231cefbb",
   auctionsPackageId:"",
   rentalPackageId: "0x...EL_NUEVO_PACKAGE_ID_QUE_COPIASTE...",
+  lendingPackageId: "0x...EL_NUEVO_PACKAGE_ID_QUE_COPIASTE...",
+
   
 };
