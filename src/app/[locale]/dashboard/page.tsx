@@ -47,9 +47,15 @@ function LoadingSkeletonGrid() {
 }
 
 // --- Componente para el Dashboard de USUARIO (No Proveedor) ---
-function UserDashboard({ nfts, poes, receipts, rentedReceipts }: { nfts: ExperienceNFT[], poes: ProofOfExperience[], receipts: PurchaseReceipt[], rentedReceipts: RentalReceipt[] }) {
-    const params = useParams();
-    const locale = params.locale;
+function UserDashboard({ nfts, poes, receipts, rentedReceipts, myLoanRequests, myBorrowedLoans, myLendedLoans }: { 
+    nfts: ExperienceNFT[], 
+    poes: ProofOfExperience[], 
+    receipts: PurchaseReceipt[], 
+    rentedReceipts: RentalReceipt[],
+    myLoanRequests: LoanRequest[],
+    myBorrowedLoans: ActiveLoan[],
+    myLendedLoans: ActiveLoan[]
+}) {
 
     return (
         <div className="space-y-8">
