@@ -16,7 +16,7 @@ import { ProofOfExperienceCard } from '@/components/ProofOfExperienceCard';
 import { PurchaseReceiptCard } from '@/components/PurchaseReceiptCard';
 import { ManageableRentalCard } from '@/components/dashboard/ManageableRentalCard';
 import { RentedReceiptCard } from '@/components/dashboard/RentedReceiptCard';
-import { Loader2, Store, PackageOpen, Inbox, History, Edit, Star, BarChart2, Coins, Key } from 'lucide-react';
+import { Loader2, Store, BadgeCheck, PackageOpen, Inbox, History, Edit, Star, BarChart2, Coins, Key, Landmark } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
 // --- HOOKS Y COMPONENTES PARA PRÉSTAMOS ---
