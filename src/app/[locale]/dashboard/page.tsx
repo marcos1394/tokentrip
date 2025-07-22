@@ -20,7 +20,7 @@ import { Loader2, Store, PackageOpen, Inbox, History, Edit, Star, BarChart2, Coi
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
 // --- HOOKS Y COMPONENTES PARA PRÉSTAMOS ---
-import { useGetLoanRequests, LoanRequest } from '@/hooks/useGetLoanRequests';
+import { useGetLoanRequests, LoanRequest } from '@/hooks/useGetLoanRequest';
 import { useGetActiveLoans, ActiveLoan } from '@/hooks/useGetActiveLoans';
 import { LoanRequestManagementCard } from '@/components/LoanRequestManagementCard';
 import { ActiveLoanCard } from '@/components/ActiveLoanCard';
