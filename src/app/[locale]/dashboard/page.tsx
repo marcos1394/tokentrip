@@ -146,8 +146,17 @@ function UserDashboard({ nfts, poes, receipts, rentedReceipts, myLoanRequests, m
 }
 
 // --- Componente para el Dashboard de PROVEEDOR ---
-function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListings, rentedReceipts }: { providerProfile: ProviderProfile, nfts: ExperienceNFT[], poes: ProofOfExperience[], receipts: PurchaseReceipt[], rentalListings: RentalListing[], rentedReceipts: RentalReceipt[] }) {
-    const queryClient = useQueryClient();
+function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListings, rentedReceipts, myLoanRequests, myBorrowedLoans, myLendedLoans }: { 
+    providerProfile: ProviderProfile, 
+    nfts: ExperienceNFT[], 
+    poes: ProofOfExperience[], 
+    receipts: PurchaseReceipt[], 
+    rentalListings: RentalListing[], 
+    rentedReceipts: RentalReceipt[],
+    myLoanRequests: LoanRequest[],
+    myBorrowedLoans: ActiveLoan[],
+    myLendedLoans: ActiveLoan[]
+}) {   const queryClient = useQueryClient();
     const providerProfileFields = providerProfile.data.content.fields;
 
     const { data: activeListings, isLoading: isLoadingActiveListings } = useSuiClientQuery('multiGetObjects', { ids: providerProfileFields.active_listings, options: { showContent: true } }, { enabled: !!providerProfileFields && providerProfileFields.active_listings.length > 0 });
