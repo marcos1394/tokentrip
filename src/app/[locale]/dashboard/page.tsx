@@ -56,6 +56,17 @@ function UserDashboard({ nfts, poes, receipts, rentedReceipts, myLoanRequests, m
     myBorrowedLoans: ActiveLoan[],
     myLendedLoans: ActiveLoan[]
 }) {
+     const params = useParams();
+    const locale = params.locale;
+    const queryClient = useQueryClient(); // <-- Se necesita el queryClient
+
+    // --- AÑADE ESTA FUNCIÓN ---
+    const handleActionSuccess = () => {
+        // Invalida todas las queries relevantes para refrescar los datos del dashboard
+        queryClient.invalidateQueries({ queryKey: ['getOwnedObjects'] });
+        queryClient.invalidateQueries({ queryKey: ['get-loan-requests-graphql'] });
+        queryClient.invalidateQueries({ queryKey: ['get-active-loans-graphql'] });
+    };
 
     return (
         <div className="space-y-8">
