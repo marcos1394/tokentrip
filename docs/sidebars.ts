@@ -17,6 +17,19 @@ const sidebars: SidebarsConfig = {
 
     {
       type: 'category',
+      label: 'Community & Social Features',
+      items: [
+        {
+          type: 'category',
+          label: 'Token-Gated Channels',
+          link: { type: 'doc', id: 'community/token-gating/introduction' },
+          items: ['community/token-gating/for-providers', 'community/token-gating/for-collectors'],
+        },
+      ],
+    },
+
+    {
+      type: 'category',
       label: 'Advanced Features',
       items: [
         {
