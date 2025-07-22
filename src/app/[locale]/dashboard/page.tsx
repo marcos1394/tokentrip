@@ -22,8 +22,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 // --- HOOKS Y COMPONENTES PARA PRÉSTAMOS ---
 import { useGetLoanRequests, LoanRequest } from '@/hooks/useGetLoanRequests';
 import { useGetActiveLoans, ActiveLoan } from '@/hooks/useGetActiveLoans';
-import { LoanRequestManagementCard } from '@/components/dashboard/LoanRequestManagemetCard';
-import { ActiveLoanCard } from '@/components/dashboard/ActiveLoanCard';
+import { LoanRequestManagementCard } from '@/components/LoanRequestManagementCard';
+import { ActiveLoanCard } from '@/components/ActiveLoanCard';
 
 // Interfaces
 interface SuiObject { data: { objectId: string; content: { fields: any; }; display?: any; }; }
