@@ -1,20 +1,20 @@
-// src/middleware.ts o /middleware.ts
+// middleware.ts
 
 import { NextRequest, NextResponse } from 'next/server';
 import Negotiator from 'negotiator';
-import { match } from '@formatjs/intl-localematcher';
+import { match as matchLocale } from '@formatjs/intl-localematcher';
 
-// --- CONFIGURACIÓN DE IDIOMAS ---
-const locales = ['en', 'es']; // Tus idiomas soportados
-const defaultLocale = 'es'; // Tu idioma por defecto
+const locales = ['en', 'es'];
+const defaultLocale = 'es';
 
-// Función para obtener el mejor idioma según las cabeceras del navegador
 function getLocale(request: NextRequest): string {
-  const headers = { 'accept-language': request.headers.get('accept-language') || '' };
-  const languages = new Negotiator({ headers }).languages();
+  const negotiatorHeaders: Record<string, string> = {};
+  request.headers.forEach((value, key) => (negotiatorHeaders[key] = value));
+
+  const languages = new Negotiator({ headers: negotiatorHeaders }).languages();
   
   try {
-    return match(languages, locales, defaultLocale);
+    return matchLocale(languages, locales, defaultLocale);
   } catch (error) {
     return defaultLocale;
   }
@@ -23,7 +23,7 @@ function getLocale(request: NextRequest): string {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 1. Revisa si la ruta ya tiene un prefijo de idioma (ej. /en/about)
+  // 1. Revisa si la ruta ya tiene un prefijo de idioma (ej. /en/staking)
   const pathnameHasLocale = locales.some(
     (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
   );
@@ -36,11 +36,10 @@ export function middleware(request: NextRequest) {
   const locale = getLocale(request);
   request.nextUrl.pathname = `/${locale}${pathname}`;
 
-  // Ejemplo: Si el usuario va a '/', será redirigido a '/es/' o '/en/'
+  // Ejemplo: Si el usuario va a '/staking', será redirigido a '/es/staking'
   return NextResponse.redirect(request.nextUrl);
 }
 
-// --- CONFIGURACIÓN DEL MATCHER ---
 export const config = {
   matcher: [
     // Omitir todas las rutas internas y de archivos estáticos
