@@ -5,7 +5,7 @@ import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction } from '@
 import { Transaction } from '@mysten/sui/transactions';
 import { suiConfig } from '@/config/sui';
 import { useToast } from "@/hooks/use-toast";
-import { LoanRequest } from '@/hooks/useGetLoanRequests';
+import { LoanRequest } from '@/hooks/useGetLoanRequest';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
@@ -36,12 +36,22 @@ export function LoanRequestCard({ request }: { request: LoanRequest }) {
             let paymentCoin;
 
             if (request.currency === 'TKT') {
-                const { data: tktCoins } = await suiClient.getCoins({ owner: account.address, coinType: currencyType });
-                if (!tktCoins || tktCoins.data.length === 0) throw new Error("You have no TKT coins.");
-                const [mainCoin, ...otherCoins] = tktCoins.data;
+                const { data: userTktCoins } = await suiClient.getCoins({ owner: account.address, coinType: currencyType });
+
+                // --- INICIA CORRECCIÓN ---
+                if (!userTktCoins || userTktCoins.length === 0) {
+                    throw new Error("You have no TKT coins.");
+                }
+
+                const [mainCoin, ...otherCoins] = userTktCoins;
                 const mainCoinObject = tx.object(mainCoin.coinObjectId);
-                if (otherCoins.length > 0) tx.mergeCoins(mainCoinObject, otherCoins.map(c => tx.object(c.coinObjectId)));
+
+                if (otherCoins.length > 0) {
+                    tx.mergeCoins(mainCoinObject, otherCoins.map(c => tx.object(c.coinObjectId)));
+                }
                 [paymentCoin] = tx.splitCoins(mainCoinObject, [tx.pure.u64(principalInMist.toString())]);
+                // --- FIN CORRECCIÓN ---
+
             } else {
                 [paymentCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(principalInMist.toString())]);
             }

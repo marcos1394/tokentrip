@@ -6,7 +6,7 @@ import { useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { suiConfig } from "@/config/sui";
 import { useToast } from "@/hooks/use-toast";
-import { LoanRequest } from "@/hooks/useGetLoanRequests";
+import { LoanRequest } from "@/hooks/useGetLoanRequest";
 import { Ban, Loader2 } from "lucide-react";
 
 interface LoanRequestManagementCardProps {

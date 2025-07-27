@@ -1,1 +1,29 @@
-node_modules
+# Dependencias
+/node_modules
+/bot/node_modules
+/docs/node_modules
+
+# Archivos de compilación de Next.js
+/.next/
+/out/
+
+# Archivos de compilación de Docusaurus
+/docs/.docusaurus
+/docs/build
+
+# Archivos de entorno local (¡nunca subir secretos!)
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos del editor
+.vscode/

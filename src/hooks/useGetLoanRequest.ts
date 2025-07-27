@@ -1,4 +1,3 @@
-// src/hooks/useGetLoanRequests.ts
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
@@ -27,8 +26,8 @@ interface RawLoanRequestFields {
     repayment_amount: string;
     duration_ms: string;
     is_tkt_loan: boolean;
-    nft: { fields: { id: { id: string }, name: string, image_url: { fields: { url: string } } } };
-    fraction: { fields: { some?: any } }; // Para diferenciar
+    nft: { fields: { some?: { fields: { id: { id: string }, name: string, image_url: { fields: { url: string } } } } } };
+    fraction: { fields: { some?: { fields: { id: { id: string }, parent_name: string, parent_image_url: { fields: { url: string } } } } } };
 }
 
 const SUI_TESTNET_GRAPHQL_URL = 'https://sui-testnet.mystenlabs.com/graphql';
@@ -39,7 +38,7 @@ export function useGetLoanRequests() {
     queryFn: async (): Promise<LoanRequest[]> => {
       const GQL_QUERY = `
         query getLoanRequests($requestType: String!) {
-          objects(filter: { type: $requestType }, first: 50) {
+          objects(filter: { type: $requestType }, first: 50, orderBy: { field: VERSION, direction: DESC }) {
             nodes {
               objectId: address
               asMoveObject { contents { json } }
@@ -67,8 +66,21 @@ export function useGetLoanRequests() {
             const fields = node.asMoveObject?.contents?.json as RawLoanRequestFields;
             if (!fields) return null;
 
-            const asset = fields.nft?.fields || fields.fraction?.fields?.some?.fields;
-            if (!asset) return null;
+            let assetId: string, name: string, imageUrl: string;
+            const isFraction = !!fields.fraction.fields.some;
+
+            if (isFraction) {
+                const fractionData = fields.fraction.fields.some!.fields;
+                assetId = fractionData.id.id;
+                name = fractionData.parent_name;
+                imageUrl = fractionData.parent_image_url.fields.url;
+            } else {
+                const nftData = fields.nft.fields.some?.fields;
+                if (!nftData) return null;
+                assetId = nftData.id.id;
+                name = nftData.name;
+                imageUrl = nftData.image_url.fields.url;
+            }
 
             return {
               requestId: node.objectId,
@@ -78,9 +90,9 @@ export function useGetLoanRequests() {
               durationDays: Math.round(Number(fields.duration_ms) / (1000 * 60 * 60 * 24)),
               currency: fields.is_tkt_loan ? 'TKT' : 'SUI',
               nft: {
-                id: asset.id.id,
-                name: asset.name || asset.parent_name,
-                imageUrl: asset.image_url?.fields?.url || asset.parent_image_url?.fields?.url,
+                id: assetId,
+                name: name,
+                imageUrl: imageUrl,
               },
             };
           })
@@ -90,6 +102,6 @@ export function useGetLoanRequests() {
         return [];
       }
     },
-    refetchInterval: 60000, // Refresca cada minuto
+    refetchInterval: 60000,
   });
 }

@@ -15,9 +15,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
-import { ListPlus, Loader, Edit, Gavel, MoreVertical } from 'lucide-react';
+import { ListPlus, Loader, Edit, Gavel, MoreVertical, Key, Landmark } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from './ui/date-picker';
 
 interface ListableNftCardProps {
     nft: {
@@ -259,7 +260,7 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isLis
         <Card className="glass-card card-hover flex flex-col group">
             <CardHeader className="p-0">
                 <div className="aspect-video overflow-hidden rounded-t-lg">
-                    <img src={image_url} alt={name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
+                    <img src={imageUrl} alt={name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
                 </div>
             </CardHeader>
             <CardContent className="p-4 flex-grow">

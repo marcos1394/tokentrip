@@ -38,7 +38,7 @@ export function useGetActiveLoans() {
     queryFn: async (): Promise<ActiveLoan[]> => {
       const GQL_QUERY = `
         query getActiveLoans($loanType: String!) {
-          objects(filter: { type: $loanType }, first: 50) {
+          objects(filter: { type: $loanType }, first: 50, orderBy: { field: VERSION, direction: DESC }) {
             nodes {
               objectId: address
               asMoveObject { contents { json } }
@@ -66,8 +66,21 @@ export function useGetActiveLoans() {
             const fields = node.asMoveObject?.contents?.json as RawActiveLoanFields;
             if (!fields) return null;
 
-            const asset = fields.nft?.fields.some?.fields || fields.fraction?.fields.some?.fields;
-            if (!asset) return null;
+            let assetId: string, name: string, imageUrl: string;
+            const isFraction = !!fields.fraction.fields.some;
+
+            if (isFraction) {
+                const fractionData = fields.fraction.fields.some!.fields;
+                assetId = fractionData.id.id;
+                name = fractionData.parent_name;
+                imageUrl = fractionData.parent_image_url.fields.url;
+            } else {
+                const nftData = fields.nft.fields.some?.fields;
+                if (!nftData) return null;
+                assetId = nftData.id.id;
+                name = nftData.name;
+                imageUrl = nftData.image_url.fields.url;
+            }
 
             return {
               loanId: node.objectId,
@@ -77,9 +90,9 @@ export function useGetActiveLoans() {
               dueDate: Number(fields.due_timestamp_ms),
               currency: fields.is_tkt_loan ? 'TKT' : 'SUI',
               nft: {
-                id: asset.id.id,
-                name: asset.name || asset.parent_name,
-                imageUrl: asset.image_url?.fields?.url || asset.parent_image_url?.fields?.url,
+                id: assetId,
+                name: name,
+                imageUrl: imageUrl,
               },
             };
           })
