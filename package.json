@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "^0.6.1",
-    "@mysten/dapp-kit": "^0.16.15",
+    "@mysten/dapp-kit": "^0.16.16",
     "@mysten/sui": "^1.36.0",
     "@mysten/walrus": "^0.3.0",
     "@radix-ui/react-avatar": "^1.1.10",

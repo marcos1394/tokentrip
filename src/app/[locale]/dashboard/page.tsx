@@ -282,17 +282,45 @@ export default function DashboardPage() {
     const rentedReceipts = (rentedReceiptsData?.data as RentalReceipt[]) ?? [];
     const isLoading = isLoadingProfile || isLoadingNfts || isLoadingPoes || isLoadingReceipts || isLoadingListings || isLoadingReceiptsRental;
 
+    const { data: allLoanRequests, isLoading: isLoadingRequests } = useGetLoanRequests();
+    const { data: allActiveLoans, isLoading: isLoadingLoans } = useGetActiveLoans();
+
+    // 2. Se filtran los datos para obtener solo los que pertenecen al usuario actual
+    const myLoanRequests = useMemo(() => 
+        allLoanRequests?.filter(req => req.borrower === account?.address) ?? [], 
+        [allLoanRequests, account]
+    );
+    const myBorrowedLoans = useMemo(() => 
+        allActiveLoans?.filter(loan => loan.borrower === account?.address) ?? [], 
+        [allActiveLoans, account]
+    );
+    const myLendedLoans = useMemo(() => 
+        allActiveLoans?.filter(loan => loan.lender === account?.address) ?? [], 
+        [allActiveLoans, account]
+    );
+    
+
+
     return (
         <div className="min-h-screen pt-24 pb-12 bg-background">
              <AnimatedBackground />
             <div className="container mx-auto px-4 relative z-10">
-                {isLoading ? (
-                    <div className="flex items-center justify-center pt-24"><Loader2 className="animate-spin h-10 w-10" /></div>
-                ) : (
-                    isProvider ? 
-                        <ProviderDashboard providerProfile={providerProfile} nfts={nfts} poes={poes} receipts={receipts} rentalListings={rentalListings} rentedReceipts={rentedReceipts} /> : 
-                        <UserDashboard nfts={nfts} poes={poes} receipts={receipts} rentedReceipts={rentedReceipts} />
-                )}
+            {isLoading ? (
+    <div className="flex items-center justify-center pt-24"><Loader2 className="animate-spin h-10 w-10" /></div>
+) : (
+    isProvider ? 
+        <ProviderDashboard 
+            providerProfile={providerProfile} 
+            nfts={nfts} poes={poes} receipts={receipts} 
+            rentalListings={rentalListings} rentedReceipts={rentedReceipts} 
+            myLoanRequests={myLoanRequests} myBorrowedLoans={myBorrowedLoans} myLendedLoans={myLendedLoans}
+        /> : 
+        <UserDashboard 
+            nfts={nfts} poes={poes} receipts={receipts} 
+            rentedReceipts={rentedReceipts}
+            myLoanRequests={myLoanRequests} myBorrowedLoans={myBorrowedLoans} myLendedLoans={myLendedLoans}
+        />
+)}
             </div>
         </div>
     );
