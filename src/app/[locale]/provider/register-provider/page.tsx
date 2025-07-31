@@ -79,58 +79,68 @@ export default function RegisterProviderPage() {
             return !name.trim() || !bio.trim() || !imageFile || !category;
         }, [name, bio, imageFile, category]);
 
-        const handleRegister = async () => {
-            if (!currentWallet || !currentAccount || isFormInvalid) {
-                toast({ variant: 'destructive', title: 'Please connect your wallet and complete the form.' });
-                return;
-            }
-            // El chequeo de `imageFile` ya está en isFormInvalid, pero lo hacemos explícito para TypeScript
-            if (!imageFile) return;
-    
-            setIsPending(true);
-            try {
-                const fileBuffer = await imageFile.arrayBuffer();
-                const blob = new Uint8Array(fileBuffer);
-                
-                toast({ title: "Uploading image to decentralized storage..." });
-                const { blobId } = await walrusClient.writeBlob({
-                    blob,
-                    signer: currentWallet as any,
-                    deletable: false, // <-- Se añade esta línea
-                    epochs: 53,  // Se pasa el objeto `currentWallet` completo, que sí es un Signer
-                });
-                
-                const finalImageUrl = blobId;
-    
-                // 4. Crear y enviar la transacción
-                toast({ title: "Image uploaded! Registering profile on-chain..." });
-                const tx = new Transaction();
-                tx.moveCall({
-                    target: `${suiConfig.packageId}::experience_nft::register_provider`,
-                    arguments: [
-                        tx.pure.string(name),
-                        tx.pure.string(bio),
-                        tx.pure.string(finalImageUrl), // Se envía el blobId de Walrus
-                        tx.pure.string(category),
-                    ],
-                });
-    
-                await signAndExecuteTransaction({ transaction: tx });
-                
-                toast({ title: '✅ Registration Successful!', description: `Welcome, ${name}! You are now a provider on TokenTrip.` });
-                
-                // Refresca la query para que la UI se actualice
-                queryClient.invalidateQueries({ queryKey: ['getOwnedObjects'] });
-                
-                setTimeout(() => router.push(`/${params.locale}/dashboard`), 2000);
-                
-            } catch (error: any) {
-                toast({ variant: "destructive", title: '❌ Registration Failed', description: error.message || "An unknown error occurred." });
-            } finally {
-                setIsPending(false);
-            }
-        };
-    
+       const handleRegister = async () => {
+        console.log("1. Starting provider registration process...");
+
+        if (!currentWallet || !currentAccount || isFormInvalid || !imageFile) {
+            const errorMsg = "Validation failed: Wallet not connected or form is incomplete.";
+            console.error(errorMsg);
+            toast({ variant: 'destructive', title: errorMsg });
+            return;
+        }
+        
+        setIsPending(true);
+        try {
+            console.log("2. Reading image file...");
+            const fileBuffer = await imageFile.arrayBuffer();
+            const blob = new Uint8Array(fileBuffer);
+            console.log("   ✅ Image file read successfully.");
+
+            toast({ title: "Uploading image to decentralized storage..." });
+            console.log("3. Uploading to Walrus...");
+            const { blobId } = await walrusClient.writeBlob({
+                blob,
+                signer: currentWallet as any,
+                deletable: false,
+                epochs: 53,
+            });
+            console.log("   ✅ Image uploaded to Walrus. Blob ID:", blobId);
+
+            // --- CORRECCIÓN CLAVE: El contrato espera una URL completa ---
+            const finalImageUrl = `https://gateway.walrus.space/blobs/${blobId}`;
+            console.log("   Final Image URL:", finalImageUrl);
+
+            toast({ title: "Registering profile on-chain..." });
+            console.log("4. Building the transaction block...");
+            const tx = new Transaction();
+            tx.moveCall({
+                target: `${suiConfig.packageId}::experience_nft::register_provider`,
+                arguments: [
+                    tx.pure.string(name),
+                    tx.pure.string(bio),
+                    tx.pure.string(finalImageUrl),
+                    tx.pure.string(category),
+                ],
+            });
+            console.log("   ✅ Transaction block built.");
+
+            console.log("5. Awaiting user signature...");
+            await signAndExecuteTransaction({ transaction: tx });
+            
+            console.log("6. ✅ Transaction signed and executed successfully!");
+            toast({ title: '✅ Registration Successful!', description: `Welcome, ${name}!` });
+            
+            queryClient.invalidateQueries({ queryKey: ['getOwnedObjects'] });
+            setTimeout(() => router.push(`/${params.locale}/dashboard`), 2000);
+            
+        } catch (error: any) {
+            // --- CORRECCIÓN CLAVE: Se añade el log del error ---
+            console.error("❌ Registration Failed at some step. Full error:", error);
+            toast({ variant: "destructive", title: '❌ Registration Failed', description: error.message || "An unknown error occurred." });
+        } finally {
+            setIsPending(false);
+        }
+    };
     if (isLoading) {
         return <div className="min-h-screen flex items-center justify-center"><Loader className="animate-spin h-10 w-10" /></div>;
     }
