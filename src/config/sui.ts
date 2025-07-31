@@ -3,29 +3,22 @@
 // Configuración final con los IDs de la Testnet
 export const suiConfig = {
   // --- IDs de los PAQUETES ---
-  packageId: "0xdafa7ae2fb3e8ed1856fe5a04cd762a0600289c45af23bd59ec8c00ff4e743df", // tokentrip_experiences
-  tktPackageId: "0xab3283e7059a2da72ed1afb4ac41d93dbc71bd94451754fb4ac8570cd4d88535",
-  daoPackageId: "0xabbf6c7480cadf1f49b495fb731a113dacdfd12ee105e51ee963e13e97cfc410",
-  stakingPackageId: "0xb6a11570d35fb8b74382941d6221f0722314984e8a076443b54b286ef393b392",
+  packageId: "0x45ff0a4fc7daee05c6e7a3bdb1c92daafb722c861d2627900a039940300d7ed3", // tokentrip_experiences
+  tktPackageId: "0xed46584d450fc173a7796cdbc934248df25f0d46700a3a852fb025f1d9a000b3",
+  daoPackageId: "0xfa1a5a8c8f307f3bac14acd7b182ffef7fa5c28fc7fa905877127944e0339448",
+  stakingPackageId: "0xa94086668b5f56276dc40656b5afd660662bb18d1e4f2292bff11000591cf42a",
+  auctionsPackageId: "0xe3c3c3252dfb957c48cd0837469934320a8dc865cc493d85c66857fde7bfbee0",
+  rentalPackageId: "0xab953deb05ed6d368839482e3c81615b2dc7d39af20dcef5301b39d64f3c99e0",
+  lendingPackageId: "0x846f026b442c5841c1e5b257ddcc45941396470c4f7a4483fffa2863750ee145",
 
-  // --- IDs de los OBJETOS CREADOS ---
-  
-  // Del paquete 'tokentrip_experiences'
-  adminCapId: "0xd658c60a15d2ef21de6da03e9c84da91e620b45136dd7312fba847b6880120ac",
-  vipRegistryId: "0x487707bfd838506255d81b0facf383fd72818929e8506f04fd4096a8fdfd5101",
+    // Creado por `tokentrip_staking`
+    stakingPoolId: "0x1f10f55a350e29250a99bf76cf7d448df10474c190e87c9e1a974b58ebc06b67",
+    
+    // Creado por `tokentrip_dao`
+    daoId: "0x4163a637cead726b319dcc9c615c30fdeff6f11fa5e5efe9b5682d234c12a565",
+    daoTreasuryId: "0xa4340e33c324e4899e372e1760c10561f575a58c8e697a1d7a6d6b0aae5ef9c2",
+    
+    // Creado por `tokentrip_token`
+    tktTreasuryCapId: "0x2e0243fa40a462818771ca439bfd00ec613c27e83c29edc862f6f96ea985dfd1",
 
-  // Del paquete 'tokentrip_staking'
-  stakingPoolId: "0x383816b8e7b241f0459d6ed6a3eb89b4864671811163ebd0348dbade2698f948",
-  
-  // Del paquete 'tokentrip_dao'
-  daoId: "0x7992b0bf3dd994cc5ed0329e03d842d3ac76efec833158938ec76999e1cbae22",
-  daoTreasuryId: "0xfa60fe1d9044a1b494fb3b30e3d30c234702287d2ed1d06141851c76f5782a09",
-  
-  // Del paquete 'tokentrip_token'
-  tktTreasuryCapId: "0xfb377f4ddcc768ebe6b6086af681737500a560819efbbaa35ae964e7231cefbb",
-  auctionsPackageId:"",
-  rentalPackageId: "0x...EL_NUEVO_PACKAGE_ID_QUE_COPIASTE...",
-  lendingPackageId: "0x...EL_NUEVO_PACKAGE_ID_QUE_COPIASTE...",
-
-  
 };
