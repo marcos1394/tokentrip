@@ -104,12 +104,13 @@ export default function RegisterProviderPage() {
 
             // Se crea un objeto 'signer' simple que Walrus pueda entender.
             // Este adaptador "traduce" las llamadas a lo que `dapp-kit` espera.
-           const signer = {
+          const signer = {
                 signPersonalMessage: (message: { message: Uint8Array }) => 
                     signPersonalMessage({ message: message.message, account: currentAccount }),
                 getAddress: () => Promise.resolve(currentAccount.address),
-                // --- AÑADE ESTA LÍNEA ---
-                toSuiAddress: () => currentAccount.address, 
+                toSuiAddress: () => currentAccount.address,
+                signAndExecuteTransaction: (tx: { transaction: Transaction }) =>
+                    signAndExecuteTransaction({ transaction: tx.transaction, account: currentAccount }),
             };
 
             const { blobId } = await walrusClient.writeBlob({
