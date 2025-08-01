@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
-import { Transaction } from '@mysten/sui/transactions';
-import { Network, TurbosSdk } from 'turbos-clmm-sdk'; // <-- 1. Se importa de Turbos
+import { Network, TurbosSdk } from 'turbos-clmm-sdk';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,26 +37,28 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             try {
                 const amountInMist = (parseFloat(fromAmount) * (10 ** SUI_DECIAMLS)).toString();
                 
-                // --- LÓGICA DE COTIZACIÓN (TURBOS - CORREGIDA) ---
-                // 1. Usar getRoutes para encontrar la mejor ruta y cotización
-                const routes = await sdk.trade.getRoutes({
-                    coinTypeA: fromCoinType,
-                    coinTypeB: toCoinType,
-                    amount: amountInMist,
-                    isSwapA2B: true,
+                // PASO 1: Encontrar el pool usando los tipos de moneda
+                const pools = await sdk.pool.getPools({
+                    coin_a: fromCoinType,
+                    coin_b: toCoinType,
+                });
+                if (pools.length === 0) throw new Error("No Turbos liquidity pool found.");
+                
+                const bestPool = pools[0]; // Asumimos que el primero es el mejor
+
+                // PASO 2: Calcular el resultado del swap con ese pool
+                const [swapResult] = await sdk.trade.computeSwapResult({
+                    pools: [{ pool: bestPool.poolAddress, a2b: true }],
+                    address: account.address,
+                    amountSpecified: amountInMist,
+                    amountSpecifiedIsInput: true,
                 });
 
-                if (routes.length === 0) {
-                    throw new Error("No trade route found for SUI/WAL pair.");
-                }
-                const bestRoute = routes[0]; // La primera es la mejor
-                
-                setToAmount((Number(bestRoute.amountB) / (10 ** WAL_DECIAMLS)).toFixed(4));
-                setBestSwapResult(bestRoute); // Guardamos la ruta completa para usarla en el swap
-
+                setToAmount((Number(swapResult.amount_b) / (10 ** WAL_DECIAMLS)).toFixed(4));
+                setBestSwapResult(swapResult);
             } catch (error: any) {
                 console.error("Failed to get quote:", error);
-                setToAmount('No route found');
+                setToAmount('No pool found');
             } finally {
                 setIsFetchingQuote(false);
             }
@@ -74,14 +75,19 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
     const handleSwap = async () => {
         if (!account || !bestSwapResult) return;
         try {
-            // --- LÓGICA DE SWAP (TURBOS - CORREGIDA) ---
+            const nextTickIndex = sdk.math.bitsToNumber(bestSwapResult.tick_current_index.bits);
+
             const tx = await sdk.trade.swap({
-                routes: [bestSwapResult.route], // Usamos la ruta que obtuvimos de la cotización
+                routes: [{
+                    pool: bestSwapResult.pool,
+                    a2b: true,
+                    nextTickIndex,
+                }],
                 coinTypeA: fromCoinType,
                 coinTypeB: toCoinType,
                 address: account.address,
-                amountA: bestSwapResult.amountA.toString(),
-                amountB: bestSwapResult.amountB.toString(),
+                amountA: bestSwapResult.amount_a,
+                amountB: bestSwapResult.amount_b,
                 amountSpecifiedIsInput: true,
                 slippage: "0.1",
             });
@@ -94,7 +100,6 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
         }
     };
 
-    // El JSX se mantiene casi idéntico
     return (
         <div className="space-y-4">
             <div className="p-4 border rounded-lg bg-background/50 space-y-2">
