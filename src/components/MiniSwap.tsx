@@ -56,7 +56,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
 
                 // PASO 3: Calcular el resultado del swap con el pool encontrado
                 const [swapResult] = await sdk.trade.computeSwapResult({
-                    pools: [{ pool: matchingPool.address, a2b: a2b }],
+                    pools: [{ pool: matchingPool.objectId, a2b: a2b }],
                     address: account.address,
                     amountSpecified: amountInMist,
                     amountSpecifiedIsInput: true,
