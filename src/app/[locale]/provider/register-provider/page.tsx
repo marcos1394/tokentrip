@@ -79,7 +79,7 @@ export default function RegisterProviderPage() {
             return !name.trim() || !bio.trim() || !imageFile || !category;
         }, [name, bio, imageFile, category]);
 
-      const handleRegister = async () => {
+    const handleRegister = async () => {
         console.log("1. Starting provider registration process...");
 
         if (!currentWallet || !currentAccount || isFormInvalid || !imageFile) {
@@ -98,15 +98,25 @@ export default function RegisterProviderPage() {
 
             toast({ title: "Uploading image to decentralized storage..." });
             console.log("3. Uploading to Walrus...");
+
+            // --- INICIA CORRECCIÓN ---
+            // Creamos un objeto 'signer' simple que Walrus pueda entender.
+            // Este adaptador "traduce" las llamadas a lo que `dapp-kit` espera.
+            const signer = {
+                signPersonalMessage: (message: { message: Uint8Array }) => 
+                    currentWallet.signPersonalMessage({ message: message.message, account: currentAccount }),
+                getAddress: () => Promise.resolve(currentAccount.address),
+            };
+
             const { blobId } = await walrusClient.writeBlob({
                 blob,
-                signer: currentWallet as any,
+                signer: signer, // Pasamos el nuevo objeto adaptador
                 deletable: false,
                 epochs: 53,
             });
-            console.log("   ✅ Image uploaded to Walrus. Blob ID:", blobId);
+            // --- FIN CORRECCIÓN ---
 
-            // --- CORRECCIÓN CLAVE: El contrato espera una URL completa ---
+            console.log("   ✅ Image uploaded to Walrus. Blob ID:", blobId);
             const finalImageUrl = `https://gateway.walrus.space/blobs/${blobId}`;
             console.log("   Final Image URL:", finalImageUrl);
 
@@ -134,13 +144,13 @@ export default function RegisterProviderPage() {
             setTimeout(() => router.push(`/${params.locale}/dashboard`), 2000);
             
         } catch (error: any) {
-            // --- CORRECCIÓN CLAVE: Se añade el log del error ---
-            console.error("❌ Registration Failed at some step. Full error:", error);
+            console.error("❌ Registration Failed:", error);
             toast({ variant: "destructive", title: '❌ Registration Failed', description: error.message || "An unknown error occurred." });
         } finally {
             setIsPending(false);
         }
     };
+    
     if (isLoading) {
         return <div className="min-h-screen flex items-center justify-center"><Loader className="animate-spin h-10 w-10" /></div>;
     }
