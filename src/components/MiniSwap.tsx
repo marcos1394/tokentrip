@@ -42,10 +42,9 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 // PASO 1: Obtener TODOS los pools
                 const allPools = await sdk.pool.getPools();
 
-                // PASO 2: Filtrar para encontrar el pool SUI/WAL
                 const matchingPool = allPools.find(p =>
-                    (normalizeStructTag(p.coinTypeA) === normalizeStructTag(fromCoinType) && normalizeStructTag(p.coinTypeB) === normalizeStructTag(toCoinType)) ||
-                    (normalizeStructTag(p.coinTypeA) === normalizeStructTag(toCoinType) && normalizeStructTag(p.coinTypeB) === normalizeStructTag(fromCoinType))
+                    (normalizeStructTag(p.coin_a) === normalizeStructTag(fromCoinType) && normalizeStructTag(p.coin_b) === normalizeStructTag(toCoinType)) ||
+                    (normalizeStructTag(p.coin_a) === normalizeStructTag(toCoinType) && normalizeStructTag(p.coin_b) === normalizeStructTag(fromCoinType))
                 );
 
                 if (!matchingPool) {
