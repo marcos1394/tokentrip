@@ -52,8 +52,8 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 }
                 
                 // Determinar la dirección del swap (a2b)
-                const a2b = normalizeStructTag(matchingPool.coinTypeA) === normalizeStructTag(fromCoinType);
-
+                const a2b = normalizeStructTag(matchingPool.coin_a) === normalizeStructTag(fromCoinType);
+                
                 // PASO 3: Calcular el resultado del swap con el pool encontrado
                 const [swapResult] = await sdk.trade.computeSwapResult({
                     pools: [{ pool: matchingPool.poolAddress, a2b: a2b }],
