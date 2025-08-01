@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
+import { normalizeStructTag } from '@mysten/sui/utils';
+import { Transaction } from '@mysten/sui/transactions';
 import { Network, TurbosSdk } from 'turbos-clmm-sdk';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from '@/components/ui/button';
@@ -37,25 +39,33 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             try {
                 const amountInMist = (parseFloat(fromAmount) * (10 ** SUI_DECIAMLS)).toString();
                 
-                // PASO 1: Encontrar el pool usando los tipos de moneda
-                const pools = await sdk.pool.getPools({
-                    coin_a: fromCoinType,
-                    coin_b: toCoinType,
-                });
-                if (pools.length === 0) throw new Error("No Turbos liquidity pool found.");
-                
-                const bestPool = pools[0]; // Asumimos que el primero es el mejor
+                // PASO 1: Obtener TODOS los pools
+                const allPools = await sdk.pool.getPools();
 
-                // PASO 2: Calcular el resultado del swap con ese pool
+                // PASO 2: Filtrar para encontrar el pool SUI/WAL
+                const matchingPool = allPools.find(p =>
+                    (normalizeStructTag(p.coinTypeA) === normalizeStructTag(fromCoinType) && normalizeStructTag(p.coinTypeB) === normalizeStructTag(toCoinType)) ||
+                    (normalizeStructTag(p.coinTypeA) === normalizeStructTag(toCoinType) && normalizeStructTag(p.coinTypeB) === normalizeStructTag(fromCoinType))
+                );
+
+                if (!matchingPool) {
+                    throw new Error("No Turbos liquidity pool found for SUI/WAL pair.");
+                }
+                
+                // Determinar la dirección del swap (a2b)
+                const a2b = normalizeStructTag(matchingPool.coinTypeA) === normalizeStructTag(fromCoinType);
+
+                // PASO 3: Calcular el resultado del swap con el pool encontrado
                 const [swapResult] = await sdk.trade.computeSwapResult({
-                    pools: [{ pool: bestPool.poolAddress, a2b: true }],
+                    pools: [{ pool: matchingPool.poolAddress, a2b: a2b }],
                     address: account.address,
                     amountSpecified: amountInMist,
                     amountSpecifiedIsInput: true,
                 });
-
+                
                 setToAmount((Number(swapResult.amount_b) / (10 ** WAL_DECIAMLS)).toFixed(4));
-                setBestSwapResult(swapResult);
+                setBestSwapResult({ ...swapResult, a2b }); // Guardamos el resultado y la dirección
+
             } catch (error: any) {
                 console.error("Failed to get quote:", error);
                 setToAmount('No pool found');
@@ -80,7 +90,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             const tx = await sdk.trade.swap({
                 routes: [{
                     pool: bestSwapResult.pool,
-                    a2b: true,
+                    a2b: bestSwapResult.a2b,
                     nextTickIndex,
                 }],
                 coinTypeA: fromCoinType,
