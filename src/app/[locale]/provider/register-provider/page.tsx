@@ -59,24 +59,28 @@ export default function RegisterProviderPage() {
     
     // Función para verificar el balance de WAL
     const checkWalBalance = useCallback(async () => {
-        if (currentAccount) {
-            console.log("Checking WAL balance for:", currentAccount.address);
-            setIsCheckingWal(true);
-            try {
-                const balance = await suiClient.getBalance({ owner: currentAccount.address, coinType: WAL_COIN_TYPE });
-                if (parseInt(balance.totalBalance) > 0) {
-                    console.log("User has WAL.", balance);
-                    setHasWal(true);
-                } else {
-                    console.log("User does not have WAL.");
-                    setHasWal(false);
-                }
-            } catch (error) {
-                console.error("Failed to check WAL balance:", error);
+        // Si no hay cuenta, no hacemos nada y terminamos el estado de carga.
+        if (!currentAccount) {
+            setIsCheckingWal(false);
+            return;
+        }
+
+        console.log("Checking WAL balance for:", currentAccount.address);
+        setIsCheckingWal(true);
+        try {
+            const balance = await suiClient.getBalance({ owner: currentAccount.address, coinType: WAL_COIN_TYPE });
+            if (parseInt(balance.totalBalance) > 0) {
+                console.log("User has WAL.", balance);
+                setHasWal(true);
+            } else {
+                console.log("User does not have WAL.");
                 setHasWal(false);
-            } finally {
-                setIsCheckingWal(false);
             }
+        } catch (error) {
+            console.error("Failed to check WAL balance:", error);
+            setHasWal(false); // Si hay un error, asumimos que no tiene WAL
+        } finally {
+            setIsCheckingWal(false); // Esto se ejecutará siempre, con o sin error
         }
     }, [currentAccount, suiClient]);
 
