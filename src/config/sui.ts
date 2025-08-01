@@ -11,6 +11,11 @@ export const suiConfig = {
   rentalPackageId: "0xab953deb05ed6d368839482e3c81615b2dc7d39af20dcef5301b39d64f3c99e0",
   lendingPackageId: "0x846f026b442c5841c1e5b257ddcc45941396470c4f7a4483fffa2863750ee145",
 
+     // Creado por `tokentrip_experiences`
+    adminCapId: "0x14c69c8e98ac2428e0658bfe52d5857a727d01042c2212ebb96f5dc6bdf4db66",
+    vipRegistryId: "0x07061a4e61354f5b8cab9d1d9bd4479627e9c1651f258625c60c752da21b36bb",
+    
+
     // Creado por `tokentrip_staking`
     stakingPoolId: "0x1f10f55a350e29250a99bf76cf7d448df10474c190e87c9e1a974b58ebc06b67",
     
