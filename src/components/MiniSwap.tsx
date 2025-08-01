@@ -36,31 +36,28 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             setIsFetchingQuote(true);
             setBestSwapResult(null);
             try {
-                const amountInMist = parseFloat(fromAmount) * (10 ** SUI_DECIAMLS);
+                const amountInMist = (parseFloat(fromAmount) * (10 ** SUI_DECIAMLS)).toString();
                 
-                // --- LÓGICA DE COTIZACIÓN (TURBOS) ---
-                // 1. Encontrar el pool para SUI y WAL
-                const pools = await sdk.pool.getPools({
-                    coin_a: fromCoinType,
-                    coin_b: toCoinType,
-                });
-                if (pools.length === 0) throw new Error("No Turbos liquidity pool found for this pair.");
-                
-                const bestPool = pools[0]; // Asumimos que el primero es el mejor
-
-                // 2. Calcular el resultado del swap con ese pool
-                const [swapResult] = await sdk.trade.computeSwapResult({
-                    pools: [{ pool: bestPool.poolAddress, a2b: true }],
-                    address: account.address,
-                    amountSpecified: amountInMist.toString(),
-                    amountSpecifiedIsInput: true,
+                // --- LÓGICA DE COTIZACIÓN (TURBOS - CORREGIDA) ---
+                // 1. Usar getRoutes para encontrar la mejor ruta y cotización
+                const routes = await sdk.trade.getRoutes({
+                    coinTypeA: fromCoinType,
+                    coinTypeB: toCoinType,
+                    amount: amountInMist,
+                    isSwapA2B: true,
                 });
 
-                setToAmount((Number(swapResult.amountCalculated) / (10 ** WAL_DECIAMLS)).toFixed(4));
-                setBestSwapResult(swapResult);
+                if (routes.length === 0) {
+                    throw new Error("No trade route found for SUI/WAL pair.");
+                }
+                const bestRoute = routes[0]; // La primera es la mejor
+                
+                setToAmount((Number(bestRoute.amountB) / (10 ** WAL_DECIAMLS)).toFixed(4));
+                setBestSwapResult(bestRoute); // Guardamos la ruta completa para usarla en el swap
+
             } catch (error: any) {
                 console.error("Failed to get quote:", error);
-                setToAmount('No pool found');
+                setToAmount('No route found');
             } finally {
                 setIsFetchingQuote(false);
             }
@@ -77,22 +74,16 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
     const handleSwap = async () => {
         if (!account || !bestSwapResult) return;
         try {
-            // --- LÓGICA DE SWAP (TURBOS) ---
-            const nextTickIndex = sdk.math.bitsToNumber(bestSwapResult.tickCurrentIndex.bits);
-
+            // --- LÓGICA DE SWAP (TURBOS - CORREGIDA) ---
             const tx = await sdk.trade.swap({
-                routes: [{
-                    pool: bestSwapResult.pool,
-                    a2b: true,
-                    nextTickIndex,
-                }],
+                routes: [bestSwapResult.route], // Usamos la ruta que obtuvimos de la cotización
                 coinTypeA: fromCoinType,
                 coinTypeB: toCoinType,
                 address: account.address,
                 amountA: bestSwapResult.amountA.toString(),
                 amountB: bestSwapResult.amountB.toString(),
                 amountSpecifiedIsInput: true,
-                slippage: "0.1", // Slippage como string
+                slippage: "0.1",
             });
             
             await signAndExecuteTransaction({ transaction: tx });
