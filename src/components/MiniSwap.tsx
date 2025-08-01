@@ -36,28 +36,30 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
     const getQuote = useCallback(async () => {
         if (parseFloat(fromAmount) > 0) {
             setIsFetchingQuote(true);
-            setBestSwapResult(null);
+            setBestSwapResult(null); // Limpiamos el resultado anterior
             try {
                 const amountInMist = parseFloat(fromAmount) * (10 ** SUI_DECIAMLS);
                 
-                // --- LÓGICA DE COTIZACIÓN ACTUALIZADA ---
-                // 1. Encontrar los mejores pools para este par de monedas
-                const pools = await sdk.Router.getBestPoolsForSwap(fromCoinType, toCoinType, amountInMist);
-                if (pools.length === 0) throw new Error("No liquidity pools found for this pair.");
-                
-                // 2. Calcular el monto usando el mejor pool
+                // PASO 1: Encontrar el pool usando los tipos de moneda
+                const pools = await sdk.Pool.getPoolByCoins([fromCoinType, toCoinType]);
+                if (pools.length === 0) {
+                    throw new Error("No liquidity pools found for SUI/WAL pair.");
+                }
+                const pool = pools[0]; // Usamos el primer pool encontrado
+
+                // PASO 2: Calcular el monto de salida usando el pool encontrado
                 const result = await sdk.Router.calculateAmountWithA({
-                    pool: pools[0], // Usamos el primer resultado que es el mejor
+                    pool: pool,
                     coinTypeA: fromCoinType,
                     coinTypeB: toCoinType,
                     amountA: amountInMist,
                     byAmountIn: true,
-                    slippage: 0.1
+                    slippage: 0.1 // Un deslizamiento de precio aceptable del 10%
                 });
-
+                
                 setToAmount((Number(result.amountB) / (10 ** WAL_DECIAMLS)).toFixed(4));
-                setBestSwapResult(result); // Guardamos el resultado para usarlo en el swap
-            } catch (error) {
+                setBestSwapResult(result); // Guardamos el resultado completo para usarlo en el swap
+            } catch (error: any) {
                 console.error("Failed to get quote:", error);
                 setToAmount('No pool found');
             } finally {
