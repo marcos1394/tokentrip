@@ -13,7 +13,8 @@ import { Loader2, ArrowDown } from 'lucide-react';
 
 // --- Configuración del SDK ---
 const sdk = new CetusClmmSDK({
-    suiRpcUrl: 'https://fullnode.testnet.sui.io:443',
+    fullRpcUrl: 'https://fullnode.testnet.sui.io:443',
+
 });
 const SUI_DECIAMLS = 9;
 const WAL_DECIAMLS = 9; // Walrus token tiene 9 decimales
