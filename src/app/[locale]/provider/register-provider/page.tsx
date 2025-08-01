@@ -112,7 +112,7 @@ export default function RegisterProviderPage() {
 
             const { blobId } = await walrusClient.writeBlob({
                 blob,
-                signer: signer, // Se pasa el nuevo objeto adaptador
+                signer: signer as any, // Se pasa el nuevo objeto adaptador
                 deletable: false,
                 epochs: 53,
             });
