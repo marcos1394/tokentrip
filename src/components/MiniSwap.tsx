@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
-import { CetusClmmSDK } from '@cetusprotocol/cetus-sui-clmm-sdk';
+import { initCetusSDK } from '@cetusprotocol/cetus-sui-clmm-sdk';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,10 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Loader2, ArrowDown } from 'lucide-react';
 
 // --- Configuración del SDK ---
-const sdk = new CetusClmmSDK({
-    fullRpcUrl: 'https://fullnode.testnet.sui.io:443',
+const sdk = initCetusSDK({ network: 'testnet' });
 
-});
 const SUI_DECIAMLS = 9;
 const WAL_DECIAMLS = 9; // Walrus token tiene 9 decimales
 
