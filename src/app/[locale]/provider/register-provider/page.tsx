@@ -230,7 +230,12 @@ export default function RegisterProviderPage() {
                                 <div className="space-y-2"><Label>Provider Category</Label>
                                     <Select onValueChange={setCategory} value={category}>
                                         <SelectTrigger disabled={isPending}><SelectValue placeholder="Select your primary category..." /></SelectTrigger>
-                                        <SelectContent>{/* ... SelectItems ... */}</SelectContent>
+                                        <SelectContent>
+                                            <SelectItem value="Events">🎟️ Event Organizers & Venues</SelectItem>
+                                            <SelectItem value="Hospitality">🏨 Hospitality & Lodging</SelectItem>
+                                            <SelectItem value="Tours">🗺️ Tour & Activity Operators</SelectItem>
+                                            <SelectItem value="Digital">🖥️ Digital Content & Media</SelectItem>
+                                        </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="space-y-2"><Label>Short Bio</Label><Textarea value={bio} onChange={(e) => setBio(e.target.value)} disabled={isPending} /></div>
