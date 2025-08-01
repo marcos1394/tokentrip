@@ -165,12 +165,35 @@ export default function RegisterProviderPage() {
         }
     };
     
-    if (isLoading || isLoadingProfile) {
+    if (isLoadingProfile) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>;
     }
     
     if (isAlreadyProvider) {
-        // ... (JSX para cuando ya es proveedor se mantiene igual)
+        return (
+            <div className="min-h-screen flex items-center justify-center text-center p-4">
+                <AnimatedBackground />
+                <Card className="max-w-md mx-auto glass-card p-8 relative z-10">
+                    <CardHeader>
+                        <BadgeCheck className="w-16 h-16 mx-auto text-green-500" />
+                        <CardTitle className="text-2xl mt-4 text-foreground">
+                            You're Already a Provider!
+                        </CardTitle>
+                        <CardDescription className="mt-2 text-muted-foreground">
+                            You can now manage your experiences and view your sales from your dashboard.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className='flex flex-col gap-4 mt-4'>
+                        <Button asChild size="lg" className="w-full btn-sui">
+                            <Link href="/dashboard">Go to Dashboard</Link>
+                        </Button>
+                        <Button asChild variant="secondary">
+                            <Link href="/">Back to Home</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
     }
 
     return (
