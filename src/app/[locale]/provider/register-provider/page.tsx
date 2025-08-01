@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useCurrentWallet, useSignAndExecuteTransaction, useSuiClientQuery } from '@mysten/dapp-kit';
+import { useCurrentWallet, useSignAndExecuteTransaction, useSuiClientQuery, useSignPersonalMessage } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { suiConfig } from '@/config/sui';
 import Link from 'next/link';
@@ -23,6 +23,7 @@ import { ProviderInfoCard } from '@/components/provider/ProviderInfoCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWalrus } from '@/hooks/useWalrus'; // <-- 1. Importamos nuestro nuevo hook
 import { useQueryClient } from '@tanstack/react-query';
+
 
 
 const isValidUrl = (urlString: string) => {
@@ -50,6 +51,8 @@ export default function RegisterProviderPage() {
 
 
     const { mutateAsync: signAndExecuteTransaction} = useSignAndExecuteTransaction();
+    const { mutateAsync: signPersonalMessage } = useSignPersonalMessage(); // <-- AÑADE ESTA LÍNEA
+
 
     // Hook para verificar si el usuario ya tiene un perfil
     const { data: existingProfile, isLoading } = useSuiClientQuery(
@@ -99,22 +102,20 @@ export default function RegisterProviderPage() {
             toast({ title: "Uploading image to decentralized storage..." });
             console.log("3. Uploading to Walrus...");
 
-            // --- INICIA CORRECCIÓN ---
-            // Creamos un objeto 'signer' simple que Walrus pueda entender.
+            // Se crea un objeto 'signer' simple que Walrus pueda entender.
             // Este adaptador "traduce" las llamadas a lo que `dapp-kit` espera.
             const signer = {
                 signPersonalMessage: (message: { message: Uint8Array }) => 
-                    currentWallet.signPersonalMessage({ message: message.message, account: currentAccount }),
+                    signPersonalMessage({ message: message.message, account: currentAccount }),
                 getAddress: () => Promise.resolve(currentAccount.address),
             };
 
             const { blobId } = await walrusClient.writeBlob({
                 blob,
-                signer: signer, // Pasamos el nuevo objeto adaptador
+                signer: signer, // Se pasa el nuevo objeto adaptador
                 deletable: false,
                 epochs: 53,
             });
-            // --- FIN CORRECCIÓN ---
 
             console.log("   ✅ Image uploaded to Walrus. Blob ID:", blobId);
             const finalImageUrl = `https://gateway.walrus.space/blobs/${blobId}`;
