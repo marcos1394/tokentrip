@@ -98,25 +98,15 @@ export default function RegisterProviderPage() {
 
             toast({ title: "Uploading image to decentralized storage..." });
             console.log("3. Uploading to Walrus...");
-
-            // --- INICIA CORRECCIÓN ---
-            // Creamos un objeto 'signer' simple que Walrus pueda entender.
-            // Este adaptador "traduce" las llamadas a lo que `dapp-kit` espera.
-            const signer = {
-                signPersonalMessage: (message: { message: Uint8Array }) => 
-                    currentWallet.signPersonalMessage({ message: message.message, account: currentAccount }),
-                getAddress: () => Promise.resolve(currentAccount.address),
-            };
-
             const { blobId } = await walrusClient.writeBlob({
                 blob,
-                signer: signer, // Pasamos el nuevo objeto adaptador
+                signer: currentWallet as any,
                 deletable: false,
                 epochs: 53,
             });
-            // --- FIN CORRECCIÓN ---
-
             console.log("   ✅ Image uploaded to Walrus. Blob ID:", blobId);
+
+            // --- CORRECCIÓN CLAVE: El contrato espera una URL completa ---
             const finalImageUrl = `https://gateway.walrus.space/blobs/${blobId}`;
             console.log("   Final Image URL:", finalImageUrl);
 
@@ -144,7 +134,8 @@ export default function RegisterProviderPage() {
             setTimeout(() => router.push(`/${params.locale}/dashboard`), 2000);
             
         } catch (error: any) {
-            console.error("❌ Registration Failed:", error);
+            // --- CORRECCIÓN CLAVE: Se añade el log del error ---
+            console.error("❌ Registration Failed at some step. Full error:", error);
             toast({ variant: "destructive", title: '❌ Registration Failed', description: error.message || "An unknown error occurred." });
         } finally {
             setIsPending(false);
