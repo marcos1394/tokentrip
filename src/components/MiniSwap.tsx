@@ -3,16 +3,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
-import { CetusClmmSDK } from '@cetusprotocol/cetus-sui-clmm-sdk'; // Se importa la clase principal
+import { Network, TurbosSdk } from 'turbos-clmm-sdk'; // <-- 1. Se importa de Turbos
 import { useToast } from "@/hooks/use-toast";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowDown } from 'lucide-react';
 
-// --- Configuración del SDK (ACTUALIZADA) ---
-// Se usa el nuevo método estático createSDK()
-const sdk = CetusClmmSDK.createSDK({ network: 'testnet' });
+// --- Configuración del SDK (TURBOS) ---
+const sdk = new TurbosSdk(Network.testnet);
 const SUI_DECIAMLS = 9;
 const WAL_DECIAMLS = 9;
 
@@ -24,41 +23,41 @@ interface MiniSwapProps {
 
 export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapProps) {
     const account = useCurrentAccount();
-    const suiClient = useSuiClient();
     const { toast } = useToast();
     const { mutate: signAndExecuteTransaction, isPending } = useSignAndExecuteTransaction();
 
     const [fromAmount, setFromAmount] = useState('0.1');
     const [toAmount, setToAmount] = useState('');
     const [isFetchingQuote, setIsFetchingQuote] = useState(false);
-    const [bestSwapResult, setBestSwapResult] = useState<any>(null); // Guardamos el resultado para el swap
+    const [bestSwapResult, setBestSwapResult] = useState<any>(null);
 
     const getQuote = useCallback(async () => {
-        if (parseFloat(fromAmount) > 0) {
+        if (parseFloat(fromAmount) > 0 && account) {
             setIsFetchingQuote(true);
-            setBestSwapResult(null); // Limpiamos el resultado anterior
+            setBestSwapResult(null);
             try {
                 const amountInMist = parseFloat(fromAmount) * (10 ** SUI_DECIAMLS);
                 
-                // PASO 1: Encontrar el pool usando los tipos de moneda
-                const pools = await sdk.Pool.getPoolByCoins([fromCoinType, toCoinType]);
-                if (pools.length === 0) {
-                    throw new Error("No liquidity pools found for SUI/WAL pair.");
-                }
-                const pool = pools[0]; // Usamos el primer pool encontrado
-
-                // PASO 2: Calcular el monto de salida usando el pool encontrado
-                const result = await sdk.Router.calculateAmountWithA({
-                    pool: pool,
-                    coinTypeA: fromCoinType,
-                    coinTypeB: toCoinType,
-                    amountA: amountInMist,
-                    byAmountIn: true,
-                    slippage: 0.1 // Un deslizamiento de precio aceptable del 10%
+                // --- LÓGICA DE COTIZACIÓN (TURBOS) ---
+                // 1. Encontrar el pool para SUI y WAL
+                const pools = await sdk.pool.getPools({
+                    coin_a: fromCoinType,
+                    coin_b: toCoinType,
                 });
+                if (pools.length === 0) throw new Error("No Turbos liquidity pool found for this pair.");
                 
-                setToAmount((Number(result.amountB) / (10 ** WAL_DECIAMLS)).toFixed(4));
-                setBestSwapResult(result); // Guardamos el resultado completo para usarlo en el swap
+                const bestPool = pools[0]; // Asumimos que el primero es el mejor
+
+                // 2. Calcular el resultado del swap con ese pool
+                const [swapResult] = await sdk.trade.computeSwapResult({
+                    pools: [{ pool: bestPool.poolAddress, a2b: true }],
+                    address: account.address,
+                    amountSpecified: amountInMist.toString(),
+                    amountSpecifiedIsInput: true,
+                });
+
+                setToAmount((Number(swapResult.amountCalculated) / (10 ** WAL_DECIAMLS)).toFixed(4));
+                setBestSwapResult(swapResult);
             } catch (error: any) {
                 console.error("Failed to get quote:", error);
                 setToAmount('No pool found');
@@ -68,7 +67,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
         } else {
             setToAmount('');
         }
-    }, [fromAmount, fromCoinType, toCoinType]);
+    }, [fromAmount, fromCoinType, toCoinType, account]);
 
     useEffect(() => {
         const debounce = setTimeout(() => { getQuote() }, 500);
@@ -78,23 +77,23 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
     const handleSwap = async () => {
         if (!account || !bestSwapResult) return;
         try {
-            const tx = new Transaction();
-            
-            // --- LÓGICA DE SWAP ACTUALIZADA ---
-            const swapPayload = await sdk.Router.swapA2B({
-                tx,
-                pool: bestSwapResult.pool,
+            // --- LÓGICA DE SWAP (TURBOS) ---
+            const nextTickIndex = sdk.math.bitsToNumber(bestSwapResult.tickCurrentIndex.bits);
+
+            const tx = await sdk.trade.swap({
+                routes: [{
+                    pool: bestSwapResult.pool,
+                    a2b: true,
+                    nextTickIndex,
+                }],
                 coinTypeA: fromCoinType,
                 coinTypeB: toCoinType,
                 address: account.address,
-                amountA: BigInt(bestSwapResult.amountA.toString()),
-                amountB: BigInt(bestSwapResult.amountB.toString()),
-                byAmountIn: true,
-                slippage: 0.1
+                amountA: bestSwapResult.amountA.toString(),
+                amountB: bestSwapResult.amountB.toString(),
+                amountSpecifiedIsInput: true,
+                slippage: "0.1", // Slippage como string
             });
-            
-            // `swapPayload` es la moneda que recibes, necesita ser transferida a tu dirección
-            tx.transferObjects([swapPayload], tx.pure.address(account.address));
             
             await signAndExecuteTransaction({ transaction: tx });
             toast({ title: "✅ Swap Successful!", description: `You received ~${toAmount} WAL.` });
@@ -104,6 +103,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
         }
     };
 
+    // El JSX se mantiene casi idéntico
     return (
         <div className="space-y-4">
             <div className="p-4 border rounded-lg bg-background/50 space-y-2">
