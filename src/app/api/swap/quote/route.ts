@@ -1,4 +1,5 @@
 // src/app/api/swap/quote/route.ts
+export const runtime = 'nodejs'; 
 
 import { NextResponse } from 'next/server';
 import { Network, TurbosSdk } from 'turbos-clmm-sdk';
@@ -8,7 +9,6 @@ import { suiConfig } from '@/config/sui';
 
 // --- LÍNEA CLAVE ---
 // Le dice a Vercel que ejecute esta ruta en el entorno completo de Node.js
-export const runtime = 'nodejs'; 
 
 export async function POST(request: Request) {
   try {
