@@ -26,8 +26,6 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
     const suiClient = useSuiClient();
     const { toast } = useToast();
     const { mutate: signAndExecuteTransaction, isPending } = useSignAndExecuteTransaction();
-
-    // --- CORRECCIÓN: Se inicializa el SDK aquí, con el cliente ---
     const sdk = new TurbosSdk(Network.testnet, suiClient);
 
     const [fromAmount, setFromAmount] = useState('0.1');
@@ -39,27 +37,45 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
         if (parseFloat(fromAmount) > 0 && account) {
             setIsFetchingQuote(true);
             setBestSwapResult(null);
+            console.log('[SWAP_DEBUG] 1. Iniciando cotización...');
             try {
                 const amountInMist = (parseFloat(fromAmount) * (10 ** SUI_DECIAMLS)).toString();
+                console.log(`[SWAP_DEBUG] 2. Cantidad a cambiar (en MIST): ${amountInMist}`);
                 
+                console.log(`[SWAP_DEBUG] 3. Obteniendo pool con ID: ${suiConfig.suiWalPoolId}`);
                 const pool = await sdk.pool.getPool(suiConfig.suiWalPoolId);
-                const a2b = normalizeStructTag(pool.coin_a) === normalizeStructTag(fromCoinType);
+                if (!pool) throw new Error("sdk.pool.getPool() no devolvió ningún pool.");
+                console.log("[SWAP_DEBUG]    ✅ Pool encontrado:", pool);
 
-                const [swapResult] = await sdk.trade.computeSwapResult({
+                const a2b = normalizeStructTag(pool.coin_a) === normalizeStructTag(fromCoinType);
+                console.log(`[SWAP_DEBUG] 4. Dirección del swap (a2b): ${a2b}`);
+
+                const swapParams = {
                     pools: [{ pool: pool.objectId, a2b }],
                     address: account.address,
                     amountSpecified: amountInMist,
                     amountSpecifiedIsInput: true,
-                });
+                };
+                console.log('[SWAP_DEBUG] 5. Calculando resultado con parámetros:', swapParams);
+
+                const swapResultArray = await sdk.trade.computeSwapResult(swapParams);
+                console.log('[SWAP_DEBUG]    ✅ SDK devolvió:', swapResultArray);
                 
+                if (!swapResultArray || swapResultArray.length === 0) {
+                    throw new Error("computeSwapResult devolvió un resultado vacío.");
+                }
+
+                const swapResult = swapResultArray[0];
                 setToAmount((Number(swapResult.amount_b) / (10 ** WAL_DECIAMLS)).toFixed(4));
                 setBestSwapResult({ ...swapResult, a2b });
+                console.log('[SWAP_DEBUG] ✅ Cotización exitosa.');
 
             } catch (error: any) {
-                console.error("Failed to get quote:", error);
+                console.error("--- ERROR DETALLADO DE COTIZACIÓN ---", error);
                 setToAmount('Quote unavailable');
             } finally {
                 setIsFetchingQuote(false);
+                console.log('[SWAP_DEBUG] Proceso de cotización finalizado.');
             }
         } else {
             setToAmount('');
