@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
+import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { normalizeStructTag } from '@mysten/sui/utils';
 import { Transaction } from '@mysten/sui/transactions';
 import { Network, TurbosSdk } from 'turbos-clmm-sdk';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowDown } from 'lucide-react';
+import { suiConfig } from '@/config/sui'; // <-- Importar la configuración
 
 // --- Configuración del SDK (TURBOS) ---
 const sdk = new TurbosSdk(Network.testnet);
@@ -39,23 +40,14 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             try {
                 const amountInMist = (parseFloat(fromAmount) * (10 ** SUI_DECIAMLS)).toString();
                 
-                // --- CORRECCIÓN CLAVE ---
-                // Se añade `|| []` para asegurar que `allPools` nunca sea `undefined`.
-                const allPools = (await sdk.pool.getPools()) || [];
+                // --- LÓGICA SIMPLIFICADA ---
+                // 1. Obtener el pool directamente por su ID
+                const pool = await sdk.pool.getPool(suiConfig.suiWalPoolId);
+                const a2b = normalizeStructTag(pool.coin_a) === normalizeStructTag(fromCoinType);
 
-                const matchingPool = allPools.find(p =>
-                    (normalizeStructTag(p.coin_a) === normalizeStructTag(fromCoinType) && normalizeStructTag(p.coin_b) === normalizeStructTag(toCoinType)) ||
-                    (normalizeStructTag(p.coin_a) === normalizeStructTag(toCoinType) && normalizeStructTag(p.coin_b) === normalizeStructTag(fromCoinType))
-                );
-
-                if (!matchingPool) {
-                    throw new Error("No Turbos liquidity pool found for SUI/WAL pair.");
-                }
-                
-                const a2b = normalizeStructTag(matchingPool.coin_a) === normalizeStructTag(fromCoinType);
-
+                // 2. Calcular el resultado del swap con ese pool
                 const [swapResult] = await sdk.trade.computeSwapResult({
-                    pools: [{ pool: matchingPool.objectId, a2b: a2b }],
+                    pools: [{ pool: pool.objectId, a2b }],
                     address: account.address,
                     amountSpecified: amountInMist,
                     amountSpecifiedIsInput: true,
@@ -66,7 +58,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
 
             } catch (error: any) {
                 console.error("Failed to get quote:", error);
-                setToAmount('No pool found');
+                setToAmount('Quote unavailable');
             } finally {
                 setIsFetchingQuote(false);
             }
@@ -108,6 +100,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
         }
     };
 
+    // --- El JSX se mantiene igual ---
     return (
         <div className="space-y-4">
             <div className="p-4 border rounded-lg bg-background/50 space-y-2">

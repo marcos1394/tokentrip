@@ -14,6 +14,8 @@ export const suiConfig = {
      // Creado por `tokentrip_experiences`
     adminCapId: "0x14c69c8e98ac2428e0658bfe52d5857a727d01042c2212ebb96f5dc6bdf4db66",
     vipRegistryId: "0x07061a4e61354f5b8cab9d1d9bd4479627e9c1651f258625c60c752da21b36bb",
+    suiWalPoolId: "0x24eb5e717160b6803632074071b791987b1163ad09bd037516a06fa38d538c50",
+
     
 
     // Creado por `tokentrip_staking`
