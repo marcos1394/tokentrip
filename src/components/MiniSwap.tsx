@@ -37,27 +37,41 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
         if (parseFloat(fromAmount) > 0 && account) {
             setIsFetchingQuote(true);
             setBestSwapResult(null);
+            console.log('[DEBUG] Starting quote process...');
             try {
                 const amountInMist = (parseFloat(fromAmount) * (10 ** SUI_DECIAMLS)).toString();
                 
-                // --- LÓGICA SIMPLIFICADA ---
-                // 1. Obtener el pool directamente por su ID
+                console.log(`[DEBUG] Getting pool with ID: ${suiConfig.suiWalPoolId}`);
                 const pool = await sdk.pool.getPool(suiConfig.suiWalPoolId);
-                const a2b = normalizeStructTag(pool.coin_a) === normalizeStructTag(fromCoinType);
+                console.log('[DEBUG] Pool found:', pool);
 
-                // 2. Calcular el resultado del swap con ese pool
-                const [swapResult] = await sdk.trade.computeSwapResult({
+                const a2b = normalizeStructTag(pool.coin_a) === normalizeStructTag(fromCoinType);
+                console.log(`[DEBUG] Swap direction a2b: ${a2b}`);
+
+                const swapParams = {
                     pools: [{ pool: pool.objectId, a2b }],
                     address: account.address,
                     amountSpecified: amountInMist,
                     amountSpecifiedIsInput: true,
-                });
+                };
+                console.log('[DEBUG] Calling computeSwapResult with params:', swapParams);
+
+                const swapResultArray = await sdk.trade.computeSwapResult(swapParams);
+                console.log('[DEBUG] Received swap result array:', swapResultArray);
+                
+                if (!swapResultArray || swapResultArray.length === 0) {
+                    throw new Error("computeSwapResult returned an empty or invalid result.");
+                }
+
+                const swapResult = swapResultArray[0];
+                console.log('[DEBUG] Best swap result:', swapResult);
                 
                 setToAmount((Number(swapResult.amount_b) / (10 ** WAL_DECIAMLS)).toFixed(4));
                 setBestSwapResult({ ...swapResult, a2b });
 
             } catch (error: any) {
-                console.error("Failed to get quote:", error);
+                // Este es el log más importante
+                console.error("--- DETAILED QUOTE ERROR ---", error);
                 setToAmount('Quote unavailable');
             } finally {
                 setIsFetchingQuote(false);
