@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
-import { normalizeStructTag } from '@mysten/sui/utils';
+import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
-import { Network, TurbosSdk } from 'turbos-clmm-sdk';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowDown } from 'lucide-react';
 import { suiConfig } from '@/config/sui';
+// Se importa el SDK solo para la transacción final
+import { Network, TurbosSdk } from 'turbos-clmm-sdk'; 
 
 const SUI_DECIAMLS = 9;
 const WAL_DECIAMLS = 9;
@@ -23,10 +23,8 @@ interface MiniSwapProps {
 
 export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapProps) {
     const account = useCurrentAccount();
-    const suiClient = useSuiClient();
     const { toast } = useToast();
     const { mutate: signAndExecuteTransaction, isPending } = useSignAndExecuteTransaction();
-    const sdk = new TurbosSdk(Network.testnet, suiClient);
 
     const [fromAmount, setFromAmount] = useState('0.1');
     const [toAmount, setToAmount] = useState('');
@@ -37,50 +35,38 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
         if (parseFloat(fromAmount) > 0 && account) {
             setIsFetchingQuote(true);
             setBestSwapResult(null);
-            console.log('[SWAP_DEBUG] 1. Iniciando cotización...');
             try {
-                const amountInMist = (parseFloat(fromAmount) * (10 ** SUI_DECIAMLS)).toString();
-                console.log(`[SWAP_DEBUG] 2. Cantidad a cambiar (en MIST): ${amountInMist}`);
-                
-                console.log(`[SWAP_DEBUG] 3. Obteniendo pool con ID: ${suiConfig.suiWalPoolId}`);
-                const pool = await sdk.pool.getPool(suiConfig.suiWalPoolId);
-                if (!pool) throw new Error("sdk.pool.getPool() no devolvió ningún pool.");
-                console.log("[SWAP_DEBUG]    ✅ Pool encontrado:", pool);
+                const response = await fetch('/api/swap/quote', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fromCoinType,
+                        toCoinType,
+                        amount: fromAmount,
+                        accountAddress: account.address,
+                        poolId: suiConfig.suiWalPoolId,
+                    }),
+                });
 
-                const a2b = normalizeStructTag(pool.coin_a) === normalizeStructTag(fromCoinType);
-                console.log(`[SWAP_DEBUG] 4. Dirección del swap (a2b): ${a2b}`);
-
-                const swapParams = {
-                    pools: [{ pool: pool.objectId, a2b }],
-                    address: account.address,
-                    amountSpecified: amountInMist,
-                    amountSpecifiedIsInput: true,
-                };
-                console.log('[SWAP_DEBUG] 5. Calculando resultado con parámetros:', swapParams);
-
-                const swapResultArray = await sdk.trade.computeSwapResult(swapParams);
-                console.log('[SWAP_DEBUG]    ✅ SDK devolvió:', swapResultArray);
-                
-                if (!swapResultArray || swapResultArray.length === 0) {
-                    throw new Error("computeSwapResult devolvió un resultado vacío.");
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to fetch quote from API');
                 }
 
-                const swapResult = swapResultArray[0];
+                const swapResult = await response.json();
                 setToAmount((Number(swapResult.amount_b) / (10 ** WAL_DECIAMLS)).toFixed(4));
-                setBestSwapResult({ ...swapResult, a2b });
-                console.log('[SWAP_DEBUG] ✅ Cotización exitosa.');
+                setBestSwapResult(swapResult);
 
             } catch (error: any) {
-                console.error("--- ERROR DETALLADO DE COTIZACIÓN ---", error);
+                console.error("Failed to get quote via API:", error);
                 setToAmount('Quote unavailable');
             } finally {
                 setIsFetchingQuote(false);
-                console.log('[SWAP_DEBUG] Proceso de cotización finalizado.');
             }
         } else {
             setToAmount('');
         }
-    }, [fromAmount, fromCoinType, toCoinType, account, sdk, suiClient]);
+    }, [fromAmount, fromCoinType, toCoinType, account]);
 
     useEffect(() => {
         const debounce = setTimeout(() => { getQuote() }, 500);
@@ -90,6 +76,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
     const handleSwap = async () => {
         if (!account || !bestSwapResult) return;
         try {
+            const sdk = new TurbosSdk(Network.testnet); // Solo se necesita aquí para construir la tx
             const nextTickIndex = sdk.math.bitsToNumber(bestSwapResult.tick_current_index.bits);
 
             const tx = await sdk.trade.swap({
