@@ -4,10 +4,16 @@ import { NextResponse } from 'next/server';
 import { Network, TurbosSdk } from 'turbos-clmm-sdk';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import { normalizeStructTag } from '@mysten/sui/utils';
+import { suiConfig } from '@/config/sui';
+
+// --- LÍNEA CLAVE ---
+// Le dice a Vercel que ejecute esta ruta en el entorno completo de Node.js
+export const runtime = 'nodejs'; 
 
 export async function POST(request: Request) {
   try {
-    const { fromCoinType, toCoinType, amount, accountAddress, poolId } = await request.json();
+    const { fromCoinType, toCoinType, amount, accountAddress } = await request.json();
+    const poolId = suiConfig.suiWalPoolId; // Se obtiene del config
 
     const client = new SuiClient({ url: getFullnodeUrl('testnet') });
     const sdk = new TurbosSdk(Network.testnet, client);
@@ -21,12 +27,18 @@ export async function POST(request: Request) {
     
     const a2b = normalizeStructTag(pool.coin_a) === normalizeStructTag(fromCoinType);
 
-    const [swapResult] = await sdk.trade.computeSwapResult({
+    const swapResultArray = await sdk.trade.computeSwapResult({
         pools: [{ pool: pool.objectId, a2b }],
         address: accountAddress,
         amountSpecified: amountInMist,
         amountSpecifiedIsInput: true,
     });
+
+    if (!swapResultArray || swapResultArray.length === 0) {
+        throw new Error("Turbos SDK could not compute a swap result.");
+    }
+
+    const swapResult = swapResultArray[0];
     
     return NextResponse.json({ ...swapResult, a2b });
 
