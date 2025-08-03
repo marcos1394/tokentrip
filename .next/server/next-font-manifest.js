@@ -1,1 +1,0 @@
-self.__NEXT_FONT_MANIFEST='{"pages":{},"app":{"/home/ingsandoval1394/tokentrip/src/app/layout":["static/media/e4af272ccee01ff0-s.p.woff2"],"/home/ingsandoval1394/tokentrip/src/app/[locale]/layout":["static/media/e4af272ccee01ff0-s.p.woff2"]},"appUsingSizeAdjust":true,"pagesUsingSizeAdjust":false}';

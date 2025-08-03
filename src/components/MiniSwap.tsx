@@ -39,8 +39,9 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             try {
                 const amountInMist = (parseFloat(fromAmount) * (10 ** SUI_DECIAMLS)).toString();
                 
-                // PASO 1: Obtener TODOS los pools
-                const allPools = await sdk.pool.getPools();
+                // --- CORRECCIÓN CLAVE ---
+                // Se añade `|| []` para asegurar que `allPools` nunca sea `undefined`.
+                const allPools = (await sdk.pool.getPools()) || [];
 
                 const matchingPool = allPools.find(p =>
                     (normalizeStructTag(p.coin_a) === normalizeStructTag(fromCoinType) && normalizeStructTag(p.coin_b) === normalizeStructTag(toCoinType)) ||
@@ -51,10 +52,8 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                     throw new Error("No Turbos liquidity pool found for SUI/WAL pair.");
                 }
                 
-                // Determinar la dirección del swap (a2b)
                 const a2b = normalizeStructTag(matchingPool.coin_a) === normalizeStructTag(fromCoinType);
 
-                // PASO 3: Calcular el resultado del swap con el pool encontrado
                 const [swapResult] = await sdk.trade.computeSwapResult({
                     pools: [{ pool: matchingPool.objectId, a2b: a2b }],
                     address: account.address,
@@ -63,7 +62,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 });
                 
                 setToAmount((Number(swapResult.amount_b) / (10 ** WAL_DECIAMLS)).toFixed(4));
-                setBestSwapResult({ ...swapResult, a2b }); // Guardamos el resultado y la dirección
+                setBestSwapResult({ ...swapResult, a2b });
 
             } catch (error: any) {
                 console.error("Failed to get quote:", error);
