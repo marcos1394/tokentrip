@@ -5,12 +5,12 @@ import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-ki
 import { Transaction } from '@mysten/sui/transactions';
 import { initCetusSDK, Percentage, adjustForSlippage } from '@cetusprotocol/cetus-sui-clmm-sdk';
 import BN from 'bn.js';
-import Decimal from 'decimal.js'; // <-- Se importa Decimal
 import { useToast } from "@/hooks/use-toast";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowDown } from 'lucide-react';
+import Decimal from 'decimal.js';
 
 const SUI_DECIMALS = 9;
 const WAL_DECIMALS = 9;
@@ -76,9 +76,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
         try {
             const sdk = initCetusSDK({ network: 'testnet' });
             sdk.senderAddress = account.address;
-            
-            // --- CORRECCIÓN DE SLIPPAGE ---
-            const slippage = Percentage.fromDecimal(new Decimal(0.05)); // 5%
+            const slippage = Percentage.fromDecimal(new Decimal(0.05));
 
             const amountLimit = adjustForSlippage(
                 new BN(preswapResult.estimatedAmountOut),
