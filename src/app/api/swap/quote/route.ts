@@ -1,4 +1,3 @@
-// src/app/api/swap/quote/route.ts
 import { NextResponse } from 'next/server';
 import { initCetusSDK } from '@cetusprotocol/cetus-sui-clmm-sdk';
 import { normalizeStructTag } from '@mysten/sui/utils';
@@ -9,27 +8,21 @@ export async function POST(request: Request) {
   try {
     const { fromCoinType, toCoinType, amount, decimalsA, decimalsB } = await request.json();
 
-    const sdk = initCetusSDK({ network: 'testnet' });
-    await sdk.Pool.getPoolsWithPage([]); // "Calentar" el SDK
+    const sdk = initCetusSDK({
+        network: 'testnet',
+        fullNodeUrl: 'https://fullnode.testnet.sui.io:443',
+    });
+    
+    // "Calentamos" el SDK para que cargue la lista interna de pools
+    await sdk.Pool.getPoolsWithPage([]);
 
     const amountInMist = parseFloat(amount) * (10 ** decimalsA);
 
-    const allPools = await sdk.Pool.getPoolsWithPage([]);
-    if (!allPools) {
-        throw new Error("getPoolsWithPage did not return any pools.");
-    }
-    
-    const normalizedFrom = normalizeStructTag(fromCoinType);
-    const normalizedTo = normalizeStructTag(toCoinType);
-
-    const bestPool = allPools.find(p => 
-        (normalizeStructTag(p.coinTypeA) === normalizedFrom && normalizeStructTag(p.coinTypeB) === normalizedTo) ||
-        (normalizeStructTag(p.coinTypeA) === normalizedTo && normalizeStructTag(p.coinTypeB) === normalizedFrom)
-    );
-
-    if (!bestPool) {
+    const pools = await sdk.Pool.getPoolByCoins([fromCoinType, toCoinType]);
+    if (!pools || pools.length === 0) {
       throw new Error("Cetus pool not found for this pair.");
     }
+    const bestPool = pools[0];
 
     const preswapResult = await sdk.Swap.preswap({
         pool: bestPool,

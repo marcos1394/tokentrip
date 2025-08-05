@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
+import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { initCetusSDK, Percentage, adjustForSlippage } from '@cetusprotocol/cetus-sui-clmm-sdk';
 import BN from 'bn.js';
+import Decimal from 'decimal.js';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowDown } from 'lucide-react';
-import Decimal from 'decimal.js';
 
 const SUI_DECIMALS = 9;
 const WAL_DECIMALS = 9;
@@ -23,8 +23,6 @@ interface MiniSwapProps {
 
 export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapProps) {
     const account = useCurrentAccount();
-    const suiClient = useSuiClient(); // <--- Obtén el cliente aquí
-
     const { toast } = useToast();
     const { mutate: signAndExecuteTransaction, isPending } = useSignAndExecuteTransaction();
 
@@ -76,18 +74,14 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
     const handleSwap = async () => {
         if (!account || !preswapResult) return;
         try {
-            // --- INICIA CORRECCIÓN ---
-            // Se inicializa el SDK con el `suiClient` para que pueda leer la billetera
-              const sdk = initCetusSDK({
+            const sdk = initCetusSDK({
                 network: 'testnet',
                 fullNodeUrl: 'https://fullnode.testnet.sui.io:443',
                 wallet: account.address,
             });
             sdk.senderAddress = account.address;
-            // --- FIN CORRECCIÓN ---
-            
-            const slippage = Percentage.fromDecimal(new Decimal(0.05));
 
+            const slippage = Percentage.fromDecimal(new Decimal(0.05));
             const amountLimit = adjustForSlippage(
                 new BN(preswapResult.estimatedAmountOut),
                 slippage,
@@ -112,7 +106,6 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             toast({ variant: "destructive", title: "❌ Swap Failed", description: error.message });
         }
     };
-
 
     return (
         <div className="space-y-4">
