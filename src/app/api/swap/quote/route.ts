@@ -11,10 +11,10 @@ export async function POST(request: Request) {
 
     const scriptPath = path.join(process.cwd(), 'scripts', 'test-quote.ts');
     
-    // Construye la ruta completa al ejecutable de tsx dentro de node_modules
-const tsxPath = path.join(process.cwd(), 'node_modules', '.bin', 'tsx');
-const command = `${tsxPath} ${scriptPath} ${amountInMist}`;
-
+    // Construye la ruta al script principal de tsx, no al atajo .bin
+const tsxPath = path.join(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
+// Se ejecuta directamente con el comando 'node'
+const command = `node ${tsxPath} ${scriptPath} ${amountInMist}`;
     // --- INICIA CORRECCIÓN ---
     // Se envuelve `exec` en una Promise para poder usar `await`
     const scriptOutput = await new Promise<string>((resolve, reject) => {
