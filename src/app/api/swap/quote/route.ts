@@ -7,42 +7,65 @@ import { suiConfig } from '@/config/sui';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
+  const logs: string[] = []; // Array para guardar nuestros logs
+  
   try {
-    const { fromCoinType, toCoinType, amount } = await request.json();
+    logs.push("API route started.");
+    const { fromCoinType, toCoinType, amount, accountAddress } = await request.json();
+    logs.push(`Request body parsed: amount=${amount}, from=${fromCoinType}, to=${toCoinType}`);
+    
     const poolId = suiConfig.suiWalPoolId;
+    if (!poolId) throw new Error("suiWalPoolId is not defined in suiConfig.");
+    logs.push(`Using Pool ID: ${poolId}`);
 
     const client = new SuiClient({ url: getFullnodeUrl('testnet') });
+    logs.push("SuiClient initialized for testnet.");
+
     const sdk = new TurbosSdk(Network.testnet, client);
+    logs.push("TurbosSdk initialized.");
 
     const amountInMist = (parseFloat(amount) * 1e9).toString();
+    logs.push(`Amount in MIST calculated: ${amountInMist}`);
     
+    logs.push("Attempting to fetch pool...");
     const pool = await sdk.pool.getPool(poolId);
-    if (!pool) {
-      return NextResponse.json({ error: "Pool not found" }, { status: 404 });
-    }
+    if (!pool) throw new Error("sdk.pool.getPool() returned null or undefined.");
+    logs.push(`✅ Pool found successfully. Object ID: ${pool.objectId}`);
     
     const a2b = normalizeStructTag(pool.coin_a) === normalizeStructTag(fromCoinType);
+    logs.push(`Swap direction (a2b) determined: ${a2b}`);
 
-    // --- CORRECCIÓN CLAVE: Usamos una dirección 'dummy' como en el script ---
     const dummyAddress = '0x0000000000000000000000000000000000000000000000000000000000000000';
-
-    const swapResultArray = await sdk.trade.computeSwapResult({
+    const swapParams = {
         pools: [{ pool: pool.objectId, a2b }],
-        address: dummyAddress, // Se usa la dirección 'dummy'
+        address: dummyAddress,
         amountSpecified: amountInMist,
         amountSpecifiedIsInput: true,
-    });
+    };
+    logs.push(`Calling sdk.trade.computeSwapResult with params: ${JSON.stringify(swapParams)}`);
+
+    const swapResultArray = await sdk.trade.computeSwapResult(swapParams);
+    logs.push("✅ sdk.trade.computeSwapResult finished successfully.");
 
     if (!swapResultArray || swapResultArray.length === 0) {
-        throw new Error("Turbos SDK could not compute a swap result.");
+        throw new Error("Turbos SDK could not compute a swap result (returned empty or invalid array).");
     }
-
-    const swapResult = swapResultArray[0];
+    logs.push("Swap result array is valid and contains data.");
     
+    const swapResult = swapResultArray[0];
     return NextResponse.json({ ...swapResult, a2b });
 
   } catch (error: any) {
-    console.error("API Error fetching quote:", error);
-    return NextResponse.json({ error: error.message || "Failed to fetch quote" }, { status: 500 });
+    console.error("API Error caught:", error);
+    // Devolvemos los logs junto con el error
+    return NextResponse.json(
+        { 
+            error: "Failed to fetch quote",
+            errorMessage: error.message,
+            errorStack: error.stack,
+            logs: logs // <-- Se añade el listado de logs
+        }, 
+        { status: 500 }
+    );
   }
 }
