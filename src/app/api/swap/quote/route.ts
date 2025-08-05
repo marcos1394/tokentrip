@@ -10,7 +10,10 @@ export async function POST(request: Request) {
     const amountInMist = (parseFloat(amount) * 1e9).toString();
 
     const scriptPath = path.join(process.cwd(), 'scripts', 'test-quote.ts');
-    const command = `npx tsx ${scriptPath} ${amountInMist}`;
+    
+    // Construye la ruta completa al ejecutable de tsx dentro de node_modules
+const tsxPath = path.join(process.cwd(), 'node_modules', '.bin', 'tsx');
+const command = `${tsxPath} ${scriptPath} ${amountInMist}`;
 
     // --- INICIA CORRECCIÓN ---
     // Se envuelve `exec` en una Promise para poder usar `await`
