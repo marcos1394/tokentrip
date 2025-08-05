@@ -3,17 +3,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
+import { initCetusSDK, Percentage, adjustForSlippage } from '@cetusprotocol/cetus-sui-clmm-sdk';
+import BN from 'bn.js';
+import Decimal from 'decimal.js'; // <-- Se importa Decimal
 import { useToast } from "@/hooks/use-toast";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowDown } from 'lucide-react';
-import { suiConfig } from '@/config/sui';
-// Se importa el SDK solo para la transacción final
-import { Network, TurbosSdk } from 'turbos-clmm-sdk'; 
 
-const SUI_DECIAMLS = 9;
-const WAL_DECIAMLS = 9;
+const SUI_DECIMALS = 9;
+const WAL_DECIMALS = 9;
 
 interface MiniSwapProps {
     fromCoinType: string;
@@ -29,33 +29,33 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
     const [fromAmount, setFromAmount] = useState('0.1');
     const [toAmount, setToAmount] = useState('');
     const [isFetchingQuote, setIsFetchingQuote] = useState(false);
-    const [bestSwapResult, setBestSwapResult] = useState<any>(null);
+    const [preswapResult, setPreswapResult] = useState<any>(null);
 
     const getQuote = useCallback(async () => {
         if (parseFloat(fromAmount) > 0 && account) {
             setIsFetchingQuote(true);
-            setBestSwapResult(null);
+            setPreswapResult(null);
             try {
                 const response = await fetch('/api/swap/quote', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        fromCoinType,
-                        toCoinType,
+                    body: JSON.stringify({ 
+                        fromCoinType, 
+                        toCoinType, 
                         amount: fromAmount,
-                        accountAddress: account.address,
-                        poolId: suiConfig.suiWalPoolId,
+                        decimalsA: SUI_DECIMALS,
+                        decimalsB: WAL_DECIMALS,
                     }),
                 });
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to fetch quote from API');
+                    throw new Error(errorData.error || "Failed to fetch quote from API");
                 }
-
-                const swapResult = await response.json();
-                setToAmount((Number(swapResult.amount_b) / (10 ** WAL_DECIAMLS)).toFixed(4));
-                setBestSwapResult(swapResult);
+                
+                const result = await response.json();
+                setToAmount((Number(result.estimatedAmountOut) / (10 ** WAL_DECIMALS)).toFixed(4));
+                setPreswapResult(result);
 
             } catch (error: any) {
                 console.error("Failed to get quote via API:", error);
@@ -63,8 +63,6 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             } finally {
                 setIsFetchingQuote(false);
             }
-        } else {
-            setToAmount('');
         }
     }, [fromAmount, fromCoinType, toCoinType, account]);
 
@@ -74,30 +72,35 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
     }, [fromAmount, getQuote]);
 
     const handleSwap = async () => {
-        if (!account || !bestSwapResult) return;
+        if (!account || !preswapResult) return;
         try {
-            const sdk = new TurbosSdk(Network.testnet); // Solo se necesita aquí para construir la tx
-            const nextTickIndex = sdk.math.bitsToNumber(bestSwapResult.tick_current_index.bits);
+            const sdk = initCetusSDK({ network: 'testnet' });
+            sdk.senderAddress = account.address;
+            
+            // --- CORRECCIÓN DE SLIPPAGE ---
+            const slippage = Percentage.fromDecimal(new Decimal(0.05)); // 5%
 
-            const tx = await sdk.trade.swap({
-                routes: [{
-                    pool: bestSwapResult.pool,
-                    a2b: bestSwapResult.a2b,
-                    nextTickIndex,
-                }],
-                coinTypeA: fromCoinType,
-                coinTypeB: toCoinType,
-                address: account.address,
-                amountA: bestSwapResult.amount_a,
-                amountB: bestSwapResult.amount_b,
-                amountSpecifiedIsInput: true,
-                slippage: "0.1",
+            const amountLimit = adjustForSlippage(
+                new BN(preswapResult.estimatedAmountOut),
+                slippage,
+                false
+            );
+
+            const tx = await sdk.Swap.createSwapTransactionPayload({
+                pool_id: preswapResult.poolAddress,
+                coinTypeA: preswapResult.coinTypeA,
+                coinTypeB: preswapResult.coinTypeB,
+                a2b: preswapResult.aToB,
+                by_amount_in: true,
+                amount: preswapResult.amount,
+                amount_limit: amountLimit.toString(),
             });
             
             await signAndExecuteTransaction({ transaction: tx });
             toast({ title: "✅ Swap Successful!", description: `You received ~${toAmount} WAL.` });
             onSwapSuccess();
         } catch (error: any) {
+            console.error("Swap failed:", error);
             toast({ variant: "destructive", title: "❌ Swap Failed", description: error.message });
         }
     };
@@ -124,7 +127,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                     </div>
                 </div>
             </div>
-            <Button size="lg" className="w-full btn-sui" disabled={isPending || !account || !bestSwapResult || isFetchingQuote} onClick={handleSwap}>
+            <Button size="lg" className="w-full btn-sui" disabled={isPending || !account || !preswapResult || isFetchingQuote} onClick={handleSwap}>
                 {isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Swap for WAL
             </Button>

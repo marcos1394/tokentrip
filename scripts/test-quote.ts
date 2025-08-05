@@ -1,47 +1,54 @@
-import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
-import { Network, TurbosSdk } from 'turbos-clmm-sdk';
-import { normalizeStructTag } from '@mysten/sui/utils';
+// scripts/test-deepbook-quote.ts
 
-// Lee el monto desde los argumentos de la línea de comandos
-const amount = process.argv[2]; 
-if (!amount) {
-    throw new Error("Missing amount argument");
-}
+import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
+import { DeepBookClient } from '@mysten/deepbook-v3';
+import 'dotenv/config';
+
+// --- IDs de Deepbook en Testnet (Verificados) ---
+const SUI_COIN_TYPE = '0x2::sui::SUI';
+const WAL_COIN_TYPE = '0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL';
+const WAL_DECIMALS = 9;
 
 async function main() {
-    const SUI_COIN_TYPE = '0x2::sui::SUI';
-    const WAL_COIN_TYPE = '0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL';
-    const POOL_ID = "0x24eb5e717160b6803632074071b791987b1163ad09bd037516a06fa38d538c50";
-    
+    const amountToSwap = 0.1; // 0.1 SUI
+
+    console.log('🚀 Initializing DeepBookClient for Testnet...');
     const client = new SuiClient({ url: getFullnodeUrl('testnet') });
-    const sdk = new TurbosSdk(Network.testnet, client);
     
-    const dummyAddress = '0x0000000000000000000000000000000000000000000000000000000000000000';
+    const deepbook = new DeepBookClient({
+        client,
+        env: 'testnet',
+        address: '0x0000000000000000000000000000000000000000000000000000000000000000'
+    });
 
     try {
-        const pool = await sdk.pool.getPool(POOL_ID);
-        if (!pool) throw new Error("Pool not found");
+        console.log(`1. Buscando el ID del pool para SUI -> WAL...`);
 
-        const a2b = normalizeStructTag(pool.coin_a) === normalizeStructTag(SUI_COIN_TYPE);
-
-        const swapResultArray = await sdk.trade.computeSwapResult({
-            pools: [{ pool: pool.objectId, a2b }],
-            address: dummyAddress,
-            amountSpecified: amount, // Usa el monto del argumento
-            amountSpecifiedIsInput: true,
-        });
-
-        if (!swapResultArray || swapResultArray.length === 0) {
-            throw new Error("Turbos SDK could not compute a swap result.");
-        }
+        const poolId = await deepbook.getPoolIdByAssets(SUI_COIN_TYPE, WAL_COIN_TYPE);
         
-        // Imprime el resultado como un JSON en la consola
-        console.log(JSON.stringify({ ...swapResultArray[0], a2b }));
+        if (!poolId) {
+            throw new Error("Could not find a DeepBook pool for SUI/WAL. This means no one has created one yet.");
+        }
+        console.log(`   ✅ Pool ID encontrado: ${poolId}`);
+
+        const amountInMist = amountToSwap * 1e9;
+        console.log(`2. Obteniendo cotización para ${amountToSwap} SUI...`);
+        
+        const quoteResult = await deepbook.getQuoteQuantityOut(
+            poolId,
+            amountInMist
+        );
+
+        const amountOut = Number(quoteResult.quoteOut) / (10 ** WAL_DECIMALS);
+
+        console.log('\n✅ ¡Cotización de Deepbook exitosa!');
+        console.log('-------------------------------------');
+        console.log(`   Cambiando: ${amountToSwap} SUI`);
+        console.log(`   Recibirás (aprox): ${amountOut.toFixed(4)} WAL`);
+        console.log('-------------------------------------');
 
     } catch (error: any) {
-        // Imprime el error como JSON para que la API pueda leerlo
-        console.error(JSON.stringify({ error: error.message }));
-        process.exit(1);
+        console.error('--- ERROR DETALLADO ---', error);
     }
 }
 

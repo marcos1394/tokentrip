@@ -10,6 +10,7 @@ export const suiConfig = {
   auctionsPackageId: "0xe3c3c3252dfb957c48cd0837469934320a8dc865cc493d85c66857fde7bfbee0",
   rentalPackageId: "0xab953deb05ed6d368839482e3c81615b2dc7d39af20dcef5301b39d64f3c99e0",
   lendingPackageId: "0x846f026b442c5841c1e5b257ddcc45941396470c4f7a4483fffa2863750ee145",
+  cetusSuiWalPoolId: "0x72eaf5b60fadc6a7f0ecd81b067824fda96844a049a3c1ddb4bbca00c22fa992",
 
      // Creado por `tokentrip_experiences`
     adminCapId: "0x14c69c8e98ac2428e0658bfe52d5857a727d01042c2212ebb96f5dc6bdf4db66",

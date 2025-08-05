@@ -1,41 +1,44 @@
+// src/app/api/swap/quote/route.ts
 import { NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import path from 'path';
+import { initCetusSDK } from '@cetusprotocol/cetus-sui-clmm-sdk';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
-    const { amount } = await request.json();
-    const amountInMist = (parseFloat(amount) * 1e9).toString();
+    const { fromCoinType, toCoinType, amount, decimalsA, decimalsB } = await request.json();
 
-    const scriptPath = path.join(process.cwd(), 'scripts', 'test-quote.ts');
-    
-    // Construye la ruta al script principal de tsx, no al atajo .bin
-const tsxPath = path.join(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
-// Se ejecuta directamente con el comando 'node'
-const command = `node ${tsxPath} ${scriptPath} ${amountInMist}`;
-    // --- INICIA CORRECCIÓN ---
-    // Se envuelve `exec` en una Promise para poder usar `await`
-    const scriptOutput = await new Promise<string>((resolve, reject) => {
-        exec(command, (error, stdout, stderr) => {
-            if (error || stderr) {
-                // Si hay un error, se rechaza la promesa con el stderr o el error
-                reject(new Error(stderr || error?.message));
-                return;
-            }
-            // Si todo va bien, se resuelve con la salida estándar
-            resolve(stdout);
-        });
+    const sdk = initCetusSDK({ network: 'testnet' });
+    // La línea 'await sdk.build()' se ha eliminado.
+
+    const amountInMist = parseFloat(amount) * (10 ** decimalsA);
+
+    const pools = await sdk.Pool.getPoolByCoins([fromCoinType, toCoinType]);
+    if (!pools || pools.length === 0) {
+      throw new Error("Cetus pool not found for this pair.");
+    }
+    const bestPool = pools[0];
+
+    const preswapResult = await sdk.Swap.preswap({
+        pool: bestPool,
+        currentSqrtPrice: bestPool.current_sqrt_price,
+        coinTypeA: bestPool.coinTypeA,
+        coinTypeB: bestPool.coinTypeB,
+        decimalsA: decimalsA,
+        decimalsB: decimalsB,
+        a2b: bestPool.coinTypeA === fromCoinType,
+        byAmountIn: true,
+        amount: amountInMist.toString(),
     });
-    
-    // Ahora que tenemos la salida, la parseamos y la retornamos
-    const swapResult = JSON.parse(scriptOutput);
-    return NextResponse.json(swapResult);
-    // --- FIN CORRECCIÓN ---
+
+    if (!preswapResult) {
+      throw new Error("Preswap did not return a valid result.");
+    }
+
+    return NextResponse.json(preswapResult);
 
   } catch (error: any) {
-    console.error("API Error executing script:", error);
-    return NextResponse.json({ error: error.message || "Failed to execute script" }, { status: 500 });
+    console.error("Cetus API Error fetching quote:", error);
+    return NextResponse.json({ error: error.message || "Failed to fetch quote" }, { status: 500 });
   }
 }
