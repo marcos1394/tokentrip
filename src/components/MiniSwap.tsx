@@ -74,6 +74,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
     const handleSwap = async () => {
         if (!account || !preswapResult) return;
         try {
+            // --- INICIA CORRECCIÓN: Se inicializa el SDK con la info necesaria ---
             const sdk = initCetusSDK({
                 network: 'testnet',
                 fullNodeUrl: 'https://fullnode.testnet.sui.io:443',
@@ -82,6 +83,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             sdk.senderAddress = account.address;
 
             const slippage = Percentage.fromDecimal(new Decimal(0.05));
+
             const amountLimit = adjustForSlippage(
                 new BN(preswapResult.estimatedAmountOut),
                 slippage,
