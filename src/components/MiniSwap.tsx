@@ -104,7 +104,17 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 console.log('📊 Calculando cotización...');
                 const amountInMist = parseFloat(fromAmount) * (10 ** SUI_DECIMALS);
                 
-                const a2b = normalizeStructTag(bestPool.coinTypeA) === normalizedSui;
+                // CORRECCIÓN CRÍTICA: Usar el orden real del pool
+                const normalizedPoolCoinA = normalizeStructTag(bestPool.coinTypeA);
+                const normalizedPoolCoinB = normalizeStructTag(bestPool.coinTypeB);
+                const a2b = normalizedPoolCoinA === normalizedSui; // true si A es SUI (swap SUI->WAL)
+                
+                console.log('🔧 Dirección del swap según pool:', {
+                    poolCoinA: bestPool.coinTypeA,
+                    poolCoinB: bestPool.coinTypeB,
+                    a2b: a2b,
+                    isSuiToWal: a2b
+                });
                 
                 const preswapResultLocal = await sdk.Swap.preswap({
                     pool: bestPool,
@@ -211,13 +221,17 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             sdk.senderAddress = account.address;
             console.log('✅ SDK inicializado con sender address:', account.address);
 
-            // Configurar parámetros del swap - COMO EN EL SCRIPT QUE FUNCIONA
+            // Configurar parámetros del swap - CORREGIDO
             console.log('📊 Configurando parámetros del swap...');
             
-            // Determinar dirección correcta
+            // Usar los tipos de moneda EXACTAMENTE como vienen del pool
+            const coinTypeA = poolData.coinTypeA;
+            const coinTypeB = poolData.coinTypeB;
+            
+            // Determinar dirección correcta basada en el orden del pool
             const normalizedSui = normalizeStructTag(SUI_COIN_TYPE);
-            const normalizedWal = normalizeStructTag(WAL_COIN_TYPE);
-            const a2b = normalizeStructTag(poolData.coinTypeA) === normalizedSui;
+            const normalizedPoolCoinA = normalizeStructTag(coinTypeA);
+            const a2b = normalizedPoolCoinA === normalizedSui; // true si A es SUI
             
             // Convertir amount a unidades base
             const amountInBaseUnits = new BN(parseFloat(fromAmount) * (10 ** SUI_DECIMALS));
@@ -233,11 +247,11 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             );
             const amountLimitStr = amountLimit.toString();
             
-            console.log('🔧 Parámetros para swap:', {
+            console.log('🔧 Parámetros CORREGIDOS para swap:', {
                 pool_id: poolData.poolAddress,
-                coinTypeA: poolData.coinTypeA,
-                coinTypeB: poolData.coinTypeB,
-                a2b: a2b,
+                coinTypeA: coinTypeA,  // USAR EXACTAMENTE COMO VIENE DEL POOL
+                coinTypeB: coinTypeB,  // USAR EXACTAMENTE COMO VIENE DEL POOL
+                a2b: a2b,              // CALCULAR BASADO EN EL ORDEN DEL POOL
                 by_amount_in: true,
                 amount: amountStr,
                 amount_limit: amountLimitStr,
@@ -248,9 +262,9 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             
             const swapPayloadResult = sdk.Swap.createSwapTransactionPayload({
                 pool_id: poolData.poolAddress,        // string verificado
-                coinTypeA: poolData.coinTypeA,        // string verificado
-                coinTypeB: poolData.coinTypeB,        // string verificado
-                a2b: a2b,                             // boolean calculado
+                coinTypeA: coinTypeA,                 // EXACTAMENTE del pool
+                coinTypeB: coinTypeB,                 // EXACTAMENTE del pool
+                a2b: a2b,                             // CALCULADO correctamente
                 by_amount_in: true,                   // boolean fijo
                 amount: amountStr,                    // string convertido
                 amount_limit: amountLimitStr,         // string calculado
