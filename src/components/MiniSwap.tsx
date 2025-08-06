@@ -239,11 +239,24 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
 
             // Construir la transacción completa manualmente - CORREGIDO
             console.log('🔨 Construyendo transacción completa...');
+            console.log('📋 Estructura de swapPayload:', swapPayload);
+            
             const { tx: swapTx, coinABs } = swapPayload;
             
+            // Log para ver la estructura real de coinABs
+            console.log('📋 Estructura de coinABs:', coinABs);
+            console.log('📋 Tipo de coinABs:', typeof coinABs);
+            console.log('📋 Es array:', Array.isArray(coinABs));
+            
             // Transferir los coins resultantes al usuario - CORREGIDO
-            // Usar tx.pure.address() para convertir correctamente la dirección
-            swapTx.transferObjects(coinABs, swapTx.pure.address(account.address));
+            // Manejar ambos casos: array y objeto individual
+            if (Array.isArray(coinABs)) {
+                console.log('🔄 Transferindo array de coins...');
+                swapTx.transferObjects(coinABs, swapTx.pure.address(account.address));
+            } else {
+                console.log('🔄 Transferindo objeto individual...');
+                swapTx.transferObjects([coinABs], swapTx.pure.address(account.address));
+            }
             
             console.log('✅ Transacción completa construida');
 
