@@ -171,7 +171,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             });
             console.log('✅ SDK inicializado');
 
-            // Configurar slippage - CORREGIDO según documentación
+            // Configurar slippage - CORREGIDO según documentación de versión anterior
             console.log('📊 Configurando slippage...');
             const slippage = Percentage.fromDecimal(new Decimal(0.05));
             
@@ -203,26 +203,26 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             const coinTypeA = preswapResult.fromCoinType || fromCoinType;
             const coinTypeB = preswapResult.toCoinType || toCoinType;
             
-            // Corregir aToB según la dirección del swap
-            let aToB = true; // SUI -> WAL siempre es a2b = true
+            // Corregir a2b según la dirección del swap - versión anterior usa a2b
+            let a2b = true; // SUI -> WAL siempre es a2b = true
             if (coinTypeA.includes('wal::WAL') && coinTypeB.includes('sui::SUI')) {
-                aToB = false; // WAL -> SUI sería a2b = false
+                a2b = false; // WAL -> SUI sería a2b = false
             }
             
             console.log('🔧 Dirección del swap:', {
                 coinTypeA,
                 coinTypeB,
-                aToB
+                a2b
             });
 
-            // Crear payload de swap usando el método correcto de la documentación
-            console.log('🔨 Creando payload de swap...');
+            // Crear payload de swap usando el método correcto de la versión anterior
+            console.log('🔨 Creando payload de swap (versión anterior)...');
             
-            const swapPayload = sdk.Swap.createSwapPayload({
+            const swapPayload = sdk.Swap.createSwapTransactionPayload({
                 pool_id: poolAddress,
-                coin_type_a: coinTypeA,
-                coin_type_b: coinTypeB,
-                a2b: aToB,
+                coinTypeA: coinTypeA,
+                coinTypeB: coinTypeB,
+                a2b: a2b,
                 by_amount_in: true, // fijamos el amount de input
                 amount: amountInBaseUnits.toString(),
                 amount_limit: amountLimit.toString(),
