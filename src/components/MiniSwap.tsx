@@ -270,9 +270,10 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             const amountInBaseUnits = new BN(parseFloat(fromAmount) * (10 ** SUI_DECIMALS));
             const amountStr = amountInBaseUnits.toString();
             
-            // Configurar slippage
-            const slippage = Percentage.fromDecimal(new Decimal(0.05)); // 5%
+            // Configurar slippage - USAR EL estimatedAmountOut CORRECTO DEL PRESWAP
+            console.log('🔍 [DEBUG] preswapResult.estimatedAmountOut:', preswapResult.estimatedAmountOut);
             const estimatedAmountOut = new BN(preswapResult.estimatedAmountOut);
+            const slippage = Percentage.fromDecimal(new Decimal(0.05)); // 5%
             const amountLimit = adjustForSlippage(
                 estimatedAmountOut,
                 slippage,
@@ -280,6 +281,12 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             );
             const amountLimitStr = amountLimit.toString();
             
+            console.log('🔧 [SWAP] Slippage y límites calculados:', {
+                estimatedAmountOut: estimatedAmountOut.toString(),
+                slippage: slippage.toString(),
+                amountLimit: amountLimitStr
+            });
+
             console.log('🔧 [SWAP] Parámetros para swap:', {
                 pool_id: poolData.poolAddress,
                 coinTypeA: coinTypeA,          // DEL POOL
