@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowDown } from 'lucide-react';
-import { SuiClient } from '@mysten/sui/client';
+import { SuiClient } from '@musten/sui/client';
 import { normalizeStructTag } from '@mysten/sui/utils';
 
 const SUI_COIN_TYPE = '0x2::sui::SUI';
@@ -42,7 +42,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
         if (!account) return;
         
         try {
-            console.log('🔄 Obteniendo balance del usuario:', account.address);
+            console.log('🔄 [BALANCE] Obteniendo balance del usuario:', account.address);
             const client = new SuiClient({ url: 'https://fullnode.testnet.sui.io:443' });
             
             const balanceResponse = await client.getBalance({
@@ -50,11 +50,11 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 coinType: '0x2::sui::SUI',
             });
             
-            console.log('💰 Balance obtenido:', balanceResponse);
+            console.log('💰 [BALANCE] Balance obtenido:', JSON.stringify(balanceResponse, null, 2));
             setUserBalance(balanceResponse.totalBalance);
             
         } catch (error) {
-            console.error('❌ Error obteniendo balance:', error);
+            console.error('❌ [BALANCE] Error obteniendo balance:', error);
             setUserBalance(null);
         }
     }, [account]);
@@ -67,80 +67,94 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
 
     const getQuote = useCallback(async () => {
         if (parseFloat(fromAmount) > 0 && account) {
-            console.log('🔄 Obteniendo cotización para:', fromAmount, 'SUI');
+            console.log('🔄 [QUOTE] Iniciando obtención de cotización para:', fromAmount, 'SUI');
             setIsFetchingQuote(true);
             setPreswapResult(null);
             setPoolData(null);
             
             try {
                 // Inicializar SDK para obtener pools
-                console.log('🔧 Inicializando Cetus SDK para obtener pools...');
+                console.log('🔧 [QUOTE] Inicializando Cetus SDK para obtener pools...');
                 const sdk = initCetusSDK({ network: 'testnet' });
                 
                 // Obtener pools y encontrar el correcto - COMO EN EL SCRIPT QUE FUNCIONA
-                console.log('🔍 Buscando pool SUI/WAL...');
+                console.log('🔍 [QUOTE] Buscando pool SUI/WAL...');
                 const allPools = await sdk.Pool.getPoolsWithPage([]);
                 
                 if (!allPools) {
                     throw new Error("No se pudieron obtener pools");
                 }
                 
+                console.log('📋 [QUOTE] Total pools encontrados:', allPools.length);
+                
                 const normalizedSui = normalizeStructTag(SUI_COIN_TYPE);
                 const normalizedWal = normalizeStructTag(WAL_COIN_TYPE);
 
-                const bestPool = allPools.find(p => 
-                    (normalizeStructTag(p.coinTypeA) === normalizedSui && normalizeStructTag(p.coinTypeB) === normalizedWal) ||
-                    (normalizeStructTag(p.coinTypeA) === normalizedWal && normalizeStructTag(p.coinTypeB) === normalizedSui)
-                );
+                const bestPool = allPools.find(p => {
+                    const normA = normalizeStructTag(p.coinTypeA);
+                    const normB = normalizeStructTag(p.coinTypeB);
+                    const match = (normA === normalizedSui && normB === normalizedWal) ||
+                                 (normA === normalizedWal && normB === normalizedSui);
+                    console.log('🔍 [QUOTE] Evaluando pool:', {
+                        poolAddress: p.poolAddress,
+                        coinTypeA: p.coinTypeA,
+                        normalizedA: normA,
+                        coinTypeB: p.coinTypeB,
+                        normalizedB: normB,
+                        isMatch: match
+                    });
+                    return match;
+                });
 
                 if (!bestPool) {
                     throw new Error("No se encontró pool para SUI/WAL");
                 }
                 
-                console.log('✅ Pool encontrado:', bestPool.poolAddress);
+                console.log('✅ [QUOTE] Pool encontrado:', {
+                    poolAddress: bestPool.poolAddress,
+                    coinTypeA: bestPool.coinTypeA,
+                    coinTypeB: bestPool.coinTypeB,
+                    current_sqrt_price: bestPool.current_sqrt_price,
+                    normalizedA: normalizeStructTag(bestPool.coinTypeA),
+                    normalizedB: normalizeStructTag(bestPool.coinTypeB)
+                });
                 setPoolData(bestPool);
 
                 // Calcular cotización usando preswap - COMO EN EL SCRIPT QUE FUNCIONA
-                console.log('📊 Calculando cotización...');
+                console.log('📊 [QUOTE] Calculando cotización...');
                 const amountInMist = parseFloat(fromAmount) * (10 ** SUI_DECIMALS);
                 
-                // CORRECCIÓN CRÍTICA: Usar el orden real del pool
-                const normalizedPoolCoinA = normalizeStructTag(bestPool.coinTypeA);
-                const normalizedPoolCoinB = normalizeStructTag(bestPool.coinTypeB);
-                const a2b = normalizedPoolCoinA === normalizedSui; // true si A es SUI (swap SUI->WAL)
-                
-                console.log('🔧 Dirección del swap según pool:', {
-                    poolCoinA: bestPool.coinTypeA,
-                    poolCoinB: bestPool.coinTypeB,
-                    a2b: a2b,
-                    isSuiToWal: a2b
-                });
-                
-                const preswapResultLocal = await sdk.Swap.preswap({
+                // FORZAR el orden SUI -> WAL como en el script que funciona
+                const swapParams = {
                     pool: bestPool,
                     currentSqrtPrice: bestPool.current_sqrt_price,
-                    coinTypeA: bestPool.coinTypeA,
-                    coinTypeB: bestPool.coinTypeB,
+                    coinTypeA: SUI_COIN_TYPE,  // FORZAR SUI como A
+                    coinTypeB: WAL_COIN_TYPE,  // FORZAR WAL como B
                     decimalsA: SUI_DECIMALS,
                     decimalsB: WAL_DECIMALS,
-                    a2b: a2b,
+                    a2b: true,                 // FORZAR a2b = true para SUI -> WAL
                     byAmountIn: true,
                     amount: amountInMist.toString(),
-                });
+                };
+                
+                console.log('🔧 [QUOTE] Parámetros forzados para preswap:', JSON.stringify(swapParams, null, 2));
+                
+                const preswapResultLocal = await sdk.Swap.preswap(swapParams);
 
                 if (!preswapResultLocal) {
                     throw new Error("Preswap no devolvió resultado válido");
                 }
                 
-                console.log('📊 Cotización obtenida:', preswapResultLocal);
+                console.log('📊 [QUOTE] Cotización obtenida:', JSON.stringify(preswapResultLocal, null, 2));
                 
                 const estimatedWAL = (Number(preswapResultLocal.estimatedAmountOut) / (10 ** WAL_DECIMALS)).toFixed(4);
                 setToAmount(estimatedWAL);
                 setPreswapResult(preswapResultLocal);
-                console.log('✅ Cotización procesada:', estimatedWAL, 'WAL');
+                console.log('✅ [QUOTE] Cotización procesada:', estimatedWAL, 'WAL');
 
             } catch (error: any) {
-                console.error("❌ Failed to get quote:", error);
+                console.error("❌ [QUOTE] Failed to get quote:", error);
+                console.error("❌ [QUOTE] Error stack:", error.stack);
                 setToAmount('Quote unavailable');
                 toast({ 
                     variant: "destructive", 
@@ -160,22 +174,22 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
 
     const handleSwap = async () => {
         if (!account || !preswapResult || !poolData) {
-            console.warn('⚠️ No account, preswap result or pool data');
+            console.warn('⚠️ [SWAP] No account, preswap result or pool data');
             return;
         }
 
         try {
-            console.log('🔄 Iniciando proceso de swap...');
-            console.log('📋 Datos del usuario:', {
+            console.log('🔄 [SWAP] Iniciando proceso de swap...');
+            console.log('📋 [SWAP] Datos del usuario:', {
                 address: account.address,
                 fromAmount,
-                preswapResult,
-                poolData
+                preswapResult: JSON.stringify(preswapResult, null, 2),
+                poolData: JSON.stringify(poolData, null, 2)
             });
 
             // Validar balance del usuario
             if (!userBalance) {
-                console.error('❌ No se pudo obtener el balance del usuario');
+                console.error('❌ [SWAP] No se pudo obtener el balance del usuario');
                 toast({ 
                     variant: "destructive", 
                     title: "❌ Balance Error", 
@@ -187,7 +201,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             const requiredAmount = parseFloat(fromAmount) * (10 ** SUI_DECIMALS);
             const userBalanceNum = parseFloat(userBalance);
             
-            console.log('💰 Validando balance:', {
+            console.log('💰 [SWAP] Validando balance:', {
                 required: requiredAmount,
                 available: userBalanceNum,
                 hasSufficient: userBalanceNum >= requiredAmount
@@ -197,7 +211,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 const requiredSUI = (requiredAmount / (10 ** SUI_DECIMALS)).toFixed(4);
                 const availableSUI = (userBalanceNum / (10 ** SUI_DECIMALS)).toFixed(4);
                 
-                console.error('❌ Balance insuficiente:', {
+                console.error('❌ [SWAP] Balance insuficiente:', {
                     requiredSUI,
                     availableSUI
                 });
@@ -211,27 +225,24 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             }
 
             // Inicializar SDK con sender address
-            console.log('🔧 Inicializando Cetus SDK para swap...');
+            console.log('🔧 [SWAP] Inicializando Cetus SDK para swap...');
             const sdk = initCetusSDK({
                 network: 'testnet',
                 fullNodeUrl: 'https://fullnode.testnet.sui.io:443',
             });
             
             // ESTABLECER LA DIRECCIÓN DEL REMITENTE - CRÍTICO
+            console.log('🔧 [SWAP] Estableciendo sender address:', account.address);
             sdk.senderAddress = account.address;
-            console.log('✅ SDK inicializado con sender address:', account.address);
+            console.log('✅ [SWAP] SDK inicializado con sender address:', account.address);
 
-            // Configurar parámetros del swap - CORREGIDO
-            console.log('📊 Configurando parámetros del swap...');
+            // Configurar parámetros del swap - FORZAR el orden como en el script
+            console.log('📊 [SWAP] Configurando parámetros del swap FORZADOS...');
             
-            // Usar los tipos de moneda EXACTAMENTE como vienen del pool
-            const coinTypeA = poolData.coinTypeA;
-            const coinTypeB = poolData.coinTypeB;
-            
-            // Determinar dirección correcta basada en el orden del pool
-            const normalizedSui = normalizeStructTag(SUI_COIN_TYPE);
-            const normalizedPoolCoinA = normalizeStructTag(coinTypeA);
-            const a2b = normalizedPoolCoinA === normalizedSui; // true si A es SUI
+            // FORZAR el orden SUI -> WAL como en el script que funciona
+            const coinTypeA = SUI_COIN_TYPE;  // FORZAR SUI como A
+            const coinTypeB = WAL_COIN_TYPE;  // FORZAR WAL como B
+            const a2b = true;                 // FORZAR a2b = true para SUI -> WAL
             
             // Convertir amount a unidades base
             const amountInBaseUnits = new BN(parseFloat(fromAmount) * (10 ** SUI_DECIMALS));
@@ -247,44 +258,78 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             );
             const amountLimitStr = amountLimit.toString();
             
-            console.log('🔧 Parámetros CORREGIDOS para swap:', {
+            console.log('🔧 [SWAP] Parámetros FORZADOS para swap:', {
                 pool_id: poolData.poolAddress,
-                coinTypeA: coinTypeA,  // USAR EXACTAMENTE COMO VIENE DEL POOL
-                coinTypeB: coinTypeB,  // USAR EXACTAMENTE COMO VIENE DEL POOL
-                a2b: a2b,              // CALCULAR BASADO EN EL ORDEN DEL POOL
+                coinTypeA: coinTypeA,          // FORZADO
+                coinTypeB: coinTypeB,          // FORZADO
+                a2b: a2b,                      // FORZADO
                 by_amount_in: true,
                 amount: amountStr,
                 amount_limit: amountLimitStr,
             });
 
-            // Crear payload de swap usando el método estándar - CON DATOS VERIFICADOS
-            console.log('🔨 Creando payload de swap...');
+            // VALIDACIÓN EXTRA DE PARÁMETROS
+            console.log('🔍 [SWAP] Validando parámetros antes de crear payload...');
+            if (!poolData.poolAddress) {
+                throw new Error("Pool address is missing");
+            }
+            if (!coinTypeA || !coinTypeB) {
+                throw new Error("Coin types are missing");
+            }
+            if (!amountStr || amountStr === "0") {
+                throw new Error("Invalid amount");
+            }
+            if (!amountLimitStr) {
+                throw new Error("Invalid amount limit");
+            }
+            console.log('✅ [SWAP] Todos los parámetros validados correctamente');
+
+            // Crear payload de swap usando el método estándar - CON DATOS FORZADOS
+            console.log('🔨 [SWAP] Creando payload de swap...');
             
-            const swapPayloadResult = sdk.Swap.createSwapTransactionPayload({
+            const swapParams = {
                 pool_id: poolData.poolAddress,        // string verificado
-                coinTypeA: coinTypeA,                 // EXACTAMENTE del pool
-                coinTypeB: coinTypeB,                 // EXACTAMENTE del pool
-                a2b: a2b,                             // CALCULADO correctamente
+                coinTypeA: coinTypeA,                 // FORZADO
+                coinTypeB: coinTypeB,                 // FORZADO
+                a2b: a2b,                             // FORZADO
                 by_amount_in: true,                   // boolean fijo
                 amount: amountStr,                    // string convertido
                 amount_limit: amountLimitStr,         // string calculado
-            });
+            };
+            
+            console.log('📋 [SWAP] Parámetros enviados a createSwapTransactionPayload:', JSON.stringify(swapParams, null, 2));
+            
+            const swapPayloadResult = sdk.Swap.createSwapTransactionPayload(swapParams);
             
             // Esperar a que se resuelva si es una Promise
+            console.log('⏳ [SWAP] Esperando resolución del payload...');
             const swapPayload: Transaction = await Promise.resolve(swapPayloadResult);
             
-            console.log('✅ Payload de swap creado');
+            console.log('✅ [SWAP] Payload de swap creado exitosamente');
+            console.log('📋 [SWAP] Tipo de payload:', typeof swapPayload);
+            console.log('📋 [SWAP] Payload tiene toJSON:', typeof swapPayload.toJSON === 'function');
+            
+            // Intentar inspeccionar el payload si es posible
+            try {
+                console.log('📋 [SWAP] Payload inspect:', JSON.stringify(swapPayload, null, 2));
+            } catch (inspectError) {
+                console.log('📋 [SWAP] No se pudo inspeccionar el payload:', inspectError.message);
+            }
 
             // Ejecutar transacción
-            console.log('🚀 Ejecutando transacción...');
+            console.log('🚀 [SWAP] Ejecutando transacción...');
+            console.log('📋 [SWAP] Datos de transacción a enviar:', {
+                hasTransaction: !!swapPayload,
+                transactionType: typeof swapPayload
+            });
             
             signAndExecuteTransaction(
                 { transaction: swapPayload },
                 {
                     onSuccess: (result) => {
-                        console.log('✅ Swap completado exitosamente:', result);
-                        console.log('📋 Digest:', result.digest);
-                        console.log('📋 Effects:', result.effects);
+                        console.log('✅ [SWAP] Swap completado exitosamente:', result);
+                        console.log('📋 [SWAP] Digest:', result.digest);
+                        console.log('📋 [SWAP] Effects:', JSON.stringify(result.effects, null, 2));
                         
                         toast({ 
                             title: "✅ Swap Successful!", 
@@ -293,19 +338,29 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                         onSwapSuccess();
                     },
                     onError: (error) => {
-                        console.error("❌ Error en la transacción:", error);
+                        console.error("❌ [SWAP] Error en la transacción:", error);
+                        console.error("❌ [SWAP] Error completo:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+                        
+                        // Loggear más detalles del error si es posible
+                        if (error.message) {
+                            console.error("❌ [SWAP] Mensaje de error:", error.message);
+                        }
+                        if (error.stack) {
+                            console.error("❌ [SWAP] Stack trace:", error.stack);
+                        }
+                        
                         toast({ 
                             variant: "destructive", 
                             title: "❌ Swap Failed", 
-                            description: error.message || "Transaction failed" 
+                            description: error.message || "Transaction failed. Check console for details." 
                         });
                     }
                 }
             );
 
         } catch (error: any) {
-            console.error("❌ Swap failed:", error);
-            console.error("❌ Error stack:", error.stack);
+            console.error("❌ [SWAP] Swap failed:", error);
+            console.error("❌ [SWAP] Error stack:", error.stack);
             
             toast({ 
                 variant: "destructive", 
