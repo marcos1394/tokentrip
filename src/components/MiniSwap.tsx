@@ -183,8 +183,8 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             console.log('📋 [SWAP] Datos del usuario:', {
                 address: account.address,
                 fromAmount,
-                preswapResult: JSON.stringify(preswapResult, null, 2),
-                poolData: JSON.stringify(poolData, null, 2)
+                // preswapResult: JSON.stringify(preswapResult, null, 2),
+                // poolData: JSON.stringify(poolData, null, 2)
             });
 
             // Validar balance del usuario
@@ -312,8 +312,8 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             // Intentar inspeccionar el payload si es posible
             try {
                 console.log('📋 [SWAP] Payload inspect:', JSON.stringify(swapPayload, null, 2));
-            } catch (inspectError) {
-                console.log('📋 [SWAP] No se pudo inspeccionar el payload:', inspectError.message);
+            } catch (inspectError: any) { // CORREGIDO: Tipado explícito
+                console.log('📋 [SWAP] No se pudo inspeccionar el payload:', inspectError?.message || 'Unknown error');
             }
 
             // Ejecutar transacción
