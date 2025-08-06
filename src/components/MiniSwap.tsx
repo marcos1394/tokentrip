@@ -201,7 +201,15 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             const poolAddress = preswapResult.poolAddress;
             const coinTypeA = preswapResult.fromCoinType || fromCoinType;
             const coinTypeB = preswapResult.toCoinType || toCoinType;
-            const aToB = preswapResult.aToB !== undefined ? preswapResult.aToB : true;
+            
+            // CORRECCIÓN CRÍTICA: Forzar aToB = true para SUI -> WAL
+            // Solo forzamos aToB = true si estamos haciendo SUI -> WAL
+            let aToB = preswapResult.aToB;
+            if (coinTypeA.includes('sui::SUI') && coinTypeB.includes('wal::WAL')) {
+                aToB = true; // SUI -> WAL siempre debe ser aToB = true
+                console.log('🔧 Corrigiendo aToB a true para SUI -> WAL');
+            }
+            
             const amount = preswapResult.amount || amountInBaseUnits.toString();
             const estimatedAmountOut = preswapResult.estimatedAmountOut;
 
