@@ -194,39 +194,57 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 baseUnits: amountInBaseUnits.toString()
             });
 
-            // Validar datos del preswapResult - CORREGIDO
+            // Validar datos del preswapResult - USANDO LOS CAMPOS CORRECTOS
             console.log('📋 Validando preswapResult:', preswapResult);
             
-            const requiredFields = ['poolAddress', 'coinTypeA', 'coinTypeB', 'aToB', 'amount', 'estimatedAmountOut'];
-            const missingFields = requiredFields.filter(field => 
-                preswapResult[field] === undefined || preswapResult[field] === null
-            );
-            
+            // Usar los campos que realmente devuelve tu API
+            const poolAddress = preswapResult.poolAddress;
+            const coinTypeA = preswapResult.fromCoinType || fromCoinType;
+            const coinTypeB = preswapResult.toCoinType || toCoinType;
+            const aToB = preswapResult.aToB !== undefined ? preswapResult.aToB : true;
+            const amount = preswapResult.amount || amountInBaseUnits.toString();
+            const estimatedAmountOut = preswapResult.estimatedAmountOut;
+
+            // Verificar que todos los campos necesarios existan
+            const swapData = {
+                poolAddress,
+                coinTypeA,
+                coinTypeB,
+                aToB,
+                amount,
+                estimatedAmountOut
+            };
+
+            const missingFields = Object.entries(swapData)
+                .filter(([key, value]) => value === undefined || value === null || value === '')
+                .map(([key]) => key);
+
             if (missingFields.length > 0) {
                 console.error('❌ Campos faltantes en preswapResult:', missingFields);
                 console.error('📋 Contenido completo de preswapResult:', preswapResult);
+                console.error('📋 Datos de swap que se intentan usar:', swapData);
                 throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
             }
 
             // Crear transacción
             console.log('🔨 Creando transacción de swap...');
             console.log('📋 Datos para createSwapTransactionPayload:', {
-                pool_id: preswapResult.poolAddress,
-                coinTypeA: preswapResult.coinTypeA,
-                coinTypeB: preswapResult.coinTypeB,
-                a2b: preswapResult.aToB,
+                pool_id: poolAddress,
+                coinTypeA: coinTypeA,
+                coinTypeB: coinTypeB,
+                a2b: aToB,
                 by_amount_in: true,
-                amount: amountInBaseUnits.toString(),
+                amount: amount,
                 amount_limit: amountLimit.toString(),
             });
 
             const tx = await sdk.Swap.createSwapTransactionPayload({
-                pool_id: preswapResult.poolAddress,
-                coinTypeA: preswapResult.coinTypeA,
-                coinTypeB: preswapResult.coinTypeB,
-                a2b: preswapResult.aToB,
+                pool_id: poolAddress,
+                coinTypeA: coinTypeA,
+                coinTypeB: coinTypeB,
+                a2b: aToB,
                 by_amount_in: true,
-                amount: amountInBaseUnits.toString(),
+                amount: amount,
                 amount_limit: amountLimit.toString(),
             });
             
