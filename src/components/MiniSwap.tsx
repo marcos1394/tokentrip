@@ -173,25 +173,28 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             sdk.senderAddress = account.address;
             console.log('✅ SDK inicializado');
 
-            // Configurar slippage
+            // Configurar slippage - CORREGIDO
             console.log('📊 Configurando slippage...');
             const slippage = Percentage.fromDecimal(new Decimal(0.05));
-            const amountLimit = adjustForSlippage(
+            const amountLimitBN = adjustForSlippage(
                 new BN(preswapResult.estimatedAmountOut),
                 slippage,
                 false
             );
+            // Convertir a string para evitar problemas de tipo
+            const amountLimit = amountLimitBN.toString();
             console.log('✅ Slippage configurado:', {
                 slippage: slippage.toString(),
-                amountLimit: amountLimit.toString()
+                amountLimit: amountLimit
             });
 
-            // Convertir amount a unidades base
+            // Convertir amount a unidades base - CORREGIDO
             console.log('🔢 Convirtiendo amount a unidades base...');
             const amountInBaseUnits = new BN(parseFloat(fromAmount) * (10 ** SUI_DECIMALS));
+            const amount = amountInBaseUnits.toString();
             console.log('✅ Amount convertido:', {
                 original: fromAmount,
-                baseUnits: amountInBaseUnits.toString()
+                baseUnits: amount
             });
 
             // Validar datos del preswapResult - USANDO LOS CAMPOS CORRECTOS
@@ -209,7 +212,6 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 console.log('🔧 Corrigiendo aToB a true para SUI -> WAL');
             }
             
-            const amount = amountInBaseUnits.toString(); // Usar el amount convertido
             const estimatedAmountOut = preswapResult.estimatedAmountOut;
 
             // Verificar que todos los campos necesarios existan
@@ -233,7 +235,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
             }
 
-            // Crear transacción
+            // Crear transacción con tipos asegurados
             console.log('🔨 Creando transacción de swap...');
             console.log('📋 Datos para createSwapTransactionPayload:', {
                 pool_id: poolAddress,
@@ -242,16 +244,17 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 a2b: aToB,
                 by_amount_in: true,
                 amount: amount,
-                amount_limit: amountLimit.toString(),
+                amount_limit: amountLimit,
             });
 
+            // Asegurar que todos los valores sean strings para evitar TypeMismatch
             const tx = await sdk.Swap.createSwapTransactionPayload({
-                pool_id: poolAddress,
-                coinTypeA: coinTypeA,
-                coinTypeB: coinTypeB,
-                a2b: aToB,
+                pool_id: poolAddress.toString(),
+                coinTypeA: coinTypeA.toString(),
+                coinTypeB: coinTypeB.toString(),
+                a2b: Boolean(aToB),
                 by_amount_in: true,
-                amount: amount,
+                amount: amount.toString(),
                 amount_limit: amountLimit.toString(),
             });
             
