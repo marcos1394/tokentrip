@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowDown } from 'lucide-react';
-import { SuiClient } from '@musten/sui/client';
+import { SuiClient } from '@mysten/sui/client';
 import { normalizeStructTag } from '@mysten/sui/utils';
 
 const SUI_COIN_TYPE = '0x2::sui::SUI';
