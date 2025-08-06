@@ -203,14 +203,13 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             const coinTypeB = preswapResult.toCoinType || toCoinType;
             
             // CORRECCIÓN CRÍTICA: Forzar aToB = true para SUI -> WAL
-            // Solo forzamos aToB = true si estamos haciendo SUI -> WAL
             let aToB = preswapResult.aToB;
             if (coinTypeA.includes('sui::SUI') && coinTypeB.includes('wal::WAL')) {
                 aToB = true; // SUI -> WAL siempre debe ser aToB = true
                 console.log('🔧 Corrigiendo aToB a true para SUI -> WAL');
             }
             
-            const amount = preswapResult.amount || amountInBaseUnits.toString();
+            const amount = amountInBaseUnits.toString(); // Usar el amount convertido
             const estimatedAmountOut = preswapResult.estimatedAmountOut;
 
             // Verificar que todos los campos necesarios existan
@@ -258,16 +257,33 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             
             console.log('✅ Transacción creada:', tx);
 
-            // Ejecutar transacción
+            // Ejecutar transacción con manejo de resultado mejorado
             console.log('🚀 Ejecutando transacción...');
-            const result = await signAndExecuteTransaction({ transaction: tx });
-            console.log('✅ Swap completado:', result);
             
-            toast({ 
-                title: "✅ Swap Successful!", 
-                description: `You received ~${toAmount} WAL.` 
-            });
-            onSwapSuccess();
+            signAndExecuteTransaction(
+                { transaction: tx },
+                {
+                    onSuccess: (result) => {
+                        console.log('✅ Swap completado exitosamente:', result);
+                        console.log('📋 Digest:', result.digest);
+                        console.log('📋 Effects:', result.effects);
+                        
+                        toast({ 
+                            title: "✅ Swap Successful!", 
+                            description: `You received ~${toAmount} WAL. Transaction: ${result.digest?.substring(0, 10)}...` 
+                        });
+                        onSwapSuccess();
+                    },
+                    onError: (error) => {
+                        console.error("❌ Error en la transacción:", error);
+                        toast({ 
+                            variant: "destructive", 
+                            title: "❌ Swap Failed", 
+                            description: error.message || "Transaction failed" 
+                        });
+                    }
+                }
+            );
 
         } catch (error: any) {
             console.error("❌ Swap failed:", error);
