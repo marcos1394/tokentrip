@@ -111,12 +111,10 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 }
                 
                 console.log('✅ [QUOTE] Pool encontrado:', {
-                    poolAddress: bestPool.poolAddress,
-                    coinTypeA: bestPool.coinTypeA,
-                    coinTypeB: bestPool.coinTypeB,
+                   poolAddress: bestPool.poolAddress,
+                    coinTypeA: bestPool.coinTypeA, // WAL
+                    coinTypeB: bestPool.coinTypeB, // SUI
                     current_sqrt_price: bestPool.current_sqrt_price,
-                    normalizedA: normalizeStructTag(bestPool.coinTypeA),
-                    normalizedB: normalizeStructTag(bestPool.coinTypeB)
                 });
                 setPoolData(bestPool);
 
@@ -128,11 +126,11 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 const swapParams = {
                     pool: bestPool,
                     currentSqrtPrice: bestPool.current_sqrt_price,
-                    coinTypeA: SUI_COIN_TYPE,  // FORZAR SUI como A
-                    coinTypeB: WAL_COIN_TYPE,  // FORZAR WAL como B
-                    decimalsA: SUI_DECIMALS,
-                    decimalsB: WAL_DECIMALS,
-                    a2b: true,                 // FORZAR a2b = true para SUI -> WAL
+                    coinTypeA: bestPool.coinTypeA, // WAL (del pool)
+                    coinTypeB: bestPool.coinTypeB, // SUI (del pool)
+                    decimalsA: WAL_DECIMALS,       // WAL decimals
+                    decimalsB: SUI_DECIMALS,       // SUI decimals
+                    a2b: false,                    // FALSE: de B (SUI) a A (WAL)
                     byAmountIn: true,
                     amount: amountInMist.toString(),
                 };
