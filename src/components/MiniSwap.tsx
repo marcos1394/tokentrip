@@ -218,7 +218,8 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             // Crear payload de swap usando el método correcto de la versión anterior
             console.log('🔨 Creando payload de swap (versión anterior)...');
             
-            const swapPayload = sdk.Swap.createSwapTransactionPayload({
+            // Manejar la posibilidad de que sea una Promise
+            const swapPayloadResult = sdk.Swap.createSwapTransactionPayload({
                 pool_id: poolAddress,
                 coinTypeA: coinTypeA,
                 coinTypeB: coinTypeB,
@@ -227,6 +228,9 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 amount: amountInBaseUnits.toString(),
                 amount_limit: amountLimit.toString(),
             });
+            
+            // Esperar a que se resuelva si es una Promise
+            const swapPayload = await Promise.resolve(swapPayloadResult);
             
             console.log('✅ Payload de swap creado');
 
