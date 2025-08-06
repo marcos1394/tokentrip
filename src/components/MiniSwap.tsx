@@ -237,12 +237,12 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             
             console.log('✅ Payload de swap sin transferencia creado');
 
-            // Construir la transacción completa manualmente
+            // Construir la transacción completa manualmente - CORREGIDO
             console.log('🔨 Construyendo transacción completa...');
-            const { tx: swapTx, coinsAB } = swapPayload;
+            const { tx: swapTx, coinABs } = swapPayload; // CORREGIDO: coinABs en lugar de coinsAB
             
             // Transferir los coins resultantes al usuario
-            swapTx.transferObjects([coinsAB], swapTx.pure(account.address));
+            swapTx.transferObjects([coinABs], swapTx.pure(account.address));
             
             console.log('✅ Transacción completa construida');
 
