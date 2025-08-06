@@ -163,13 +163,17 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 return;
             }
 
-            // Inicializar SDK
+            // Inicializar SDK con sender address
             console.log('🔧 Inicializando Cetus SDK...');
             const sdk = initCetusSDK({
                 network: 'testnet',
                 fullNodeUrl: 'https://fullnode.testnet.sui.io:443',
             });
-            console.log('✅ SDK inicializado');
+            
+            // ESTABLECER LA DIRECCIÓN DEL REMITENTE - CORRECCIÓN IMPORTANTE
+            sdk.senderAddress = account.address;
+            
+            console.log('✅ SDK inicializado con sender address:', account.address);
 
             // Configurar slippage - CORREGIDO según documentación de versión anterior
             console.log('📊 Configurando slippage...');
