@@ -194,11 +194,18 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 baseUnits: amountInBaseUnits.toString()
             });
 
-            // Validar datos del preswapResult
+            // Validar datos del preswapResult - CORREGIDO
             console.log('📋 Validando preswapResult:', preswapResult);
-            if (!preswapResult.poolAddress || !preswapResult.coinTypeA || !preswapResult.coinTypeB) {
-                console.error('❌ Datos incompletos en preswapResult');
-                throw new Error('Incomplete swap data');
+            
+            const requiredFields = ['poolAddress', 'coinTypeA', 'coinTypeB', 'aToB', 'amount', 'estimatedAmountOut'];
+            const missingFields = requiredFields.filter(field => 
+                preswapResult[field] === undefined || preswapResult[field] === null
+            );
+            
+            if (missingFields.length > 0) {
+                console.error('❌ Campos faltantes en preswapResult:', missingFields);
+                console.error('📋 Contenido completo de preswapResult:', preswapResult);
+                throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
             }
 
             // Crear transacción
