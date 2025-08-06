@@ -168,103 +168,73 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             const sdk = initCetusSDK({
                 network: 'testnet',
                 fullNodeUrl: 'https://fullnode.testnet.sui.io:443',
-                wallet: account.address,
             });
-            sdk.senderAddress = account.address;
             console.log('✅ SDK inicializado');
 
-            // Configurar slippage - CORREGIDO
+            // Configurar slippage - CORREGIDO según documentación
             console.log('📊 Configurando slippage...');
             const slippage = Percentage.fromDecimal(new Decimal(0.05));
-            const amountLimitBN = adjustForSlippage(
-                new BN(preswapResult.estimatedAmountOut),
+            
+            // Ajustar el amount_limit según la documentación
+            const estimatedAmountOut = new BN(preswapResult.estimatedAmountOut);
+            const amountLimit = adjustForSlippage(
+                estimatedAmountOut,
                 slippage,
-                false
+                false // false para obtener el mínimo output requerido
             );
-            // Convertir a string para evitar problemas de tipo
-            const amountLimit = amountLimitBN.toString();
             console.log('✅ Slippage configurado:', {
                 slippage: slippage.toString(),
-                amountLimit: amountLimit
+                amountLimit: amountLimit.toString(),
+                estimatedAmountOut: estimatedAmountOut.toString()
             });
 
             // Convertir amount a unidades base - CORREGIDO
             console.log('🔢 Convirtiendo amount a unidades base...');
             const amountInBaseUnits = new BN(parseFloat(fromAmount) * (10 ** SUI_DECIMALS));
-            const amount = amountInBaseUnits.toString();
             console.log('✅ Amount convertido:', {
                 original: fromAmount,
-                baseUnits: amount
+                baseUnits: amountInBaseUnits.toString()
             });
 
-            // Validar datos del preswapResult - USANDO LOS CAMPOS CORRECTOS
+            // Validar datos del preswapResult
             console.log('📋 Validando preswapResult:', preswapResult);
             
-            // Usar los campos que realmente devuelve tu API
             const poolAddress = preswapResult.poolAddress;
             const coinTypeA = preswapResult.fromCoinType || fromCoinType;
             const coinTypeB = preswapResult.toCoinType || toCoinType;
             
-            // CORRECCIÓN CRÍTICA: Forzar aToB = true para SUI -> WAL
-            let aToB = preswapResult.aToB;
-            if (coinTypeA.includes('sui::SUI') && coinTypeB.includes('wal::WAL')) {
-                aToB = true; // SUI -> WAL siempre debe ser aToB = true
-                console.log('🔧 Corrigiendo aToB a true para SUI -> WAL');
+            // Corregir aToB según la dirección del swap
+            let aToB = true; // SUI -> WAL siempre es a2b = true
+            if (coinTypeA.includes('wal::WAL') && coinTypeB.includes('sui::SUI')) {
+                aToB = false; // WAL -> SUI sería a2b = false
             }
             
-            const estimatedAmountOut = preswapResult.estimatedAmountOut;
-
-            // Verificar que todos los campos necesarios existan
-            const swapData = {
-                poolAddress,
+            console.log('🔧 Dirección del swap:', {
                 coinTypeA,
                 coinTypeB,
-                aToB,
-                amount,
-                estimatedAmountOut
-            };
-
-            const missingFields = Object.entries(swapData)
-                .filter(([key, value]) => value === undefined || value === null || value === '')
-                .map(([key]) => key);
-
-            if (missingFields.length > 0) {
-                console.error('❌ Campos faltantes en preswapResult:', missingFields);
-                console.error('📋 Contenido completo de preswapResult:', preswapResult);
-                console.error('📋 Datos de swap que se intentan usar:', swapData);
-                throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
-            }
-
-            // Crear transacción con tipos asegurados
-            console.log('🔨 Creando transacción de swap...');
-            console.log('📋 Datos para createSwapTransactionPayload:', {
-                pool_id: poolAddress,
-                coinTypeA: coinTypeA,
-                coinTypeB: coinTypeB,
-                a2b: aToB,
-                by_amount_in: true,
-                amount: amount,
-                amount_limit: amountLimit,
+                aToB
             });
 
-            // Asegurar que todos los valores sean strings para evitar TypeMismatch
-            const tx = await sdk.Swap.createSwapTransactionPayload({
-                pool_id: poolAddress.toString(),
-                coinTypeA: coinTypeA.toString(),
-                coinTypeB: coinTypeB.toString(),
-                a2b: Boolean(aToB),
-                by_amount_in: true,
-                amount: amount.toString(),
+            // Crear payload de swap usando el método correcto de la documentación
+            console.log('🔨 Creando payload de swap...');
+            
+            const swapPayload = sdk.Swap.createSwapPayload({
+                pool_id: poolAddress,
+                coin_type_a: coinTypeA,
+                coin_type_b: coinTypeB,
+                a2b: aToB,
+                by_amount_in: true, // fijamos el amount de input
+                amount: amountInBaseUnits.toString(),
                 amount_limit: amountLimit.toString(),
             });
             
-            console.log('✅ Transacción creada:', tx);
+            console.log('✅ Payload de swap creado');
 
-            // Ejecutar transacción con manejo de resultado mejorado
+            // Ejecutar transacción
             console.log('🚀 Ejecutando transacción...');
             
             signAndExecuteTransaction(
-                { transaction: tx },
+                { transaction: swapPayload },
                 {
                     onSuccess: (result) => {
                         console.log('✅ Swap completado exitosamente:', result);
