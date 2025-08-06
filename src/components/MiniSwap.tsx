@@ -170,16 +170,16 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 fullNodeUrl: 'https://fullnode.testnet.sui.io:443',
             });
             
-            // ESTABLECER LA DIRECCIÓN DEL REMITENTE - CORRECCIÓN IMPORTANTE
+            // ESTABLECER LA DIRECCIÓN DEL REMITENTE
             sdk.senderAddress = account.address;
             
             console.log('✅ SDK inicializado con sender address:', account.address);
 
-            // Configurar slippage - CORREGIDO según documentación de versión anterior
+            // Configurar slippage
             console.log('📊 Configurando slippage...');
             const slippage = Percentage.fromDecimal(new Decimal(0.05));
             
-            // Ajustar el amount_limit según la documentación
+            // Ajustar el amount_limit
             const estimatedAmountOut = new BN(preswapResult.estimatedAmountOut);
             const amountLimit = adjustForSlippage(
                 estimatedAmountOut,
@@ -192,7 +192,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 estimatedAmountOut: estimatedAmountOut.toString()
             });
 
-            // Convertir amount a unidades base - CORREGIDO
+            // Convertir amount a unidades base
             console.log('🔢 Convirtiendo amount a unidades base...');
             const amountInBaseUnits = new BN(parseFloat(fromAmount) * (10 ** SUI_DECIMALS));
             console.log('✅ Amount convertido:', {
@@ -207,7 +207,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             const coinTypeA = preswapResult.fromCoinType || fromCoinType;
             const coinTypeB = preswapResult.toCoinType || toCoinType;
             
-            // Corregir a2b según la dirección del swap - versión anterior usa a2b
+            // Corregir a2b según la dirección del swap
             let a2b = true; // SUI -> WAL siempre es a2b = true
             if (coinTypeA.includes('wal::WAL') && coinTypeB.includes('sui::SUI')) {
                 a2b = false; // WAL -> SUI sería a2b = false
@@ -219,16 +219,15 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 a2b
             });
 
-            // Crear payload de swap usando el método correcto de la versión anterior
-            console.log('🔨 Creando payload de swap (versión anterior)...');
+            // Crear payload de swap sin transferencia usando el método de la documentación
+            console.log('🔨 Creando payload de swap sin transferencia...');
             
-            // Manejar la posibilidad de que sea una Promise
-            const swapPayloadResult = sdk.Swap.createSwapTransactionPayload({
+            const swapPayloadResult = sdk.Swap.createSwapTransactionWithoutTransferCoinsPayload({
                 pool_id: poolAddress,
                 coinTypeA: coinTypeA,
                 coinTypeB: coinTypeB,
                 a2b: a2b,
-                by_amount_in: true, // fijamos el amount de input
+                by_amount_in: true,
                 amount: amountInBaseUnits.toString(),
                 amount_limit: amountLimit.toString(),
             });
@@ -236,13 +235,22 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             // Esperar a que se resuelva si es una Promise
             const swapPayload = await Promise.resolve(swapPayloadResult);
             
-            console.log('✅ Payload de swap creado');
+            console.log('✅ Payload de swap sin transferencia creado');
+
+            // Construir la transacción completa manualmente
+            console.log('🔨 Construyendo transacción completa...');
+            const { tx: swapTx, coinsAB } = swapPayload;
+            
+            // Transferir los coins resultantes al usuario
+            swapTx.transferObjects([coinsAB], swapTx.pure(account.address));
+            
+            console.log('✅ Transacción completa construida');
 
             // Ejecutar transacción
             console.log('🚀 Ejecutando transacción...');
             
             signAndExecuteTransaction(
-                { transaction: swapPayload },
+                { transaction: swapTx },
                 {
                     onSuccess: (result) => {
                         console.log('✅ Swap completado exitosamente:', result);
