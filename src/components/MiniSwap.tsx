@@ -111,31 +111,44 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 }
                 
                 console.log('✅ [QUOTE] Pool encontrado:', {
-                   poolAddress: bestPool.poolAddress,
-                    coinTypeA: bestPool.coinTypeA, // WAL
-                    coinTypeB: bestPool.coinTypeB, // SUI
+                    poolAddress: bestPool.poolAddress,
+                    coinTypeA: bestPool.coinTypeA,
+                    coinTypeB: bestPool.coinTypeB,
                     current_sqrt_price: bestPool.current_sqrt_price,
+                    normalizedA: normalizeStructTag(bestPool.coinTypeA),
+                    normalizedB: normalizeStructTag(bestPool.coinTypeB)
                 });
                 setPoolData(bestPool);
 
-                // Calcular cotización usando preswap - COMO EN EL SCRIPT QUE FUNCIONA
+                // Calcular cotización usando preswap - USAR LOS TIPOS DEL POOL
                 console.log('📊 [QUOTE] Calculando cotización...');
                 const amountInMist = parseFloat(fromAmount) * (10 ** SUI_DECIMALS);
                 
-                // FORZAR el orden SUI -> WAL como en el script que funciona
+                // Determinar dirección correcta basada en el orden del pool
+                const normalizedPoolCoinA = normalizeStructTag(bestPool.coinTypeA);
+                const a2b = normalizedPoolCoinA === normalizedWal; // TRUE si A es WAL (swap WAL->SUI), FALSE si A es SUI (swap SUI->WAL)
+                
+                console.log('🔧 [QUOTE] Dirección del swap según pool:', {
+                    poolCoinA: bestPool.coinTypeA,
+                    poolCoinB: bestPool.coinTypeB,
+                    a2b: a2b,
+                    isSuiToWal: !a2b // Lo opuesto a a2b
+                });
+                
+                // USAR LOS TIPOS Y DECIMALES DEL POOL
                 const swapParams = {
                     pool: bestPool,
                     currentSqrtPrice: bestPool.current_sqrt_price,
-                    coinTypeA: bestPool.coinTypeA, // WAL (del pool)
-                    coinTypeB: bestPool.coinTypeB, // SUI (del pool)
-                    decimalsA: WAL_DECIMALS,       // WAL decimals
-                    decimalsB: SUI_DECIMALS,       // SUI decimals
-                    a2b: false,                    // FALSE: de B (SUI) a A (WAL)
+                    coinTypeA: bestPool.coinTypeA,  // USAR DEL POOL
+                    coinTypeB: bestPool.coinTypeB,  // USAR DEL POOL
+                    decimalsA: normalizedPoolCoinA === normalizedSui ? SUI_DECIMALS : WAL_DECIMALS, // DECIMALES DE A
+                    decimalsB: normalizedPoolCoinA === normalizedSui ? WAL_DECIMALS : SUI_DECIMALS, // DECIMALES DE B
+                    a2b: a2b,                       // CALCULAR BASADO EN EL ORDEN DEL POOL
                     byAmountIn: true,
                     amount: amountInMist.toString(),
                 };
                 
-                console.log('🔧 [QUOTE] Parámetros forzados para preswap:', JSON.stringify(swapParams, null, 2));
+                console.log('🔧 [QUOTE] Parámetros CORRECTOS para preswap:', JSON.stringify(swapParams, null, 2));
                 
                 const preswapResultLocal = await sdk.Swap.preswap(swapParams);
 
@@ -234,13 +247,24 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             sdk.senderAddress = account.address;
             console.log('✅ [SWAP] SDK inicializado con sender address:', account.address);
 
-            // Configurar parámetros del swap - FORZAR el orden como en el script
-            console.log('📊 [SWAP] Configurando parámetros del swap FORZADOS...');
+            // Configurar parámetros del swap - USAR LOS TIPOS DEL POOL
+            console.log('📊 [SWAP] Configurando parámetros del swap...');
             
-            // FORZAR el orden SUI -> WAL como en el script que funciona
-            const coinTypeA = SUI_COIN_TYPE;  // FORZAR SUI como A
-            const coinTypeB = WAL_COIN_TYPE;  // FORZAR WAL como B
-            const a2b = true;                 // FORZAR a2b = true para SUI -> WAL
+            // USAR LOS TIPOS EXACTAMENTE COMO VIENEN DEL POOL
+            const coinTypeA = poolData.coinTypeA;  // WAL
+            const coinTypeB = poolData.coinTypeB;  // SUI
+            
+            // Determinar dirección correcta basada en el orden del pool
+            const normalizedPoolCoinA = normalizeStructTag(coinTypeA);
+            const normalizedSui = normalizeStructTag(SUI_COIN_TYPE);
+            const a2b = normalizedPoolCoinA === normalizedSui; // FALSE: de B (SUI) a A (WAL)
+            
+            console.log('🔧 [SWAP] Dirección del swap para payload:', {
+                coinTypeA: coinTypeA,
+                coinTypeB: coinTypeB,
+                a2b: a2b,
+                isSuiToWal: !a2b
+            });
             
             // Convertir amount a unidades base
             const amountInBaseUnits = new BN(parseFloat(fromAmount) * (10 ** SUI_DECIMALS));
@@ -256,11 +280,11 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             );
             const amountLimitStr = amountLimit.toString();
             
-            console.log('🔧 [SWAP] Parámetros FORZADOS para swap:', {
+            console.log('🔧 [SWAP] Parámetros para swap:', {
                 pool_id: poolData.poolAddress,
-                coinTypeA: coinTypeA,          // FORZADO
-                coinTypeB: coinTypeB,          // FORZADO
-                a2b: a2b,                      // FORZADO
+                coinTypeA: coinTypeA,          // DEL POOL
+                coinTypeB: coinTypeB,          // DEL POOL
+                a2b: a2b,                      // CALCULADO
                 by_amount_in: true,
                 amount: amountStr,
                 amount_limit: amountLimitStr,
@@ -282,14 +306,14 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             }
             console.log('✅ [SWAP] Todos los parámetros validados correctamente');
 
-            // Crear payload de swap usando el método estándar - CON DATOS FORZADOS
+            // Crear payload de swap usando el método estándar - CON DATOS DEL POOL
             console.log('🔨 [SWAP] Creando payload de swap...');
             
             const swapParams = {
                 pool_id: poolData.poolAddress,        // string verificado
-                coinTypeA: coinTypeA,                 // FORZADO
-                coinTypeB: coinTypeB,                 // FORZADO
-                a2b: a2b,                             // FORZADO
+                coinTypeA: coinTypeA,                 // DEL POOL
+                coinTypeB: coinTypeB,                 // DEL POOL
+                a2b: a2b,                             // CALCULADO
                 by_amount_in: true,                   // boolean fijo
                 amount: amountStr,                    // string convertido
                 amount_limit: amountLimitStr,         // string calculado
