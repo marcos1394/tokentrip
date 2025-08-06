@@ -182,7 +182,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 false
             );
             console.log('✅ Slippage configurado:', {
-                slippage: slippage.toDecimal().toString(),
+                slippage: slippage.toString(),
                 amountLimit: amountLimit.toString()
             });
 
