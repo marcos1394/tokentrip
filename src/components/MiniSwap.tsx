@@ -12,7 +12,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowDown } from 'lucide-react';
 import { SuiClient } from '@mysten/sui/client';
+import { normalizeStructTag } from '@mysten/sui/utils';
 
+const SUI_COIN_TYPE = '0x2::sui::SUI';
+const WAL_COIN_TYPE = '0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL';
 const SUI_DECIMALS = 9;
 const WAL_DECIMALS = 9;
 
@@ -32,6 +35,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
     const [isFetchingQuote, setIsFetchingQuote] = useState(false);
     const [preswapResult, setPreswapResult] = useState<any>(null);
     const [userBalance, setUserBalance] = useState<string | null>(null);
+    const [poolData, setPoolData] = useState<any>(null);
 
     // Función para obtener el balance del usuario
     const getUserBalance = useCallback(async () => {
@@ -66,35 +70,67 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             console.log('🔄 Obteniendo cotización para:', fromAmount, 'SUI');
             setIsFetchingQuote(true);
             setPreswapResult(null);
+            setPoolData(null);
+            
             try {
-                const response = await fetch('/api/swap/quote', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        fromCoinType, 
-                        toCoinType, 
-                        amount: fromAmount,
-                        decimalsA: SUI_DECIMALS,
-                        decimalsB: WAL_DECIMALS,
-                    }),
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    console.error('❌ Error en API quote:', errorData);
-                    throw new Error(errorData.error || "Failed to fetch quote from API");
+                // Inicializar SDK para obtener pools
+                console.log('🔧 Inicializando Cetus SDK para obtener pools...');
+                const sdk = initCetusSDK({ network: 'testnet' });
+                
+                // Obtener pools y encontrar el correcto - COMO EN EL SCRIPT QUE FUNCIONA
+                console.log('🔍 Buscando pool SUI/WAL...');
+                const allPools = await sdk.Pool.getPoolsWithPage([]);
+                
+                if (!allPools) {
+                    throw new Error("No se pudieron obtener pools");
                 }
                 
-                const result = await response.json();
-                console.log('📊 Cotización obtenida:', result);
+                const normalizedSui = normalizeStructTag(SUI_COIN_TYPE);
+                const normalizedWal = normalizeStructTag(WAL_COIN_TYPE);
+
+                const bestPool = allPools.find(p => 
+                    (normalizeStructTag(p.coinTypeA) === normalizedSui && normalizeStructTag(p.coinTypeB) === normalizedWal) ||
+                    (normalizeStructTag(p.coinTypeA) === normalizedWal && normalizeStructTag(p.coinTypeB) === normalizedSui)
+                );
+
+                if (!bestPool) {
+                    throw new Error("No se encontró pool para SUI/WAL");
+                }
                 
-                const estimatedWAL = (Number(result.estimatedAmountOut) / (10 ** WAL_DECIMALS)).toFixed(4);
+                console.log('✅ Pool encontrado:', bestPool.poolAddress);
+                setPoolData(bestPool);
+
+                // Calcular cotización usando preswap - COMO EN EL SCRIPT QUE FUNCIONA
+                console.log('📊 Calculando cotización...');
+                const amountInMist = parseFloat(fromAmount) * (10 ** SUI_DECIMALS);
+                
+                const a2b = normalizeStructTag(bestPool.coinTypeA) === normalizedSui;
+                
+                const preswapResultLocal = await sdk.Swap.preswap({
+                    pool: bestPool,
+                    currentSqrtPrice: bestPool.current_sqrt_price,
+                    coinTypeA: bestPool.coinTypeA,
+                    coinTypeB: bestPool.coinTypeB,
+                    decimalsA: SUI_DECIMALS,
+                    decimalsB: WAL_DECIMALS,
+                    a2b: a2b,
+                    byAmountIn: true,
+                    amount: amountInMist.toString(),
+                });
+
+                if (!preswapResultLocal) {
+                    throw new Error("Preswap no devolvió resultado válido");
+                }
+                
+                console.log('📊 Cotización obtenida:', preswapResultLocal);
+                
+                const estimatedWAL = (Number(preswapResultLocal.estimatedAmountOut) / (10 ** WAL_DECIMALS)).toFixed(4);
                 setToAmount(estimatedWAL);
-                setPreswapResult(result);
+                setPreswapResult(preswapResultLocal);
                 console.log('✅ Cotización procesada:', estimatedWAL, 'WAL');
 
             } catch (error: any) {
-                console.error("❌ Failed to get quote via API:", error);
+                console.error("❌ Failed to get quote:", error);
                 setToAmount('Quote unavailable');
                 toast({ 
                     variant: "destructive", 
@@ -105,7 +141,7 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
                 setIsFetchingQuote(false);
             }
         }
-    }, [fromAmount, fromCoinType, toCoinType, account, toast]);
+    }, [fromAmount, account, toast]);
 
     useEffect(() => {
         const debounce = setTimeout(() => { getQuote() }, 500);
@@ -113,8 +149,8 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
     }, [fromAmount, getQuote]);
 
     const handleSwap = async () => {
-        if (!account || !preswapResult) {
-            console.warn('⚠️ No account or preswap result');
+        if (!account || !preswapResult || !poolData) {
+            console.warn('⚠️ No account, preswap result or pool data');
             return;
         }
 
@@ -123,7 +159,8 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             console.log('📋 Datos del usuario:', {
                 address: account.address,
                 fromAmount,
-                preswapResult
+                preswapResult,
+                poolData
             });
 
             // Validar balance del usuario
@@ -164,107 +201,71 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             }
 
             // Inicializar SDK con sender address
-            console.log('🔧 Inicializando Cetus SDK...');
+            console.log('🔧 Inicializando Cetus SDK para swap...');
             const sdk = initCetusSDK({
                 network: 'testnet',
                 fullNodeUrl: 'https://fullnode.testnet.sui.io:443',
             });
             
-            // ESTABLECER LA DIRECCIÓN DEL REMITENTE
+            // ESTABLECER LA DIRECCIÓN DEL REMITENTE - CRÍTICO
             sdk.senderAddress = account.address;
-            
             console.log('✅ SDK inicializado con sender address:', account.address);
 
-            // Configurar slippage
-            console.log('📊 Configurando slippage...');
-            const slippage = Percentage.fromDecimal(new Decimal(0.05));
+            // Configurar parámetros del swap - COMO EN EL SCRIPT QUE FUNCIONA
+            console.log('📊 Configurando parámetros del swap...');
             
-            // Ajustar el amount_limit
+            // Determinar dirección correcta
+            const normalizedSui = normalizeStructTag(SUI_COIN_TYPE);
+            const normalizedWal = normalizeStructTag(WAL_COIN_TYPE);
+            const a2b = normalizeStructTag(poolData.coinTypeA) === normalizedSui;
+            
+            // Convertir amount a unidades base
+            const amountInBaseUnits = new BN(parseFloat(fromAmount) * (10 ** SUI_DECIMALS));
+            const amountStr = amountInBaseUnits.toString();
+            
+            // Configurar slippage
+            const slippage = Percentage.fromDecimal(new Decimal(0.05)); // 5%
             const estimatedAmountOut = new BN(preswapResult.estimatedAmountOut);
             const amountLimit = adjustForSlippage(
                 estimatedAmountOut,
                 slippage,
-                false // false para obtener el mínimo output requerido
+                false // false para by_amount_in=true: mínimo output requerido
             );
-            console.log('✅ Slippage configurado:', {
-                slippage: slippage.toString(),
-                amountLimit: amountLimit.toString(),
-                estimatedAmountOut: estimatedAmountOut.toString()
-            });
-
-            // Convertir amount a unidades base
-            console.log('🔢 Convirtiendo amount a unidades base...');
-            const amountInBaseUnits = new BN(parseFloat(fromAmount) * (10 ** SUI_DECIMALS));
-            console.log('✅ Amount convertido:', {
-                original: fromAmount,
-                baseUnits: amountInBaseUnits.toString()
-            });
-
-            // Validar datos del preswapResult
-            console.log('📋 Validando preswapResult:', preswapResult);
+            const amountLimitStr = amountLimit.toString();
             
-            const poolAddress = preswapResult.poolAddress;
-            const coinTypeA = preswapResult.fromCoinType || fromCoinType;
-            const coinTypeB = preswapResult.toCoinType || toCoinType;
-            
-            // Corregir a2b según la dirección del swap
-            let a2b = true; // SUI -> WAL siempre es a2b = true
-            if (coinTypeA.includes('wal::WAL') && coinTypeB.includes('sui::SUI')) {
-                a2b = false; // WAL -> SUI sería a2b = false
-            }
-            
-            console.log('🔧 Dirección del swap:', {
-                coinTypeA,
-                coinTypeB,
-                a2b
-            });
-
-            // Crear payload de swap sin transferencia usando el método de la documentación
-            console.log('🔨 Creando payload de swap sin transferencia...');
-            
-            const swapPayloadResult = sdk.Swap.createSwapTransactionWithoutTransferCoinsPayload({
-                pool_id: poolAddress,
-                coinTypeA: coinTypeA,
-                coinTypeB: coinTypeB,
+            console.log('🔧 Parámetros para swap:', {
+                pool_id: poolData.poolAddress,
+                coinTypeA: poolData.coinTypeA,
+                coinTypeB: poolData.coinTypeB,
                 a2b: a2b,
                 by_amount_in: true,
-                amount: amountInBaseUnits.toString(),
-                amount_limit: amountLimit.toString(),
+                amount: amountStr,
+                amount_limit: amountLimitStr,
+            });
+
+            // Crear payload de swap usando el método estándar - CON DATOS VERIFICADOS
+            console.log('🔨 Creando payload de swap...');
+            
+            const swapPayloadResult = sdk.Swap.createSwapTransactionPayload({
+                pool_id: poolData.poolAddress,        // string verificado
+                coinTypeA: poolData.coinTypeA,        // string verificado
+                coinTypeB: poolData.coinTypeB,        // string verificado
+                a2b: a2b,                             // boolean calculado
+                by_amount_in: true,                   // boolean fijo
+                amount: amountStr,                    // string convertido
+                amount_limit: amountLimitStr,         // string calculado
             });
             
             // Esperar a que se resuelva si es una Promise
-            const swapPayload = await Promise.resolve(swapPayloadResult);
+            const swapPayload: Transaction = await Promise.resolve(swapPayloadResult);
             
-            console.log('✅ Payload de swap sin transferencia creado');
-
-            // Construir la transacción completa manualmente - CORREGIDO
-            console.log('🔨 Construyendo transacción completa...');
-            console.log('📋 Estructura de swapPayload:', swapPayload);
-            
-            const { tx: swapTx, coinABs } = swapPayload;
-            
-            // Log para ver la estructura real de coinABs
-            console.log('📋 Estructura de coinABs:', coinABs);
-            console.log('📋 Tipo de coinABs:', typeof coinABs);
-            console.log('📋 Es array:', Array.isArray(coinABs));
-            
-            // Transferir los coins resultantes al usuario - CORREGIDO
-            // Manejar ambos casos: array y objeto individual
-            if (Array.isArray(coinABs)) {
-                console.log('🔄 Transferindo array de coins...');
-                swapTx.transferObjects(coinABs, swapTx.pure.address(account.address));
-            } else {
-                console.log('🔄 Transferindo objeto individual...');
-                swapTx.transferObjects([coinABs], swapTx.pure.address(account.address));
-            }
-            
-            console.log('✅ Transacción completa construida');
+            console.log('✅ Payload de swap creado');
 
             // Ejecutar transacción
             console.log('🚀 Ejecutando transacción...');
             
             signAndExecuteTransaction(
-                { transaction: swapTx },
+                { transaction: swapPayload },
                 {
                     onSuccess: (result) => {
                         console.log('✅ Swap completado exitosamente:', result);
