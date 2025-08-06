@@ -242,8 +242,8 @@ export function MiniSwap({ fromCoinType, toCoinType, onSwapSuccess }: MiniSwapPr
             const { tx: swapTx, coinABs } = swapPayload;
             
             // Transferir los coins resultantes al usuario - CORREGIDO
-            // coinABs es un array, así que usamos el operador spread
-            swapTx.transferObjects(coinABs, swapTx.pure(account.address));
+            // Usar tx.pure.address() para convertir correctamente la dirección
+            swapTx.transferObjects(coinABs, swapTx.pure.address(account.address));
             
             console.log('✅ Transacción completa construida');
 
