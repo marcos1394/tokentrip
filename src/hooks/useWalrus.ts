@@ -4,27 +4,31 @@ import { WalrusClient } from '@mysten/walrus';
 import { useSuiClient } from '@mysten/dapp-kit';
 
 export function useWalrus() {
+    // 1. Obtenemos el cliente de Sui. Ya está configurado para la red activa.
     const suiClient = useSuiClient();
 
     const walrusClient = useMemo(() => {
-        return new WalrusClient({
-            suiClient,
-            network: 'testnet',
-            // Esta es la configuración clave para usar el relay
-            uploadRelay: {
-                host: 'https://upload-relay.testnet.walrus.space',
-                
-                // --- AÑADIR ESTO ---
-                // Le decimos al SDK que incluya una pequeña propina para el relay.
-                // Esto es probablemente lo que faltaba.
-                sendTip: {
-                    // Un máximo de 1000 MIST (0.000001 SUI) es un valor muy pequeño y seguro.
-                    // El SDK determinará el monto exacto necesario hasta este máximo.
-                    max: 10000,
+        // 2. Si el cliente aún no está listo, no hacemos nada.
+        if (!suiClient) {
+            return null;
+        }
+
+        // 3. Extendemos directamente el cliente que nos da el hook.
+        // Esta es la forma correcta y simple.
+        const clientWithWalrus = suiClient.$extend(
+            WalrusClient.experimental_asClientExtension({
+                uploadRelay: {
+                    host: 'https://upload-relay.testnet.walrus.space',
+                    sendTip: {
+                        max: 1000,
+                    },
                 },
-            },
-        });
-    }, [suiClient]);
+            })
+        );
+
+        return clientWithWalrus;
+
+    }, [suiClient]); // La única dependencia es el suiClient.
 
     return { walrusClient };
 }

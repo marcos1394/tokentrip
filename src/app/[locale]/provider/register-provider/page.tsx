@@ -128,7 +128,7 @@ export default function RegisterProviderPage() {
         const imageArrayBuffer = await imageFile.arrayBuffer();
         const uint8Array = new Uint8Array(imageArrayBuffer);
 
-        const flow = walrusClient.writeFilesFlow({
+        const flow = walrusClient.walrus.writeFilesFlow({
             files: [
                 WalrusFile.from({ // Usamos la clase WalrusFile como indica la documentación
                     contents: uint8Array,
