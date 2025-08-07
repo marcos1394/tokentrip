@@ -112,7 +112,7 @@ export default function RegisterProviderPage() {
         setIsAcquireWalModalOpen(true);
         return;
     }
-    if (!currentWallet || !currentAccount || isFormInvalid || !imageFile) {
+    if (!currentWallet || !currentAccount || isFormInvalid || !imageFile || !walrusClient) {
         toast({
             variant: "destructive",
             title: "Validation Error",
@@ -142,7 +142,7 @@ export default function RegisterProviderPage() {
         toast({ title: "1/3: Uploading profile image to Walrus..." });
         
         const imageArrayBuffer = await imageFile.arrayBuffer();
-        // CORRECCIÓN: Convertir ArrayBuffer a Uint8Array
+        // Convertir ArrayBuffer a Uint8Array
         const uint8Array = new Uint8Array(imageArrayBuffer);
         console.log('📊 [REGISTER] Uint8Array de imagen creado:', { 
             length: uint8Array.length,
@@ -155,26 +155,91 @@ export default function RegisterProviderPage() {
             hasWalrusClient: !!walrusClient,
         });
 
-        const signer = {
-            signAndExecuteTransaction: (tx: { transaction: Transaction }) =>
-                signAndExecuteTransaction({ transaction: tx.transaction, account: currentAccount }),
+        // CORRECCIÓN: Crear un objeto signer que implemente todos los métodos de la interfaz Signer
+        console.log('🔧 [REGISTER] Creando objeto signer compatible con Walrus SDK...');
+        
+        // Creamos un objeto que cumpla con la interfaz Signer
+        const signer: any = {
+            // Métodos requeridos por la interfaz Signer
+            signPersonalMessage: async (input: { message: Uint8Array }) => {
+                console.log('📝 [REGISTER] signer.signPersonalMessage llamado');
+                return await signPersonalMessage({ 
+                    message: input.message, 
+                    account: currentAccount 
+                });
+            },
+            
+            getAddress: async () => {
+                console.log('📝 [REGISTER] signer.getAddress llamado');
+                return currentAccount.address;
+            },
+            
+            toSuiAddress: () => {
+                console.log('📝 [REGISTER] signer.toSuiAddress llamado');
+                return currentAccount.address;
+            },
+            
+            signTransaction: async (tx: Transaction) => {
+                console.log('📝 [REGISTER] signer.signTransaction llamado');
+                // Usamos signAndExecuteTransaction para firmar
+                const result = await signAndExecuteTransaction({
+                    transaction: tx,
+                    account: currentAccount
+                });
+                return result.digest; // Devolvemos el digest de la transacción firmada
+            },
+            
+            signAndExecuteTransaction: async (input: { transaction: Transaction }) => {
+                console.log('📝 [REGISTER] signer.signAndExecuteTransaction llamado');
+                return await signAndExecuteTransaction({
+                    transaction: input.transaction,
+                    account: currentAccount
+                });
+            },
+            
+            // Métodos adicionales requeridos por la interfaz Signer
+            getKeyScheme: () => {
+                console.log('📝 [REGISTER] signer.getKeyScheme llamado');
+                // Devolvemos un valor por defecto
+                return 'ED25519';
+            },
+            
+            getPublicKey: () => {
+                console.log('📝 [REGISTER] signer.getPublicKey llamado');
+                // Lanzamos error ya que no está disponible en contexto dApp
+                throw new Error('getPublicKey not available in dApp context');
+            },
+            
+            // Método sign (puede no ser usado por Walrus)
+            sign: () => {
+                console.log('📝 [REGISTER] signer.sign llamado');
+                throw new Error('sign method not directly supported in dApp context');
+            },
+            
+            // Método signWithIntent (puede no ser usado por Walrus)
+            signWithIntent: ( Uint8Array: any, intent: string) => {
+                console.log('📝 [REGISTER] signer.signWithIntent llamado');
+                throw new Error('signWithIntent method not directly supported in dApp context');
+            }
         };
 
+        console.log('✅ [REGISTER] Objeto signer creado con todos los métodos requeridos');
+
         console.log('📝 [REGISTER] Llamando a walrusClient.writeBlob...');
-        console.log('📝 [REGISTER] Parámetros de writeBlob (CORREGIDO):', {
+        console.log('📝 [REGISTER] Parámetros de writeBlob:', {
             deletable: false,
             epochs: 53,
-            blobLength: uint8Array.length // Mostrar longitud en lugar del objeto
+            blobLength: uint8Array.length
         });
 
         // --- CAPTURA ESPECÍFICA DEL ERROR ---
         let blobId;
         let finalImageUrl;
         try {
-            // CORRECCIÓN: Pasar Uint8Array en lugar de Blob
+            // CORRECCIÓN: Pasar Uint8Array y signer completo
             const { blobId: returnedBlobId } = await walrusClient.writeBlob({
                 blob: uint8Array, // <- CORREGIDO: Usar Uint8Array
-                signer: signer as any,
+                signer: signer, // <- CORREGIDO: Usar signer completo
                 deletable: false,
                 epochs: 53,
             });
@@ -221,14 +286,6 @@ export default function RegisterProviderPage() {
         });
 
         console.log('📝 [REGISTER] Transacción SUI creada');
-        console.log('📝 [REGISTER] Detalles de la llamada moveCall:', {
-            target: `${suiConfig.packageId}::experience_nft::register_provider`,
-            argumentCount: 4,
-            nameLength: name.length,
-            bioLength: bio.length,
-            imageUrlLength: finalImageUrl.length,
-            categoryLength: category.length
-        });
 
         // --- EJECUCIÓN DE LA TRANSACCIÓN ---
         console.log('🚀 [REGISTER] Firmando y ejecutando transacción...');
@@ -294,7 +351,7 @@ export default function RegisterProviderPage() {
         console.log('🏁 [REGISTER] Proceso de registro finalizado');
     }
 };
-    
+
     if (isLoadingProfile) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>;
     }
