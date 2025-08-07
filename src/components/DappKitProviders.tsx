@@ -9,6 +9,7 @@ import { ZkLoginProvider } from '@/context/ZkLoginContext'; // <-- Importa nuest
 
 const queryClient = new QueryClient();
 const { networkConfig } = createNetworkConfig({
+	devnet: { url: getFullnodeUrl('devnet') }, // <-- AÑADIR ESTA LÍNEA
 	testnet: { url: getFullnodeUrl('testnet') },
 	mainnet: { url: getFullnodeUrl('mainnet') },
 });
