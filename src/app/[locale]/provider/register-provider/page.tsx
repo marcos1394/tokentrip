@@ -119,33 +119,29 @@ export default function RegisterProviderPage() {
 
     setIsPending(true);
     try {
-        console.log('🔄 [REGISTER] Iniciando proceso de registro con el flujo correcto (writeFilesFlow)...');
-        console.log('📋 [REGISTER] Datos del formulario:', { name, bio, category, imageFile: imageFile.name });
+        console.log('🔄 [REGISTER] Iniciando proceso de registro con Proxy...');
+        
+        // --- INICIA EL FLUJO DE WALRUS ---
 
-        // --- INICIA EL NUEVO FLUJO DE WALRUS ---
-
-        // Paso 1: Convertir el archivo y crear el flujo
         const imageArrayBuffer = await imageFile.arrayBuffer();
         const uint8Array = new Uint8Array(imageArrayBuffer);
 
+        // CAMBIO CLAVE AQUÍ: Accedemos a la función a través de la propiedad ".walrus"
         const flow = walrusClient.walrus.writeFilesFlow({
             files: [
-                WalrusFile.from({ // Usamos la clase WalrusFile como indica la documentación
+                WalrusFile.from({
                     contents: uint8Array,
-                    identifier: imageFile.name, // Un identificador para el archivo
+                    identifier: imageFile.name,
                 }),
             ],
         });
         
-        // Paso 2: Codificar el archivo en memoria. Es un paso rápido.
         await flow.encode();
         console.log('✅ [WALRUS FLOW] Paso 1/5: Archivo codificado.');
 
-        // Paso 3: Registrar el blob en la blockchain (Primera transacción del usuario)
         toast({ title: "Subiendo imagen (1/3)...", description: "Por favor, aprueba la transacción de registro." });
-        console.log('⏳ [WALRUS FLOW] Paso 2/5: Obteniendo transacción de registro...');
         const registerTx = flow.register({
-            epochs: 53, // Tu duración deseada
+            epochs: 53,
             owner: currentAccount.address,
             deletable: false,
         });
@@ -153,30 +149,21 @@ export default function RegisterProviderPage() {
         const { digest } = await signAndExecuteTransaction({ transaction: registerTx });
         console.log('✅ [WALRUS FLOW] Paso 2/5: Transacción de registro firmada.', { digest });
 
-        // Paso 4: Subir los datos a los nodos de Walrus
         toast({ title: "Subiendo imagen (2/3)...", description: "Cargando datos..." });
-        console.log('⏳ [WALRUS FLOW] Paso 3/5: Subiendo datos a los nodos...');
         await flow.upload({ digest });
-        console.log('✅ [WALRUS FLOW] Paso 3/5: Datos subidos.');
+        console.log('✅ [WALRUS FLOW] Paso 3/5: Datos subidos (vía proxy).');
 
-        // Paso 5: Certificar el blob en la blockchain (Segunda transacción del usuario)
         toast({ title: "Subiendo imagen (3/3)...", description: "Por favor, aprueba la transacción de certificación." });
-        console.log('⏳ [WALRUS FLOW] Paso 4/5: Obteniendo transacción de certificación...');
         const certifyTx = flow.certify();
         await signAndExecuteTransaction({ transaction: certifyTx });
         console.log('✅ [WALRUS FLOW] Paso 4/5: Transacción de certificación firmada.');
 
-        // Paso 6: Obtener la URL final de la imagen
         const files = await flow.listFiles();
         const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`;
         console.log('✅ [WALRUS FLOW] Paso 5/5: Proceso completado. URL final:', finalImageUrl);
 
-        // --- FIN DEL FLUJO DE WALRUS ---
-
-
-        // --- REGISTRO EN TU PROPIO CONTRATO (sin cambios) ---
+        // --- REGISTRO EN TU PROPIO CONTRATO ---
         toast({ title: "Registrando perfil en TokenTrip..." });
-        console.log('🔗 [REGISTER] Creando transacción para registrar perfil en tu contrato...');
         const tx = new Transaction();
         tx.moveCall({
             target: `${suiConfig.packageId}::experience_nft::register_provider`,
@@ -188,27 +175,14 @@ export default function RegisterProviderPage() {
             ],
         });
 
-        const result = await signAndExecuteTransaction({
-            transaction: tx,
-            account: currentAccount
-        });
-
-        console.log('⏳ [REGISTER] Confirmando transacción final...');
-        const txResult = await suiClient.waitForTransaction({
-            digest: result.digest,
-            options: { showEffects: true }
-        });
+        const result = await signAndExecuteTransaction({ transaction: tx, account: currentAccount });
+        const txResult = await suiClient.waitForTransaction({ digest: result.digest, options: { showEffects: true } });
 
         if (txResult.effects?.status.status === 'success') {
             console.log('🎉 [REGISTER] ¡Registro completado exitosamente!');
-            toast({
-                title: "✅ ¡Éxito!",
-                description: "Tu perfil de proveedor ha sido creado."
-            });
+            toast({ title: "✅ ¡Éxito!", description: "Tu perfil de proveedor ha sido creado." });
             queryClient.invalidateQueries({ queryKey: ['ownedObjects'] });
-            setTimeout(() => {
-                router.push(`/${params.locale}/dashboard`);
-            }, 1500);
+            setTimeout(() => { router.push(`/${params.locale}/dashboard`); }, 1500);
         } else {
             throw new Error("La transacción de registro de perfil falló.");
         }
