@@ -36,15 +36,11 @@ export default function RegisterProviderClient() {
         if (suiClient && currentWallet && (activeChain === 'sui:testnet' || activeChain === 'sui:mainnet')) {
             console.log(`[EFFECT] Estado estable en ${activeChain}. Creando Walrus Client con el constructor directo...`);
             
-            // --- LA INICIALIZACIÓN CORRECTA Y SEGURA ---
-            // Usamos el constructor estándar para evitar el bug de .$extend()
+           // --- CAMBIO FINAL Y CLAVE ---
+            // Creamos el cliente de la forma más simple posible, SIN el uploadRelay.
             const client = new WalrusClient({
                 suiClient,
                 network: activeChain.slice(4) as 'testnet' | 'mainnet',
-                uploadRelay: {
-                    host: 'https://upload-relay.testnet.walrus.space',
-                    sendTip: { max: 1000 },
-                },
             });
 
             setWalrusClient(client);
@@ -52,6 +48,7 @@ export default function RegisterProviderClient() {
             setWalrusClient(null);
         }
     }, [suiClient, currentWallet, activeChain]);
+
 
     if (connectionStatus === 'connecting') {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>;
