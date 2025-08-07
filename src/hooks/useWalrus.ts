@@ -1,5 +1,5 @@
 // src/hooks/useWalrus.ts
-import { useMemo, useEffect } from 'react'; // <-- Importa useEffect
+import { useMemo, useEffect } from 'react';
 import { SuiClient } from '@mysten/sui/client';
 import { WalrusClient } from '@mysten/walrus';
 import { useSuiClient, useCurrentWallet } from '@mysten/dapp-kit';
@@ -8,37 +8,44 @@ export function useWalrus() {
     const suiClient = useSuiClient();
     const { currentWallet, connectionStatus } = useCurrentWallet();
 
-    // --- INICIA CÓDIGO DE DIAGNÓSTICO ---
-    // Este bloque se ejecutará cada vez que el estado de la wallet cambie.
+    // El código de diagnóstico sigue siendo útil, lo dejamos.
     useEffect(() => {
         console.log('--- [DIAGNÓSTICO DE WALLET] ---');
         console.log('Estado de Conexión:', connectionStatus);
         console.log('Objeto currentWallet Completo:', currentWallet);
-        
         if (currentWallet) {
-            console.log('Array de Redes Reportado (chains):', currentWallet.chains);
-        } else {
-            console.log('No hay una wallet conectada actualmente.');
+            console.log('Cadenas Soportadas por la Wallet:', currentWallet.chains);
+            console.log('Cuenta Activa:', currentWallet.accounts[0]);
+            console.log('Cadena ACTIVA de la Cuenta:', currentWallet.accounts[0]?.chains);
         }
         console.log('---------------------------------');
     }, [currentWallet, connectionStatus]);
-    // --- FIN CÓDIGO DE DIAGNÓSTICO ---
-
 
     const walrusClient = useMemo(() => {
         if (!suiClient || !currentWallet) {
             return null;
         }
 
-        const currentChain = currentWallet.chains?.[0];
+        // --- CORRECCIÓN CLAVE ---
+        // 1. Obtenemos la cuenta que está actualmente activa.
+        const currentAccount = currentWallet.accounts?.[0];
+        if (!currentAccount) {
+            return null; // Aún no hay una cuenta activa
+        }
+
+        // 2. Obtenemos la cadena desde la CUENTA, no desde la wallet.
+        const activeChain = currentAccount.chains?.[0];
         
-        if (currentChain !== 'sui:testnet' && currentChain !== 'sui:mainnet') {
-            if (currentChain) {
-                console.warn(`[Walrus] Red no soportada: ${currentChain}. El cliente no será inicializado.`);
+        // 3. La guarda de red ahora funcionará con la cadena correcta.
+        if (activeChain !== 'sui:testnet' && activeChain !== 'sui:mainnet') {
+            if (activeChain) {
+                console.warn(`[Walrus] Red activa no soportada: ${activeChain}. El cliente no será inicializado.`);
             }
             return null;
         }
 
+        console.log(`[Walrus] Red activa y soportada detectada: ${activeChain}. Inicializando cliente.`);
+        
         const clientWithWalrus = suiClient.$extend(
             WalrusClient.experimental_asClientExtension({
                 uploadRelay: {
