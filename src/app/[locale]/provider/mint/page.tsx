@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Attribute } from "@/lib/types"; // Asumiendo que tienes un tipo `Attribute` en `src/lib/types.ts`
+import { WalrusFile } from "@mysten/walrus";
 
 // Define la estructura de un perfil de proveedor para el tipado
 interface ProviderProfile {
@@ -27,8 +28,9 @@ export default function MintExperiencePage() {
     const account = useCurrentAccount();
     const { toast } = useToast();
     const { walrusClient } = useWalrus();
-    const { mutate: signAndExecuteTransaction, isPending } = useSignAndExecuteTransaction();
-    
+    const { mutateAsync: signAndExecuteTx, isPending } = useSignAndExecuteTransaction();
+    const suiClient = useSuiClient();
+
     // --- ESTADOS PARA EL FORMULARIO DEL NFT ---
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -51,85 +53,131 @@ export default function MintExperiencePage() {
         { enabled: !!account }
     );
     const providerProfile = providerData?.data?.[0] as ProviderProfile | undefined;
-
-
+    
     const handleMint = async () => {
-        if (!account || !providerProfile) {
-            toast({ variant: 'destructive', title: "Error", description: "You must be a registered provider to mint an NFT." });
-            return;
-        }
-        if (!name || !description || !imageFile) {
-            toast({ variant: 'destructive', title: "Incomplete Form", description: "Please fill all required fields and select an image." });
-            return;
-        }
+    // --- 1. Verificaciones Iniciales y Guardas de Seguridad ---
+    if (!account || !providerProfile || !walrusClient) {
+        toast({ variant: 'destructive', title: "Error", description: "La wallet no está conectada o el cliente no está listo." });
+        return;
+    }
+    if (!name || !description || !imageFile) {
+        toast({ variant: 'destructive', title: "Formulario Incompleto", description: "Por favor, completa todos los campos y selecciona una imagen." });
+        return;
+    }
 
-        try {
-            toast({ title: "1/3: Uploading image to decentralized storage..." });
-            const fileBuffer = await imageFile.arrayBuffer();
-            const blob = new Uint8Array(fileBuffer);
-            
-            const { blobId } = await walrusClient.writeBlob({
-                blob,
-                signer: account as any,
-                deletable: false,
-                epochs: 53,
-            });
-            const finalImageUrl = `https://gateway.walrus.space/blobs/${blobId}`;
-            
-            toast({ title: "2/3: Preparing on-chain transaction..." });
-            const tx = new Transaction();
+    // Suponiendo que tienes un estado de carga, lo activamos aquí.
+    // setIsMinting(true);
+    
+    try {
+        // --- 2. Subida de la Imagen a Walrus (replicando el flujo exitoso) ---
+        toast({ title: "1/4: Subiendo imagen..." });
 
-            const evolutionRulesForContract = evolutionRules.map(rule => ({
-                trigger_type: Number(rule.trigger_type),
-                trigger_value: BigInt(rule.trigger_value),
-                new_image_url: rule.new_image_url,
-                new_description: rule.new_description,
-                attributes_to_add: [],
-                is_triggered: false,
-            }));
+        const imageArrayBuffer = await imageFile.arrayBuffer();
+        const uint8Array = new Uint8Array(imageArrayBuffer);
 
-            // El tipo `Attribute` debe ser definido en tu código, ej: { key: string, value: string }
-            const attributesForContract: Attribute[] = [{ key: "Example", value: "Value" }];
-            
-            tx.moveCall({
-                target: `${suiConfig.packageId}::experience_nft::provider_mint_experience`,
-                arguments: [
-                    tx.object(providerProfile.data.objectId),
-                    tx.pure.string(name),
-                    tx.pure.string(description),
-                    tx.pure.string(finalImageUrl),
-                    tx.pure.string(eventName),
-                    tx.pure.string(eventCity),
-                    tx.pure.string(validityDetails),
-                    tx.pure.string(experienceType),
-                    tx.pure.string(tier),
-                    tx.pure.u64(serialNumber),
-                    tx.pure.string(collectionName),
-                    tx.pure(bcs.vector(bcs.struct("Attribute", { key: bcs.string(), value: bcs.string() })).serialize(attributesForContract)),
-                    tx.pure.bool(isRedeemable),
-                    tx.pure.u64((expiration?.getTime() || 0).toString()),
-                    tx.pure(bcs.vector(bcs.struct("EvolutionRule", {
-                        trigger_type: bcs.u8(),
-                        trigger_value: bcs.u64(),
-                        new_image_url: bcs.string(),
-                        new_description: bcs.string(),
-                        attributes_to_add: bcs.vector(bcs.struct("Attribute", { key: bcs.string(), value: bcs.string() })),
-                        is_triggered: bcs.bool(),
-                    })).serialize(evolutionRulesForContract)),
-                ],
-            });
-            
-            toast({ title: "3/3: Please approve the transaction in your wallet." });
-            await signAndExecuteTransaction({ transaction: tx });
-            
-            toast({ title: "✅ Experience Minted Successfully!" });
-            // Aquí podrías limpiar el formulario o redirigir al dashboard
+        const flow = walrusClient.walrus.writeFilesFlow({
+            files: [
+                WalrusFile.from({
+                    contents: uint8Array,
+                    identifier: imageFile.name,
+                }),
+            ],
+        });
+        
+        await flow.encode();
+        
+        toast({ title: "2/4: Aprobando transacción de almacenamiento..." });
+        const registerTx = flow.register({
+            epochs: 53,
+            owner: account.address,
+            deletable: false,
+        });
+        
+        // Usamos el alias único 'signAndExecuteTx' y guardamos el resultado
+        const registerResult = await signAndExecuteTx({ transaction: registerTx, account });
+        
+        await flow.upload({ digest: registerResult.digest });
+        
+        toast({ title: "3/4: Aprobando transacción de certificación..." });
+        const certifyTx = flow.certify();
+
+        // Usamos el alias único y guardamos el resultado
+        const certifyResult = await signAndExecuteTx({ transaction: certifyTx, account });
+        console.log('Certificación completada, digest:', certifyResult.digest);
+
+        const files = await flow.listFiles();
+        const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`;
+        console.log('✅ [MINT] Imagen subida exitosamente. URL:', finalImageUrl);
+
+        // --- 3. Minting del NFT en tu Contrato ---
+        toast({ title: "4/4: Preparando transacción de minting..." });
+        const tx = new Transaction();
+
+        // Tu lógica de negocio para construir los argumentos de la transacción.
+        const evolutionRulesForContract = evolutionRules.map(rule => ({
+            trigger_type: Number(rule.trigger_type),
+            trigger_value: BigInt(rule.trigger_value),
+            new_image_url: rule.new_image_url,
+            new_description: rule.new_description,
+            attributes_to_add: [],
+            is_triggered: false,
+        }));
+        const attributesForContract: Attribute[] = [{ key: "Example", value: "Value" }];
+        
+        tx.moveCall({
+            target: `${suiConfig.packageId}::experience_nft::provider_mint_experience`,
+            arguments: [
+                tx.object(providerProfile.data.objectId),
+                tx.pure.string(name),
+                tx.pure.string(description),
+                tx.pure.string(finalImageUrl),
+                tx.pure.string(eventName),
+                tx.pure.string(eventCity),
+                tx.pure.string(validityDetails),
+                tx.pure.string(experienceType),
+                tx.pure.string(tier),
+                tx.pure.u64(serialNumber),
+                tx.pure.string(collectionName),
+                tx.pure(bcs.vector(bcs.struct("Attribute", { key: bcs.string(), value: bcs.string() })).serialize(attributesForContract)),
+                tx.pure.bool(isRedeemable),
+                tx.pure.u64((expiration?.getTime() || 0).toString()),
+                tx.pure(bcs.vector(bcs.struct("EvolutionRule", {
+                    trigger_type: bcs.u8(),
+                    trigger_value: bcs.u64(),
+                    new_image_url: bcs.string(),
+                    new_description: bcs.string(),
+                    attributes_to_add: bcs.vector(bcs.struct("Attribute", { key: bcs.string(), value: bcs.string() })),
+                    is_triggered: bcs.bool(),
+                })).serialize(evolutionRulesForContract)),
+            ],
+        });
+        
+        toast({ title: "Por favor, aprueba la transacción final en tu wallet." });
+        // Usamos el alias único y guardamos el resultado final
+        const mintResult = await signAndExecuteTx({ transaction: tx, account });
+        
+        // --- 4. Confirmación de la Transacción en la Blockchain ---
+        const txResult = await suiClient.waitForTransaction({
+            digest: mintResult.digest,
+            options: { showEffects: true }
+        });
+
+        if (txResult.effects?.status.status === 'success') {
+            toast({ title: "✅ ¡Experiencia creada exitosamente!" });
+            // Opcional: limpiar el formulario o redirigir al usuario.
             // router.push(`/${params.locale}/dashboard`);
-
-        } catch (error: any) {
-            toast({ variant: "destructive", title: "❌ Minting Failed", description: error.message });
+        } else {
+            throw new Error("La transacción de minting falló en la blockchain.");
         }
-    };
+
+    } catch (error: any) {
+        toast({ variant: "destructive", title: "❌ Fallo al crear la experiencia", description: error.message || "Ocurrió un error inesperado." });
+        console.error("❌ [MINT] Fallo en el proceso:", error);
+    } finally {
+        // Suponiendo que tienes un estado de carga, lo desactivamos aquí.
+        // setIsMinting(false);
+    }
+};
     
     if (isLoadingProfile) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>

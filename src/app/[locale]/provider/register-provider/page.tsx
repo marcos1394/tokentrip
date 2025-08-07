@@ -111,22 +111,29 @@ export default function RegisterProviderPage() {
     };
 
     const handleRegister = async () => {
-    // Verificaciones iniciales (sin cambios)
+    // --- 1. Verificaciones Iniciales ---
+    // Comprueba que todos los datos y clientes necesarios estén listos.
+    // Incluye la guarda para asegurar que walrusClient no es null.
     if (!currentWallet || !currentAccount || isFormInvalid || !imageFile || !walrusClient) {
-        toast({ variant: "destructive", title: "Error de Validación", description: "Por favor, completa todos los campos y conecta tu wallet." });
+        toast({ 
+            variant: "destructive", 
+            title: "Error de Validación", 
+            description: "Por favor, completa todos los campos y conecta tu wallet." 
+        });
         return;
     }
 
     setIsPending(true);
     try {
-        console.log('🔄 [REGISTER] Iniciando proceso de registro con Proxy...');
+        console.log('🔄 [REGISTER] Iniciando proceso de registro...');
         
-        // --- INICIA EL FLUJO DE WALRUS ---
-
+        // --- 2. INICIA EL FLUJO DE WALRUS ---
+        // Preparamos el archivo para la subida.
         const imageArrayBuffer = await imageFile.arrayBuffer();
         const uint8Array = new Uint8Array(imageArrayBuffer);
 
-        // CAMBIO CLAVE AQUÍ: Accedemos a la función a través de la propiedad ".walrus"
+        // Paso 2.1: Crear el flujo de subida.
+        // Accedemos a la función a través de la propiedad ".walrus".
         const flow = walrusClient.walrus.writeFilesFlow({
             files: [
                 WalrusFile.from({
@@ -136,33 +143,38 @@ export default function RegisterProviderPage() {
             ],
         });
         
+        // Paso 2.2: Codificar el archivo en memoria.
         await flow.encode();
         console.log('✅ [WALRUS FLOW] Paso 1/5: Archivo codificado.');
 
-        toast({ title: "Subiendo imagen (1/3)...", description: "Por favor, aprueba la transacción de registro." });
+        // Paso 2.3: Registrar el blob en la blockchain (Primera transacción).
+        toast({ title: "Subiendo imagen (1/3)", description: "Por favor, aprueba la transacción de registro." });
         const registerTx = flow.register({
             epochs: 53,
             owner: currentAccount.address,
             deletable: false,
         });
-
         const { digest } = await signAndExecuteTransaction({ transaction: registerTx });
         console.log('✅ [WALRUS FLOW] Paso 2/5: Transacción de registro firmada.', { digest });
 
-        toast({ title: "Subiendo imagen (2/3)...", description: "Cargando datos..." });
+        // Paso 2.4: Subir los datos a los nodos de Walrus (usando el relay configurado).
+        toast({ title: "Subiendo imagen (2/3)", description: "Cargando datos..." });
         await flow.upload({ digest });
-        console.log('✅ [WALRUS FLOW] Paso 3/5: Datos subidos (vía proxy).');
+        console.log('✅ [WALRUS FLOW] Paso 3/5: Datos subidos.');
 
-        toast({ title: "Subiendo imagen (3/3)...", description: "Por favor, aprueba la transacción de certificación." });
+        // Paso 2.5: Certificar el blob en la blockchain (Segunda transacción).
+        toast({ title: "Subiendo imagen (3/3)", description: "Por favor, aprueba la transacción de certificación." });
         const certifyTx = flow.certify();
         await signAndExecuteTransaction({ transaction: certifyTx });
         console.log('✅ [WALRUS FLOW] Paso 4/5: Transacción de certificación firmada.');
 
+        // Paso 2.6: Obtener la URL final de la imagen.
         const files = await flow.listFiles();
         const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`;
         console.log('✅ [WALRUS FLOW] Paso 5/5: Proceso completado. URL final:', finalImageUrl);
 
-        // --- REGISTRO EN TU PROPIO CONTRATO ---
+        // --- 3. REGISTRO EN TU PROPIO CONTRATO ---
+        // Ahora que tenemos la URL de la imagen, registramos el perfil en tu contrato.
         toast({ title: "Registrando perfil en TokenTrip..." });
         const tx = new Transaction();
         tx.moveCall({
