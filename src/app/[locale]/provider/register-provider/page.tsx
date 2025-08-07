@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useCurrentWallet, useSignAndExecuteTransaction, useSuiClientQuery, useSignPersonalMessage, useSuiClient } from '@mysten/dapp-kit';
+import { useCurrentWallet, useSignAndExecuteTransaction, useSuiClientQuery, useSignPersonalMessage, useSuiClient, useSignTransaction  } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { suiConfig } from '@/config/sui';
 import Link from 'next/link';
@@ -34,6 +34,7 @@ export default function RegisterProviderPage() {
     const params = useParams();
     const currentAccount = currentWallet?.accounts[0];
 
+
     // Estados para el formulario
     const [name, setName] = useState('');
     const [bio, setBio] = useState('');
@@ -50,6 +51,8 @@ export default function RegisterProviderPage() {
 
     const { mutateAsync: signAndExecuteTransaction } = useSignAndExecuteTransaction();
     const { mutateAsync: signPersonalMessage } = useSignPersonalMessage();
+    const { mutateAsync: signTransactionOnly } = useSignTransaction(); // <--- AÑADIR ESTA LÍNEA
+
 
     const { data: existingProfile, isLoading: isLoadingProfile } = useSuiClientQuery('getOwnedObjects', {
         owner: currentAccount?.address!,
@@ -179,24 +182,26 @@ export default function RegisterProviderPage() {
                 return currentAccount.address;
             },
             
-            signTransaction: async (tx: Transaction) => {
-                console.log('📝 [REGISTER] signer.signTransaction llamado');
-                // Usamos signAndExecuteTransaction para firmar
-                const result = await signAndExecuteTransaction({
-                    transaction: tx,
-                    account: currentAccount
-                });
-                return result.digest; // Devolvemos el digest de la transacción firmada
-            },
+           //  MÉTODO CORREGIDO
+    signTransaction: async (tx: { transaction: Transaction }) => {
+        console.log('📝 [REGISTER] signer.signTransaction llamado (MODO SOLO FIRMA)');
+        // Usamos el hook que SÓLO FIRMA y devuelve la firma, sin ejecutar.
+        return await signTransactionOnly({
+            transaction: tx.transaction, // El SDK de Walrus puede pasar un objeto { transaction: ... }
+            account: currentAccount,
+            chain: currentAccount.chains[0] // Es buena práctica especificar la chain
+        });
+    },
             
             signAndExecuteTransaction: async (input: { transaction: Transaction }) => {
-                console.log('📝 [REGISTER] signer.signAndExecuteTransaction llamado');
-                return await signAndExecuteTransaction({
-                    transaction: input.transaction,
-                    account: currentAccount
-                });
-            },
-            
+        console.log('📝 [REGISTER] signer.signAndExecuteTransaction llamado');
+        return await signAndExecuteTransaction({
+            transaction: input.transaction,
+            account: currentAccount
+        });
+    },
+
+    
             // Métodos adicionales requeridos por la interfaz Signer
             getKeyScheme: () => {
                 console.log('📝 [REGISTER] signer.getKeyScheme llamado');
