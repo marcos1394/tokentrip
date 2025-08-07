@@ -4,7 +4,7 @@ import Link from 'next/link';
 // --- CORRECCIÓN: Se importa useParams ---
 import { usePathname, useParams } from 'next/navigation';
 import { useState } from 'react';
-import { Plane, Menu, X, User, LogOut, LayoutDashboard, Settings, HandCoins } from 'lucide-react';
+import { Plane, Menu, X, User, LogOut, LayoutDashboard, Settings, HandCoins, ArrowLeftRight  } from 'lucide-react'; // Importa Swap
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from './ui/button';
 import { ConnectModal } from './ConnectModal'; 
@@ -20,11 +20,22 @@ import {
   DropdownMenuGroup
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from './ui/avatar';
+import { 
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { MiniSwap } from './MiniSwap'; // Asegúrate de la ruta correcta
 
+const WAL_COIN_TYPE = '0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL';
 
 export function Navbar() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSwapSheetOpen, setIsSwapSheetOpen] = useState(false); // Estado para el Sheet del MiniSwap
   
   // --- CORRECCIÓN: Se obtiene el locale actual de la URL ---
   const params = useParams();
@@ -70,6 +81,12 @@ export function Navbar() {
                     </p>
                 </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {/* --- NUEVO: Enlace al MiniSwap en el menú de usuario --- */}
+            <DropdownMenuItem onClick={() => setIsSwapSheetOpen(true)}>
+                <ArrowLeftRight className="mr-2 h-4 w-4" />
+                <span>Swap Tokens</span>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               {/* --- CORRECCIÓN: Los enlaces ahora son dinámicos --- */}
@@ -119,6 +136,18 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
+            {/* --- NUEVO: Botón de Swap en la barra de navegación desktop --- */}
+            {currentAccount && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsSwapSheetOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeftRight className="w-4 h-4" />
+                <span>Swap</span>
+              </Button>
+            )}
           </div>
 
           <div className="flex items-center space-x-2">
@@ -135,6 +164,38 @@ export function Navbar() {
         </div>
       </nav>
 
+      {/* --- NUEVO: Sheet para el MiniSwap --- */}
+      <Sheet open={isSwapSheetOpen} onOpenChange={setIsSwapSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Swap Tokens</SheetTitle>
+            <SheetDescription>
+              Swap SUI for WAL or vice versa.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="py-6">
+            {/* Solo renderiza el MiniSwap si hay una cuenta conectada */}
+            {currentAccount ? (
+              <MiniSwap
+                fromCoinType='0x2::sui::SUI'
+                toCoinType={WAL_COIN_TYPE}
+                onSwapSuccess={() => {
+                  console.log("Swap successful from Navbar");
+                  setIsSwapSheetOpen(false); // Cierra el sheet al finalizar
+                }}
+              />
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-muted-foreground">Please connect your wallet to swap tokens.</p>
+                <div className="mt-4">
+                  <ConnectModal />
+                </div>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {isMenuOpen && (
         <div className="md:hidden fixed inset-0 top-[61px] z-40 bg-background/95 backdrop-blur-lg">
            <div className="sm:hidden p-4 border-b border-white/10 flex justify-center">
@@ -146,6 +207,19 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
+            {/* --- NUEVO: Enlace de Swap en el menú móvil --- */}
+            {currentAccount && (
+              <button 
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  setIsSwapSheetOpen(true);
+                }}
+                className="text-xl font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-2"
+              >
+                <ArrowLeftRight className="w-5 h-5" />
+                <span>Swap Tokens</span>
+              </button>
+            )}
           </div>
         </div>
       )}
