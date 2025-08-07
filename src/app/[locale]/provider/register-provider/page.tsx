@@ -109,12 +109,8 @@ export default function RegisterProviderPage() {
         checkWalBalance();
     };
 
+    
     const handleRegister = async () => {
-    // 1. Verificaciones iniciales del formulario y la wallet
-    if (!hasWal) {
-        setIsAcquireWalModalOpen(true);
-        return;
-    }
     if (!currentWallet || !currentAccount || isFormInvalid || !imageFile || !walrusClient) {
         toast({
             variant: "destructive",
@@ -129,91 +125,68 @@ export default function RegisterProviderPage() {
         console.log('🔄 [REGISTER] Iniciando proceso de registro...');
         console.log('📋 [REGISTER] Datos del formulario:', { name, bio, category, imageFile: imageFile.name, imageFileSize: imageFile.size });
 
-        // 2. Verificación de balance WAL (como doble chequeo)
-        console.log('🔍 [REGISTER] Verificando balance de WAL antes del registro...');
         const balanceCheck = await suiClient.getBalance({ owner: currentAccount.address, coinType: WAL_COIN_TYPE });
         if (parseInt(balanceCheck.totalBalance) === 0) {
             console.warn('⚠️ [REGISTER] Balance de WAL insuficiente detectado.');
             setIsAcquireWalModalOpen(true);
-            setIsPending(false); // Detener la carga
+            setIsPending(false);
             return;
         }
         console.log('✅ [REGISTER] Balance de WAL verificado');
 
-        // 3. Preparación de la imagen para subir
-        console.log('📂 [REGISTER] Preparando imagen para subir a Walrus...');
         toast({ title: "1/3: Subiendo imagen de perfil..." });
         const imageArrayBuffer = await imageFile.arrayBuffer();
         const uint8Array = new Uint8Array(imageArrayBuffer);
-        console.log('📊 [REGISTER] Uint8Array de imagen creado:', { length: uint8Array.length });
 
-        // 4. Creación del objeto signer COMPLETO
-        const fullSigner: any = {
-            signTransaction: async (tx: { transaction: Transaction }) => {
-                console.log('📝 [REGISTER] fullSigner.signTransaction llamado (MODO SOLO FIRMA)');
-                return await signTransactionOnly({
-                    transaction: tx.transaction,
-                    account: currentAccount,
-                    chain: currentAccount.chains[0]
-                });
+        const finalSigner = {
+            getAddress: async () => {
+                return currentAccount.address;
             },
             signAndExecuteTransaction: async (input: { transaction: Transaction }) => {
-                console.log('📝 [REGISTER] fullSigner.signAndExecuteTransaction llamado');
-                return await signAndExecuteTransaction({
+                console.log('📝 [SIGNER] signAndExecuteTransaction llamado por el SDK');
+                const result = await signAndExecuteTransaction({
                     transaction: input.transaction,
-                    account: currentAccount
+                    account: currentAccount,
+                    chain: currentAccount.chains[0],
                 });
+                // SOLUCIÓN: Usamos "as any" para resolver la incompatibilidad de tipos entre librerías.
+                return result as any; 
             },
-            signPersonalMessage: async (input: { message: Uint8Array }) => {
-                console.log('📝 [REGISTER] signer.signPersonalMessage llamado');
-                return await signPersonalMessage({
-                    message: input.message,
-                    account: currentAccount
-                });
+            signTransaction: async (bytes: Uint8Array) => {
+                 throw new Error("El método 'signTransaction' no está implementado.");
             },
-            getAddress: async () => {
-                console.log('📝 [REGISTER] signer.getAddress llamado');
-                return currentAccount.address;
+            signPersonalMessage: async (bytes: Uint8Array) => {
+                 throw new Error("El método 'signPersonalMessage' no está implementado.");
             },
             toSuiAddress: () => {
-                console.log('📝 [REGISTER] signer.toSuiAddress llamado');
                 return currentAccount.address;
             },
-            getKeyScheme: () => 'ED25519',
-            getPublicKey: () => { throw new Error('getPublicKey not available in dApp context'); },
-            sign: () => { throw new Error('sign method not directly supported in dApp context'); },
-            signWithIntent: () => { throw new Error('signWithIntent method not directly supported in dApp context'); }
+            getKeyScheme: () => 'ED25519' as const,
+            getPublicKey: () => { throw new Error('getPublicKey no implementado'); },
+            sign: (data: Uint8Array) => { throw new Error('sign no implementado'); },
+            signWithIntent: (bytes: Uint8Array, intent: any) => { throw new Error('signWithIntent no implementado'); },
         };
-
-        // 5. Creación del signer LIMITADO para Walrus
-        const walrusSigner = {
-            ...fullSigner,
-            signAndExecuteTransaction: undefined, // ¡Clave! Forzamos al SDK a no usar este método.
-        };
-        console.log('🔧 [REGISTER] Objeto signer específico para Walrus creado.');
         
-        // 6. Subida de la imagen a Walrus
+        console.log('🔧 [REGISTER] Objeto signer final y completo creado.');
+
         let finalImageUrl;
         try {
-            console.log('🚀 [REGISTER] Llamando a walrusClient.writeBlob con signer limitado...');
+            console.log('🚀 [REGISTER] Llamando a walrusClient.writeBlob...');
             const { blobId } = await walrusClient.writeBlob({
                 blob: uint8Array,
-                signer: walrusSigner, // Usamos el signer limitado
+                signer: finalSigner,
                 deletable: false,
                 epochs: 53,
             });
             finalImageUrl = `https://gateway.walrus.space/blobs/${blobId}`;
-            console.log('✅ [REGISTER] Blob subido exitosamente:', { blobId, finalImageUrl });
+            console.log('✅ [REGISTER] Blob subido exitosamente:', { finalImageUrl });
         } catch (walrusError: any) {
-            // Este catch es específico para el error de Walrus
             console.error('❌ [REGISTER] Error DETALLADO al subir a Walrus:', walrusError);
             throw new Error(`Fallo al subir la imagen a Walrus: ${walrusError.message || 'Error desconocido'}`);
         }
 
         toast({ title: "2/3: Registrando perfil en la blockchain..." });
 
-        // 7. Creación de la transacción para registrar el perfil
-        console.log('🔗 [REGISTER] Creando transacción para registrar perfil en cadena...');
         const tx = new Transaction();
         tx.moveCall({
             target: `${suiConfig.packageId}::experience_nft::register_provider`,
@@ -224,19 +197,13 @@ export default function RegisterProviderPage() {
                 tx.pure.string(category),
             ],
         });
-        console.log('📝 [REGISTER] Transacción SUI creada');
 
-        // 8. Ejecución de la transacción de registro (usando el hook directamente)
-        console.log('🚀 [REGISTER] Firmando y ejecutando transacción de perfil...');
         const result = await signAndExecuteTransaction({
             transaction: tx,
             account: currentAccount
         });
-        console.log('✅ [REGISTER] Transacción de perfil ejecutada:', { digest: result.digest });
 
-        // 9. Confirmación de la transacción
         toast({ title: "3/3: Confirmando transacción..." });
-        console.log('⏳ [REGISTER] Esperando confirmación de la transacción...');
         const txResult = await suiClient.waitForTransaction({
             digest: result.digest,
             options: { showEffects: true }
@@ -253,15 +220,11 @@ export default function RegisterProviderPage() {
                 router.push(`/${params.locale}/dashboard`);
             }, 1500);
         } else {
-            console.error('❌ [REGISTER] La transacción de perfil falló:', txResult.effects);
             throw new Error("La transacción en la blockchain falló después de ser enviada.");
         }
 
     } catch (error: any) {
-        // Catch general para toda la función
         console.error("❌ [REGISTER] Fallo en el Proceso de Registro:", error);
-        console.error("❌ [REGISTER] Mensaje de error:", error.message);
-        console.error("❌ [REGISTER] Stack trace:", error.stack);
         toast({
             variant: "destructive",
             title: "❌ Fallo en el Registro",
