@@ -1,4 +1,4 @@
-// Archivo: src/components/provider/RegisterProviderClient.tsx
+// src/components/provider/RegisterProviderClient.tsx
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -17,7 +17,7 @@ import { MiniSwap } from '@/components/MiniSwap';
 import { AnimatedBackground } from "@/components/animated-background";
 import { Button } from "@/components/ui/button";
 import { Toaster } from '@/components/ui/toaster';
-import { ArrowLeft, Store, Loader2, BadgeCheck } from 'lucide-react';
+import { ArrowLeft, Store, Loader2, BadgeCheck, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -26,8 +26,62 @@ import { Textarea } from '@/components/ui/textarea';
 import { ProviderInfoCard } from '@/components/provider/ProviderInfoCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// NOTA: Hemos cambiado el nombre de la función exportada
+
+/**
+ * Componente principal que maneja los estados de conexión de la wallet.
+ * Renderiza diferentes vistas (carga, error, formulario) según el estado.
+ */
 export default function RegisterProviderClient() {
+    const { currentWallet, connectionStatus } = useCurrentWallet();
+    const activeChain = currentWallet?.accounts[0]?.chains[0];
+
+    // 1. Si la wallet se está conectando, muestra un spinner.
+    if (connectionStatus === 'connecting') {
+        return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>;
+    }
+
+    // 2. Si no hay wallet conectada, pide al usuario que se conecte.
+    if (connectionStatus === 'disconnected' || !currentWallet?.accounts[0]) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-4">
+                 <Card className="max-w-md text-center p-8">
+                    <CardHeader>
+                        <AlertCircle className="w-12 h-12 mx-auto text-primary" />
+                        <CardTitle className="mt-4">Conecta tu Wallet</CardTitle>
+                        <CardDescription>Para registrarte como proveedor, por favor conecta tu wallet de Sui.</CardDescription>
+                    </CardHeader>
+                 </Card>
+            </div>
+        );
+    }
+    
+    // 3. Si la wallet está en una red no soportada por Walrus, pide cambiar de red.
+    if (activeChain !== 'sui:testnet' && activeChain !== 'sui:mainnet') {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-4">
+                <Card className="max-w-md text-center p-8">
+                    <CardHeader>
+                        <AlertCircle className="w-12 h-12 mx-auto text-yellow-500" />
+                        <CardTitle className="mt-4">Red Incorrecta</CardTitle>
+                        <CardDescription>
+                            Por favor, cambia la red en tu wallet a <strong>Testnet</strong> o <strong>Mainnet</strong> para continuar. La red actual es <strong>{activeChain?.replace('sui:', '') || 'desconocida'}</strong>.
+                        </CardDescription>
+                    </CardHeader>
+                 </Card>
+            </div>
+        );
+    }
+
+    // 4. Si todas las verificaciones pasan, renderiza el formulario principal.
+    return <RegisterFormProvider />;
+}
+
+
+/**
+ * Componente que contiene la lógica y el JSX del formulario.
+ * Solo se renderiza cuando el estado de la wallet es válido y está en la red correcta.
+ */
+function RegisterFormProvider() {
     const router = useRouter();
     const { toast } = useToast();
     const { currentWallet } = useCurrentWallet();
@@ -35,7 +89,8 @@ export default function RegisterProviderClient() {
     const queryClient = useQueryClient();
     const suiClient = useSuiClient();
     const params = useParams();
-    const currentAccount = currentWallet?.accounts[0];
+    // Sabemos que currentAccount no será nulo aquí gracias a las verificaciones anteriores.
+    const currentAccount = currentWallet?.accounts[0]!;
 
     const { mutateAsync: signAndExecuteTransaction } = useSignAndExecuteTransaction();
 
@@ -46,31 +101,28 @@ export default function RegisterProviderClient() {
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [category, setCategory] = useState('');
     const [isPending, setIsPending] = useState(false);
-
-    // --- ESTADOS Y LÓGICA PARA VERIFICACIÓN DE WAL ---
-    const [hasWal, setHasWal] = useState(false);
     const [isCheckingWal, setIsCheckingWal] = useState(true);
     const [isAcquireWalModalOpen, setIsAcquireWalModalOpen] = useState(false);
     const WAL_COIN_TYPE = '0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL';
 
     const { data: existingProfile, isLoading: isLoadingProfile } = useSuiClientQuery('getOwnedObjects', {
-        owner: currentAccount?.address!,
+        owner: currentAccount.address,
         filter: { StructType: `${suiConfig.packageId}::experience_nft::ProviderProfile` },
         limit: 1,
     }, { enabled: !!currentAccount });
     
     const checkWalBalance = useCallback(async () => {
-        if (!currentAccount) {
-            setIsCheckingWal(false);
-            return;
-        }
+        if (!currentAccount) return;
         setIsCheckingWal(true);
         try {
             const balance = await suiClient.getBalance({ owner: currentAccount.address, coinType: WAL_COIN_TYPE });
-            setHasWal(parseInt(balance.totalBalance) > 0);
+            if (parseInt(balance.totalBalance) > 0) {
+              console.log("User has WAL.", balance);
+            } else {
+              console.log("User does not have WAL.");
+            }
         } catch (error) {
             console.error("Failed to check WAL balance:", error);
-            setHasWal(false);
         } finally {
             setIsCheckingWal(false);
         }
@@ -132,11 +184,11 @@ export default function RegisterProviderClient() {
                 owner: currentAccount.address,
                 deletable: false,
             });
-            const { digest } = await signAndExecuteTransaction({ transaction: registerTx, account: currentAccount });
-            console.log('✅ [WALRUS FLOW] Paso 2/5: Transacción de registro firmada.', { digest });
+            const registerResult = await signAndExecuteTransaction({ transaction: registerTx, account: currentAccount });
+            console.log('✅ [WALRUS FLOW] Paso 2/5: Transacción de registro firmada.', { digest: registerResult.digest });
 
             toast({ title: "Subiendo imagen (2/3)", description: "Cargando datos..." });
-            await flow.upload({ digest });
+            await flow.upload({ digest: registerResult.digest });
             console.log('✅ [WALRUS FLOW] Paso 3/5: Datos subidos.');
 
             toast({ title: "Subiendo imagen (3/3)", description: "Por favor, aprueba la transacción de certificación." });
@@ -196,20 +248,10 @@ export default function RegisterProviderClient() {
                 <Card className="max-w-md mx-auto glass-card p-8 relative z-10">
                     <CardHeader>
                         <BadgeCheck className="w-16 h-16 mx-auto text-green-500" />
-                        <CardTitle className="text-2xl mt-4 text-foreground">
-                            You're Already a Provider!
-                        </CardTitle>
-                        <CardDescription className="mt-2 text-muted-foreground">
-                            You can now manage your experiences and view your sales from your dashboard.
-                        </CardDescription>
+                        <CardTitle className="text-2xl mt-4 text-foreground">You're Already a Provider!</CardTitle>
                     </CardHeader>
                     <CardContent className='flex flex-col gap-4 mt-4'>
-                        <Button asChild size="lg" className="w-full btn-sui">
-                            <Link href="/dashboard">Go to Dashboard</Link>
-                        </Button>
-                        <Button asChild variant="secondary">
-                            <Link href="/">Back to Home</Link>
-                        </Button>
+                        <Button asChild size="lg" className="w-full btn-sui"><Link href="/dashboard">Go to Dashboard</Link></Button>
                     </CardContent>
                 </Card>
             </div>
@@ -221,11 +263,7 @@ export default function RegisterProviderClient() {
             <AnimatedBackground />
             <div className="container mx-auto px-4 relative z-10">
                 <div className="mb-8">
-                    <Button asChild variant="outline" className="glass-card">
-                        <Link href="/">
-                            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Home
-                        </Link>
-                    </Button>
+                    <Button asChild variant="outline" className="glass-card"><Link href="/"><ArrowLeft className="w-4 h-4 mr-2" /> Back to Home</Link></Button>
                 </div>
                 
                 <div className="max-w-6xl mx-auto">
@@ -275,15 +313,9 @@ export default function RegisterProviderClient() {
                 <DialogContent className="glass-card">
                     <DialogHeader>
                         <DialogTitle>Storage Token (WAL) Required</DialogTitle>
-                        <DialogDescription className="pt-2">
-                            To store your image on-chain, Walrus requires a small payment in WAL tokens. You can swap a little SUI to get the required WAL right here.
-                        </DialogDescription>
+                        <DialogDescription className="pt-2">To store your image on-chain, Walrus requires a small payment in WAL tokens. You can swap a little SUI to get the required WAL right here.</DialogDescription>
                     </DialogHeader>
-                    <MiniSwap 
-                        fromCoinType='0x2::sui::SUI'
-                        toCoinType={WAL_COIN_TYPE}
-                        onSwapSuccess={handleSwapSuccess}
-                    />
+                    <MiniSwap fromCoinType='0x2::sui::SUI' toCoinType={WAL_COIN_TYPE} onSwapSuccess={handleSwapSuccess}/>
                 </DialogContent>
             </Dialog>
             <Toaster />
