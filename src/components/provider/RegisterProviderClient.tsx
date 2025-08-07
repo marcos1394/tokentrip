@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useCurrentWallet, useSignAndExecuteTransaction, useSuiClientQuery, useSuiClient } from '@mysten/dapp-kit';
+import { SuiClient } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
 import { suiConfig } from '@/config/sui';
 import Link from 'next/link';
@@ -24,46 +25,27 @@ import { Textarea } from '@/components/ui/textarea';
 import { ProviderInfoCard } from '@/components/provider/ProviderInfoCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Definimos el tipo para el cliente de Walrus. Ya no es un cliente extendido.
-type WalrusClientInstance = WalrusClient;
+type WalrusClientInstance = SuiClient & { walrus: WalrusClient };
 
-/**
- * Componente principal que maneja los estados de conexión y la inicialización segura del cliente.
- */
 export default function RegisterProviderClient() {
     const { currentWallet, connectionStatus } = useCurrentWallet();
     const suiClient = useSuiClient();
     const activeChain = currentWallet?.accounts[0]?.chains[0];
-
-    // 1. Manejamos el Walrus Client con un estado local.
     const [walrusClient, setWalrusClient] = useState<WalrusClientInstance | null>(null);
 
-    // 2. Usamos useEffect para crear el cliente de forma segura y diferida.
     useEffect(() => {
-        // Solo se ejecuta si la wallet está conectada y en una red soportada.
         if (suiClient && currentWallet && (activeChain === 'sui:testnet' || activeChain === 'sui:mainnet')) {
-            console.log(`[EFFECT] Estado estable en ${activeChain}. Creando Walrus Client con el constructor directo...`);
-            
-            // Creamos el cliente usando el constructor estándar, evitando el bug de .$extend()
-            const client = new WalrusClient({
-                suiClient,
-                network: activeChain.slice(4) as 'testnet' | 'mainnet',
-                uploadRelay: {
-                    host: 'https://upload-relay.testnet.walrus.space',
-                    sendTip: { max: 1000 },
-                },
-            });
-
-            setWalrusClient(client);
+            const clientWithWalrus = suiClient.$extend(
+                WalrusClient.experimental_asClientExtension({
+                    uploadRelay: { host: 'https://upload-relay.testnet.walrus.space', sendTip: { max: 1000 } },
+                })
+            );
+            setWalrusClient(clientWithWalrus);
         } else {
-            // Si la red es incorrecta o nos desconectamos, nos aseguramos de que el cliente sea nulo.
             setWalrusClient(null);
         }
-    }, [suiClient, currentWallet, activeChain]); // Se ejecuta solo cuando estos valores se estabilizan.
+    }, [suiClient, currentWallet, activeChain]);
 
-
-    // --- RENDERIZADO CONDICIONAL ---
-    
     if (connectionStatus === 'connecting') {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>;
     }
@@ -98,14 +80,9 @@ export default function RegisterProviderClient() {
         );
     }
 
-    // Si todo es correcto, renderizamos el formulario y le pasamos el cliente ya inicializado.
     return <RegisterFormProvider walrusClient={walrusClient} />;
 }
 
-
-/**
- * Componente que contiene la lógica y el JSX del formulario.
- */
 function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClientInstance | null }) {
     const { currentWallet } = useCurrentWallet();
     const currentAccount = currentWallet?.accounts[0]!;
@@ -133,53 +110,78 @@ function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClientInst
         limit: 1,
     }, { enabled: !!currentAccount });
     
-    const checkWalBalance = useCallback(async () => { /* ... (sin cambios) ... */ }, [currentAccount, suiClient]);
-    useEffect(() => { checkWalBalance(); }, [checkWalBalance]);
-    useEffect(() => { if (imageFile) { /* ... (sin cambios) ... */ } }, [imageFile]);
+    const checkWalBalance = useCallback(async () => {
+        // CORRECCIÓN FINAL: Nos aseguramos de que el estado de carga siempre se desactive.
+        if (!currentAccount) {
+            setIsCheckingWal(false);
+            return;
+        }
+        setIsCheckingWal(true);
+        try {
+            const balance = await suiClient.getBalance({ owner: currentAccount.address, coinType: WAL_COIN_TYPE });
+            if(parseInt(balance.totalBalance) > 0) {
+                console.log("User has WAL.", balance);
+            } else {
+                console.log("User does not have WAL.");
+            }
+        } catch (error) {
+            console.error("Failed to check WAL balance:", error);
+        } finally {
+            setIsCheckingWal(false);
+        }
+    }, [currentAccount, suiClient]);
+
+    useEffect(() => {
+        checkWalBalance();
+    }, [checkWalBalance]);
+
+    useEffect(() => {
+        if (imageFile) {
+            const previewUrl = URL.createObjectURL(imageFile);
+            setImagePreview(previewUrl);
+            return () => URL.revokeObjectURL(previewUrl);
+        } else {
+            setImagePreview(null);
+        }
+    }, [imageFile]);
     
     const isAlreadyProvider = useMemo(() => existingProfile && existingProfile.data.length > 0, [existingProfile]);
     const isFormInvalid = useMemo(() => !name.trim() || !bio.trim() || !imageFile || !category, [name, bio, imageFile, category]);
 
-    const handleSwapSuccess = () => { /* ... (sin cambios) ... */ };
+    const handleSwapSuccess = () => {
+        setIsAcquireWalModalOpen(false);
+        toast({ title: "Balance Updated!", description: "You now have WAL. You can proceed with the registration." });
+        checkWalBalance();
+    };
 
     const handleRegister = async () => {
         if (!currentAccount || isFormInvalid || !imageFile || !walrusClient) {
             toast({ variant: "destructive", title: "Error de Validación", description: "Por favor, completa todos los campos y asegúrate de que tu wallet esté conectada a la red correcta." });
             return;
         }
-
         setIsPending(true);
         try {
-            console.log('🔄 [REGISTER] Iniciando proceso de registro...');
-            
             const imageArrayBuffer = await imageFile.arrayBuffer();
             const uint8Array = new Uint8Array(imageArrayBuffer);
-            
-            // Ya no usamos ".walrus"
-            const flow = walrusClient.writeFilesFlow({
+
+            const flow = walrusClient.walrus.writeFilesFlow({
                 files: [WalrusFile.from({ contents: uint8Array, identifier: imageFile.name })],
             });
             
             await flow.encode();
-            console.log('✅ [WALRUS FLOW] Paso 1/5: Archivo codificado.');
-
             toast({ title: "Subiendo imagen (1/3)", description: "Por favor, aprueba la transacción de registro." });
             const registerTx = flow.register({ epochs: 53, owner: currentAccount.address, deletable: false });
             const registerResult = await signAndExecuteTransaction({ transaction: registerTx, account: currentAccount });
-            console.log('✅ [WALRUS FLOW] Paso 2/5: Transacción de registro firmada.', { digest: registerResult.digest });
 
             toast({ title: "Subiendo imagen (2/3)", description: "Cargando datos..." });
             await flow.upload({ digest: registerResult.digest });
-            console.log('✅ [WALRUS FLOW] Paso 3/5: Datos subidos.');
 
             toast({ title: "Subiendo imagen (3/3)", description: "Por favor, aprueba la transacción de certificación." });
             const certifyTx = flow.certify();
             const certifyResult = await signAndExecuteTransaction({ transaction: certifyTx, account: currentAccount });
-            console.log('✅ [WALRUS FLOW] Paso 4/5: Transacción de certificación firmada.', { digest: certifyResult.digest });
 
             const files = await flow.listFiles();
             const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`;
-            console.log('✅ [WALRUS FLOW] Paso 5/5: Proceso completado. URL final:', finalImageUrl);
 
             toast({ title: "Registrando perfil en TokenTrip..." });
             const tx = new Transaction();
@@ -192,7 +194,6 @@ function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClientInst
             const txResult = await suiClient.waitForTransaction({ digest: result.digest, options: { showEffects: true } });
 
             if (txResult.effects?.status.status === 'success') {
-                console.log('🎉 [REGISTER] ¡Registro completado exitosamente!');
                 toast({ title: "✅ ¡Éxito!", description: "Tu perfil de proveedor ha sido creado." });
                 queryClient.invalidateQueries({ queryKey: ['getOwnedObjects'] });
                 setTimeout(() => { router.push(`/${params.locale}/dashboard`); }, 1500);
@@ -200,11 +201,9 @@ function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClientInst
                 throw new Error("La transacción de registro de perfil falló.");
             }
         } catch (error: any) {
-            console.error("❌ [REGISTER] Fallo en el Proceso de Registro:", error);
             toast({ variant: "destructive", title: "❌ Fallo en el Registro", description: error.message || "Ocurrió un error inesperado." });
         } finally {
             setIsPending(false);
-            console.log('🏁 [REGISTER] Proceso de registro finalizado.');
         }
     };
 
@@ -213,7 +212,22 @@ function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClientInst
     }
     
     if (isAlreadyProvider) {
-        // ... (JSX para proveedor ya existente, sin cambios)
+        return (
+            <div className="min-h-screen flex items-center justify-center text-center p-4">
+                <AnimatedBackground />
+                <Card className="max-w-md mx-auto glass-card p-8 relative z-10">
+                    <CardHeader>
+                        <BadgeCheck className="w-16 h-16 mx-auto text-green-500" />
+                        <CardTitle className="text-2xl mt-4 text-foreground">You're Already a Provider!</CardTitle>
+                        <CardDescription className="mt-2 text-muted-foreground">You can now manage your experiences and view your sales from your dashboard.</CardDescription>
+                    </CardHeader>
+                    <CardContent className='flex flex-col gap-4 mt-4'>
+                        <Button asChild size="lg" className="w-full btn-sui"><Link href="/dashboard">Go to Dashboard</Link></Button>
+                        <Button asChild variant="secondary"><Link href="/">Back to Home</Link></Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
     }
 
     return (
