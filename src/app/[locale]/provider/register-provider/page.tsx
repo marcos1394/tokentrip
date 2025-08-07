@@ -23,6 +23,7 @@ import { ProviderInfoCard } from '@/components/provider/ProviderInfoCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWalrus } from '@/hooks/useWalrus';
 import { useQueryClient } from '@tanstack/react-query';
+import { WalrusFile } from '@mysten/walrus';
 
 export default function RegisterProviderPage() {
     const router = useRouter();
@@ -109,84 +110,73 @@ export default function RegisterProviderPage() {
         checkWalBalance();
     };
 
-    
     const handleRegister = async () => {
+    // Verificaciones iniciales (sin cambios)
     if (!currentWallet || !currentAccount || isFormInvalid || !imageFile || !walrusClient) {
-        toast({
-            variant: "destructive",
-            title: "Error de Validación",
-            description: "Por favor, completa todos los campos y conecta tu wallet."
-        });
+        toast({ variant: "destructive", title: "Error de Validación", description: "Por favor, completa todos los campos y conecta tu wallet." });
         return;
     }
 
     setIsPending(true);
     try {
-        console.log('🔄 [REGISTER] Iniciando proceso de registro...');
-        console.log('📋 [REGISTER] Datos del formulario:', { name, bio, category, imageFile: imageFile.name, imageFileSize: imageFile.size });
+        console.log('🔄 [REGISTER] Iniciando proceso de registro con el flujo correcto (writeFilesFlow)...');
+        console.log('📋 [REGISTER] Datos del formulario:', { name, bio, category, imageFile: imageFile.name });
 
-        const balanceCheck = await suiClient.getBalance({ owner: currentAccount.address, coinType: WAL_COIN_TYPE });
-        if (parseInt(balanceCheck.totalBalance) === 0) {
-            console.warn('⚠️ [REGISTER] Balance de WAL insuficiente detectado.');
-            setIsAcquireWalModalOpen(true);
-            setIsPending(false);
-            return;
-        }
-        console.log('✅ [REGISTER] Balance de WAL verificado');
+        // --- INICIA EL NUEVO FLUJO DE WALRUS ---
 
-        toast({ title: "1/3: Subiendo imagen de perfil..." });
+        // Paso 1: Convertir el archivo y crear el flujo
         const imageArrayBuffer = await imageFile.arrayBuffer();
         const uint8Array = new Uint8Array(imageArrayBuffer);
 
-        const finalSigner = {
-            getAddress: async () => {
-                return currentAccount.address;
-            },
-            signAndExecuteTransaction: async (input: { transaction: Transaction }) => {
-                console.log('📝 [SIGNER] signAndExecuteTransaction llamado por el SDK');
-                const result = await signAndExecuteTransaction({
-                    transaction: input.transaction,
-                    account: currentAccount,
-                    chain: currentAccount.chains[0],
-                });
-                // SOLUCIÓN: Usamos "as any" para resolver la incompatibilidad de tipos entre librerías.
-                return result as any; 
-            },
-            signTransaction: async (bytes: Uint8Array) => {
-                 throw new Error("El método 'signTransaction' no está implementado.");
-            },
-            signPersonalMessage: async (bytes: Uint8Array) => {
-                 throw new Error("El método 'signPersonalMessage' no está implementado.");
-            },
-            toSuiAddress: () => {
-                return currentAccount.address;
-            },
-            getKeyScheme: () => 'ED25519' as const,
-            getPublicKey: () => { throw new Error('getPublicKey no implementado'); },
-            sign: (data: Uint8Array) => { throw new Error('sign no implementado'); },
-            signWithIntent: (bytes: Uint8Array, intent: any) => { throw new Error('signWithIntent no implementado'); },
-        };
+        const flow = walrusClient.writeFilesFlow({
+            files: [
+                WalrusFile.from({ // Usamos la clase WalrusFile como indica la documentación
+                    contents: uint8Array,
+                    identifier: imageFile.name, // Un identificador para el archivo
+                }),
+            ],
+        });
         
-        console.log('🔧 [REGISTER] Objeto signer final y completo creado.');
+        // Paso 2: Codificar el archivo en memoria. Es un paso rápido.
+        await flow.encode();
+        console.log('✅ [WALRUS FLOW] Paso 1/5: Archivo codificado.');
 
-        let finalImageUrl;
-        try {
-            console.log('🚀 [REGISTER] Llamando a walrusClient.writeBlob...');
-            const { blobId } = await walrusClient.writeBlob({
-                blob: uint8Array,
-                signer: finalSigner,
-                deletable: false,
-                epochs: 53,
-            });
-            finalImageUrl = `https://gateway.walrus.space/blobs/${blobId}`;
-            console.log('✅ [REGISTER] Blob subido exitosamente:', { finalImageUrl });
-        } catch (walrusError: any) {
-            console.error('❌ [REGISTER] Error DETALLADO al subir a Walrus:', walrusError);
-            throw new Error(`Fallo al subir la imagen a Walrus: ${walrusError.message || 'Error desconocido'}`);
-        }
+        // Paso 3: Registrar el blob en la blockchain (Primera transacción del usuario)
+        toast({ title: "Subiendo imagen (1/3)...", description: "Por favor, aprueba la transacción de registro." });
+        console.log('⏳ [WALRUS FLOW] Paso 2/5: Obteniendo transacción de registro...');
+        const registerTx = flow.register({
+            epochs: 53, // Tu duración deseada
+            owner: currentAccount.address,
+            deletable: false,
+        });
 
-        toast({ title: "2/3: Registrando perfil en la blockchain..." });
+        const { digest } = await signAndExecuteTransaction({ transaction: registerTx });
+        console.log('✅ [WALRUS FLOW] Paso 2/5: Transacción de registro firmada.', { digest });
 
+        // Paso 4: Subir los datos a los nodos de Walrus
+        toast({ title: "Subiendo imagen (2/3)...", description: "Cargando datos..." });
+        console.log('⏳ [WALRUS FLOW] Paso 3/5: Subiendo datos a los nodos...');
+        await flow.upload({ digest });
+        console.log('✅ [WALRUS FLOW] Paso 3/5: Datos subidos.');
+
+        // Paso 5: Certificar el blob en la blockchain (Segunda transacción del usuario)
+        toast({ title: "Subiendo imagen (3/3)...", description: "Por favor, aprueba la transacción de certificación." });
+        console.log('⏳ [WALRUS FLOW] Paso 4/5: Obteniendo transacción de certificación...');
+        const certifyTx = flow.certify();
+        await signAndExecuteTransaction({ transaction: certifyTx });
+        console.log('✅ [WALRUS FLOW] Paso 4/5: Transacción de certificación firmada.');
+
+        // Paso 6: Obtener la URL final de la imagen
+        const files = await flow.listFiles();
+        const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`;
+        console.log('✅ [WALRUS FLOW] Paso 5/5: Proceso completado. URL final:', finalImageUrl);
+
+        // --- FIN DEL FLUJO DE WALRUS ---
+
+
+        // --- REGISTRO EN TU PROPIO CONTRATO (sin cambios) ---
+        toast({ title: "Registrando perfil en TokenTrip..." });
+        console.log('🔗 [REGISTER] Creando transacción para registrar perfil en tu contrato...');
         const tx = new Transaction();
         tx.moveCall({
             target: `${suiConfig.packageId}::experience_nft::register_provider`,
@@ -203,7 +193,7 @@ export default function RegisterProviderPage() {
             account: currentAccount
         });
 
-        toast({ title: "3/3: Confirmando transacción..." });
+        console.log('⏳ [REGISTER] Confirmando transacción final...');
         const txResult = await suiClient.waitForTransaction({
             digest: result.digest,
             options: { showEffects: true }
@@ -220,7 +210,7 @@ export default function RegisterProviderPage() {
                 router.push(`/${params.locale}/dashboard`);
             }, 1500);
         } else {
-            throw new Error("La transacción en la blockchain falló después de ser enviada.");
+            throw new Error("La transacción de registro de perfil falló.");
         }
 
     } catch (error: any) {
