@@ -107,67 +107,193 @@ export default function RegisterProviderPage() {
     };
 
     const handleRegister = async () => {
-        // Verificación proactiva: si no tiene WAL, abrir el modal de swap
+    // Verificación proactiva: si no tiene WAL, abrir el modal de swap
+    if (!hasWal) {
+        setIsAcquireWalModalOpen(true);
+        return;
+    }
+    if (!currentWallet || !currentAccount || isFormInvalid || !imageFile) {
+        toast({
+            variant: "destructive",
+            title: "Validation Error",
+            description: "Please fill all required fields and connect your wallet."
+        });
+        return;
+    }
+
+    setIsPending(true);
+    try {
+        console.log('🔄 [REGISTER] Iniciando proceso de registro...');
+        console.log('📋 [REGISTER] Datos del formulario:', { name, bio, category, imageFile: imageFile.name, imageFileSize: imageFile.size });
+
+        // --- VERIFICACIÓN DE WAL ANTES DEL REGISTRO ---
+        console.log('🔍 [REGISTER] Verificando balance de WAL antes del registro...');
+        await checkWalBalance(); // Forzar verificación
+        
         if (!hasWal) {
+            console.warn('⚠️ [REGISTER] Balance de WAL insuficiente detectado antes del registro');
             setIsAcquireWalModalOpen(true);
             return;
         }
+        console.log('✅ [REGISTER] Balance de WAL verificado');
 
-        if (!currentWallet || !currentAccount || isFormInvalid || !imageFile) {
-            toast({ variant: 'destructive', title: 'Please connect your wallet and complete the form.' });
-            return;
-        }
+        // --- PREPARACIÓN DEL BLOB ---
+        console.log('📂 [REGISTER] Preparando imagen para subir a Walrus...');
+        toast({ title: "1/3: Uploading profile image to Walrus..." });
         
-        setIsPending(true);
-        try {
-            toast({ title: "1/3: Uploading image to decentralized storage..." });
-            const fileBuffer = await imageFile.arrayBuffer();
-            const blob = new Uint8Array(fileBuffer);
-            
-            const signer = {
-                signPersonalMessage: (message: { message: Uint8Array }) => 
-                    signPersonalMessage({ message: message.message, account: currentAccount }),
-                getAddress: () => Promise.resolve(currentAccount.address),
-                toSuiAddress: () => currentAccount.address,
-                signAndExecuteTransaction: (tx: { transaction: Transaction }) =>
-                    signAndExecuteTransaction({ transaction: tx.transaction, account: currentAccount }),
-            };
+        const imageArrayBuffer = await imageFile.arrayBuffer();
+        // CORRECCIÓN: Convertir ArrayBuffer a Uint8Array
+        const uint8Array = new Uint8Array(imageArrayBuffer);
+        console.log('📊 [REGISTER] Uint8Array de imagen creado:', { 
+            length: uint8Array.length,
+            byteLength: uint8Array.byteLength
+        });
 
-            const { blobId } = await walrusClient.writeBlob({
-                blob,
+        // --- SUBIDA A WALRUS ---
+        console.log('🚀 [REGISTER] Subiendo Uint8Array a Walrus...');
+        console.log('🔧 [REGISTER] Configuración de walrusClient:', {
+            hasWalrusClient: !!walrusClient,
+        });
+
+        const signer = {
+            signAndExecuteTransaction: (tx: { transaction: Transaction }) =>
+                signAndExecuteTransaction({ transaction: tx.transaction, account: currentAccount }),
+        };
+
+        console.log('📝 [REGISTER] Llamando a walrusClient.writeBlob...');
+        console.log('📝 [REGISTER] Parámetros de writeBlob (CORREGIDO):', {
+            deletable: false,
+            epochs: 53,
+            blobLength: uint8Array.length // Mostrar longitud en lugar del objeto
+        });
+
+        // --- CAPTURA ESPECÍFICA DEL ERROR ---
+        let blobId;
+        let finalImageUrl;
+        try {
+            // CORRECCIÓN: Pasar Uint8Array en lugar de Blob
+            const { blobId: returnedBlobId } = await walrusClient.writeBlob({
+                blob: uint8Array, // <- CORREGIDO: Usar Uint8Array
                 signer: signer as any,
                 deletable: false,
                 epochs: 53,
             });
-            const finalImageUrl = `https://gateway.walrus.space/blobs/${blobId}`;
+            blobId = returnedBlobId;
+            finalImageUrl = `https://gateway.walrus.space/blobs/${blobId}`;
+            console.log('✅ [REGISTER] Blob subido exitosamente:', { blobId, finalImageUrl });
+        } catch (walrusError: any) {
+            console.error('❌ [REGISTER] Error DETALLADO al subir a Walrus:', walrusError);
+            console.error('❌ [REGISTER] Tipo de error:', typeof walrusError);
+            console.error('❌ [REGISTER] Propiedades del error:', Object.keys(walrusError));
+            
+            // Intentar obtener más información del error
+            if (walrusError.message) {
+                console.error('❌ [REGISTER] Mensaje de error:', walrusError.message);
+            }
+            if (walrusError.code) {
+                console.error('❌ [REGISTER] Código de error:', walrusError.code);
+            }
+            if (walrusError.response) {
+                console.error('❌ [REGISTER] Respuesta de error:', walrusError.response);
+            }
+            if (walrusError.stack) {
+                console.error('❌ [REGISTER] Stack trace:', walrusError.stack);
+            }
+            
+            throw new Error(`Failed to upload image to Walrus: ${walrusError.message || walrusError}`);
+        }
 
-            toast({ title: "2/3: Registering profile on-chain..." });
-            const tx = new Transaction();
-            tx.moveCall({
-                target: `${suiConfig.packageId}::experience_nft::register_provider`,
-                arguments: [
-                    tx.pure.string(name),
-                    tx.pure.string(bio),
-                    tx.pure.string(finalImageUrl),
-                    tx.pure.string(category),
-                ],
+        toast({ title: "2/3: Registering profile on-chain..." });
+
+        // --- REGISTRO EN CADENA ---
+        console.log('🔗 [REGISTER] Creando transacción para registrar perfil en cadena...');
+        console.log('🔗 [REGISTER] URL de imagen generada:', finalImageUrl);
+
+        const tx = new Transaction();
+        tx.moveCall({
+            target: `${suiConfig.packageId}::experience_nft::register_provider`,
+            arguments: [
+                tx.pure.string(name),
+                tx.pure.string(bio),
+                tx.pure.string(finalImageUrl),
+                tx.pure.string(category),
+            ],
+        });
+
+        console.log('📝 [REGISTER] Transacción SUI creada');
+        console.log('📝 [REGISTER] Detalles de la llamada moveCall:', {
+            target: `${suiConfig.packageId}::experience_nft::register_provider`,
+            argumentCount: 4,
+            nameLength: name.length,
+            bioLength: bio.length,
+            imageUrlLength: finalImageUrl.length,
+            categoryLength: category.length
+        });
+
+        // --- EJECUCIÓN DE LA TRANSACCIÓN ---
+        console.log('🚀 [REGISTER] Firmando y ejecutando transacción...');
+        const result = await signAndExecuteTransaction({
+            transaction: tx,
+            account: currentAccount
+        });
+        
+        console.log('✅ [REGISTER] Transacción ejecutada:', result);
+        console.log('📋 [REGISTER] Digest de la transacción:', result.digest);
+
+        // --- CONFIRMACIÓN ---
+        console.log('⏳ [REGISTER] Esperando confirmación de la transacción...');
+        toast({ title: "3/3: Confirming transaction..." });
+        
+        const txResult = await suiClient.waitForTransaction({
+            digest: result.digest,
+            options: { showEffects: true, showObjectChanges: true }
+        });
+
+        console.log('✅ [REGISTER] Transacción confirmada:', txResult);
+        
+        if (txResult.effects?.status.status === 'success') {
+            console.log('🎉 [REGISTER] ¡Registro completado exitosamente!');
+            toast({
+                title: "✅ Success!",
+                description: "Provider profile created successfully."
             });
             
-            toast({ title: "3/3: Please approve in your wallet..." });
-            await signAndExecuteTransaction({ transaction: tx });
+            // Invalidar cachés relevantes
+            queryClient.invalidateQueries({ queryKey: ['ownedObjects'] });
             
-            toast({ title: '✅ Registration Successful!', description: `Welcome, ${name}!` });
-            
-            queryClient.invalidateQueries({ queryKey: ['getOwnedObjects'] });
-            setTimeout(() => router.push(`/${params.locale}/dashboard`), 2000);
-            
-        } catch (error: any) {
-            console.error("❌ Registration Failed:", error);
-            toast({ variant: "destructive", title: '❌ Registration Failed', description: error.message || "An unknown error occurred." });
-        } finally {
-            setIsPending(false);
+            // Redirigir al dashboard
+            setTimeout(() => {
+                router.push(`/${params.locale}/dashboard`);
+            }, 1500);
+        } else {
+            console.error('❌ [REGISTER] La transacción falló:', txResult.effects);
+            throw new Error("Transaction failed");
         }
-    };
+
+    } catch (error: any) {
+        console.error("❌ [REGISTER] Registration Failed:", error);
+        console.error("❌ [REGISTER] Tipo de error:", typeof error);
+        console.error("❌ [REGISTER] Mensaje de error:", error.message);
+        console.error("❌ [REGISTER] Stack trace:", error.stack);
+        
+        // Loggear propiedades específicas del error si existen
+        if (error.cause) {
+            console.error("❌ [REGISTER] Causa del error:", error.cause);
+        }
+        if (error.code) {
+            console.error("❌ [REGISTER] Código de error:", error.code);
+        }
+        
+        toast({
+            variant: "destructive",
+            title: "❌ Registration Failed",
+            description: error.message || "An unexpected error occurred during registration."
+        });
+    } finally {
+        setIsPending(false);
+        console.log('🏁 [REGISTER] Proceso de registro finalizado');
+    }
+};
     
     if (isLoadingProfile) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>;
