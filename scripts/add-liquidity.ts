@@ -112,7 +112,7 @@ async function main() {
         if (suiAmount < 1.0) {
             throw new Error(`Fondos insuficientes de SUI. Necesitas al menos 1.0 SUI, tienes ${suiAmount.toFixed(2)} SUI`);
         }
-        if (walAmount < 1.5) {
+        if (walAmount < 1.4) {
             throw new Error(`Fondos insuficientes de WAL. Necesitas al menos 1.5 WAL, tienes ${walAmount.toFixed(2)} WAL`);
         }
 
