@@ -1,22 +1,21 @@
-// src/components/provider/RegisterProviderClient.tsx
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useCurrentWallet, useSignAndExecuteTransaction, useSuiClientQuery, useSuiClient } from '@mysten/dapp-kit';
+import { SuiClient } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
 import { suiConfig } from '@/config/sui';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { WalrusFile } from '@mysten/walrus';
+import { WalrusClient, WalrusFile } from '@mysten/walrus';
 
-// Componentes y Hooks
-import { useWalrus } from '@/hooks/useWalrus';
-import { useToast } from "@/hooks/use-toast";
+// Componentes y UI
 import { MiniSwap } from '@/components/MiniSwap';
 import { AnimatedBackground } from "@/components/animated-background";
 import { Button } from "@/components/ui/button";
 import { Toaster } from '@/components/ui/toaster';
+import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Store, Loader2, BadgeCheck, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -26,21 +25,52 @@ import { Textarea } from '@/components/ui/textarea';
 import { ProviderInfoCard } from '@/components/provider/ProviderInfoCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+// Definimos un tipo para nuestro cliente extendido de Walrus para mayor claridad.
+type WalrusClientInstance = SuiClient & { walrus: WalrusClient };
 
 /**
  * Componente principal que maneja los estados de conexión de la wallet.
  * Renderiza diferentes vistas (carga, error, formulario) según el estado.
+ * También se encarga de la inicialización segura del WalrusClient.
  */
 export default function RegisterProviderClient() {
     const { currentWallet, connectionStatus } = useCurrentWallet();
+    const suiClient = useSuiClient();
     const activeChain = currentWallet?.accounts[0]?.chains[0];
 
-    // 1. Si la wallet se está conectando, muestra un spinner.
+    // 1. MANEJAMOS EL WALRUS CLIENT CON useState
+    const [walrusClient, setWalrusClient] = useState<WalrusClientInstance | null>(null);
+
+    // 2. USAMOS useEffect PARA CREAR EL CLIENTE DE FORMA SEGURA
+    useEffect(() => {
+        // Solo intentamos crear el cliente si la wallet está conectada y en la red correcta.
+        if (suiClient && currentWallet && (activeChain === 'sui:testnet' || activeChain === 'sui:mainnet')) {
+            console.log(`[EFFECT] Estado estable detectado en ${activeChain}. Creando Walrus Client...`);
+            
+            const clientWithWalrus = suiClient.$extend(
+                WalrusClient.experimental_asClientExtension({
+                    uploadRelay: {
+                        host: 'https://upload-relay.testnet.walrus.space',
+                        sendTip: { max: 1000 },
+                    },
+                })
+            );
+            setWalrusClient(clientWithWalrus);
+        } else {
+            // Si la red es incorrecta o nos desconectamos, reseteamos el cliente.
+            if (walrusClient) {
+                setWalrusClient(null);
+            }
+        }
+    }, [suiClient, currentWallet, activeChain, walrusClient]); // Se ejecuta cuando estos valores cambian y se estabilizan.
+
+
+    // --- RENDERIZADO CONDICIONAL ---
+    
     if (connectionStatus === 'connecting') {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>;
     }
 
-    // 2. Si no hay wallet conectada, pide al usuario que se conecte.
     if (connectionStatus === 'disconnected' || !currentWallet?.accounts[0]) {
         return (
             <div className="min-h-screen flex items-center justify-center p-4">
@@ -55,7 +85,6 @@ export default function RegisterProviderClient() {
         );
     }
     
-    // 3. Si la wallet está en una red no soportada por Walrus, pide cambiar de red.
     if (activeChain !== 'sui:testnet' && activeChain !== 'sui:mainnet') {
         return (
             <div className="min-h-screen flex items-center justify-center p-4">
@@ -72,26 +101,25 @@ export default function RegisterProviderClient() {
         );
     }
 
-    // 4. Si todas las verificaciones pasan, renderiza el formulario principal.
-    return <RegisterFormProvider />;
+    // Si todas las verificaciones pasan, renderiza el formulario principal, 
+    // pasándole el cliente de Walrus ya inicializado.
+    return <RegisterFormProvider walrusClient={walrusClient} />;
 }
 
 
 /**
- * Componente que contiene la lógica y el JSX del formulario.
+ * Componente que contiene toda la lógica y el JSX del formulario.
  * Solo se renderiza cuando el estado de la wallet es válido y está en la red correcta.
  */
-function RegisterFormProvider() {
+function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClientInstance | null }) {
+    const { currentWallet } = useCurrentWallet();
+    const currentAccount = currentWallet?.accounts[0]!;
+    
     const router = useRouter();
     const { toast } = useToast();
-    const { currentWallet } = useCurrentWallet();
-    const { walrusClient } = useWalrus();
     const queryClient = useQueryClient();
     const suiClient = useSuiClient();
     const params = useParams();
-    // Sabemos que currentAccount no será nulo aquí gracias a las verificaciones anteriores.
-    const currentAccount = currentWallet?.accounts[0]!;
-
     const { mutateAsync: signAndExecuteTransaction } = useSignAndExecuteTransaction();
 
     // Estados para el formulario
@@ -116,11 +144,8 @@ function RegisterFormProvider() {
         setIsCheckingWal(true);
         try {
             const balance = await suiClient.getBalance({ owner: currentAccount.address, coinType: WAL_COIN_TYPE });
-            if (parseInt(balance.totalBalance) > 0) {
-              console.log("User has WAL.", balance);
-            } else {
-              console.log("User does not have WAL.");
-            }
+            if(parseInt(balance.totalBalance) > 0) console.log("User has WAL.", balance);
+            else console.log("User does not have WAL.");
         } catch (error) {
             console.error("Failed to check WAL balance:", error);
         } finally {
@@ -150,12 +175,8 @@ function RegisterFormProvider() {
     };
 
     const handleRegister = async () => {
-        if (!currentWallet || !currentAccount || isFormInvalid || !imageFile || !walrusClient) {
-            toast({ 
-                variant: "destructive", 
-                title: "Error de Validación", 
-                description: "Por favor, completa todos los campos y asegúrate de que tu wallet esté conectada a la red correcta." 
-            });
+        if (!currentAccount || isFormInvalid || !imageFile || !walrusClient) {
+            toast({ variant: "destructive", title: "Error de Validación", description: "Por favor, completa todos los campos y asegúrate de que tu wallet esté conectada a la red correcta." });
             return;
         }
 
@@ -167,23 +188,14 @@ function RegisterFormProvider() {
             const uint8Array = new Uint8Array(imageArrayBuffer);
 
             const flow = walrusClient.walrus.writeFilesFlow({
-                files: [
-                    WalrusFile.from({
-                        contents: uint8Array,
-                        identifier: imageFile.name,
-                    }),
-                ],
+                files: [WalrusFile.from({ contents: uint8Array, identifier: imageFile.name })],
             });
             
             await flow.encode();
             console.log('✅ [WALRUS FLOW] Paso 1/5: Archivo codificado.');
 
             toast({ title: "Subiendo imagen (1/3)", description: "Por favor, aprueba la transacción de registro." });
-            const registerTx = flow.register({
-                epochs: 53,
-                owner: currentAccount.address,
-                deletable: false,
-            });
+            const registerTx = flow.register({ epochs: 53, owner: currentAccount.address, deletable: false });
             const registerResult = await signAndExecuteTransaction({ transaction: registerTx, account: currentAccount });
             console.log('✅ [WALRUS FLOW] Paso 2/5: Transacción de registro firmada.', { digest: registerResult.digest });
 
@@ -204,12 +216,7 @@ function RegisterFormProvider() {
             const tx = new Transaction();
             tx.moveCall({
                 target: `${suiConfig.packageId}::experience_nft::register_provider`,
-                arguments: [
-                    tx.pure.string(name),
-                    tx.pure.string(bio),
-                    tx.pure.string(finalImageUrl),
-                    tx.pure.string(category),
-                ],
+                arguments: [tx.pure.string(name), tx.pure.string(bio), tx.pure.string(finalImageUrl), tx.pure.string(category)],
             });
 
             const result = await signAndExecuteTransaction({ transaction: tx, account: currentAccount });
@@ -223,14 +230,9 @@ function RegisterFormProvider() {
             } else {
                 throw new Error("La transacción de registro de perfil falló.");
             }
-
         } catch (error: any) {
             console.error("❌ [REGISTER] Fallo en el Proceso de Registro:", error);
-            toast({
-                variant: "destructive",
-                title: "❌ Fallo en el Registro",
-                description: error.message || "Ocurrió un error inesperado."
-            });
+            toast({ variant: "destructive", title: "❌ Fallo en el Registro", description: error.message || "Ocurrió un error inesperado." });
         } finally {
             setIsPending(false);
             console.log('🏁 [REGISTER] Proceso de registro finalizado.');
