@@ -230,28 +230,36 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
     );
 }
 
-
-// --- Componente Cliente que renderiza el Dashboard ---
+// --- COMPONENTE CLIENTE CORREGIDO ---
 export default function DashboardClient() {
     const account = useCurrentAccount();
-    
-    if (!account?.address) {
-        return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>;
-    }
-    
-    const ownerAddress = account.address;
+    const ownerAddress = account?.address;
 
-    const { data: providerData, isLoading: isLoadingProfile } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress, filter: { StructType: `${suiConfig.packageId}::experience_nft::ProviderProfile` }, limit: 1, options: { showContent: true } });
-    const { data: nftsData, isLoading: isLoadingNfts } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress, filter: { StructType: `${suiConfig.packageId}::experience_nft::ExperienceNFT` }, options: { showContent: true, showDisplay: true } });
-    const { data: poesData, isLoading: isLoadingPoes } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress, filter: { StructType: `${suiConfig.packageId}::experience_nft::ProofOfExperience` }, options: { showContent: true } });
-    const { data: receiptsData, isLoading: isLoadingReceipts } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress, filter: { StructType: `${suiConfig.packageId}::experience_nft::PurchaseReceipt` }, options: { showContent: true } });
-    const { data: rentalListingsData, isLoading: isLoadingListings } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress, filter: { StructType: `${suiConfig.rentalPackageId}::rental_market::RentalListing` }, options: { showContent: true } });
-    const { data: rentedReceiptsData, isLoading: isLoadingReceiptsRental } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress, filter: { StructType: `${suiConfig.rentalPackageId}::rental_market::RentalReceipt` }, options: { showContent: true } });
+    // --- LA CORRECCIÓN ESTÁ AQUÍ ---
+    // 1. Llamamos a TODOS los hooks de forma incondicional en la parte superior.
+    // 2. Usamos la opción `enabled: !!ownerAddress` para que las queries solo se activen
+    //    cuando la dirección del usuario esté disponible.
     
+    const { data: providerData, isLoading: isLoadingProfile } = useSuiClientQuery(
+        'getOwnedObjects', 
+        { owner: ownerAddress!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ProviderProfile` }, limit: 1, options: { showContent: true } }, 
+        { enabled: !!ownerAddress }
+    );
+    const { data: nftsData, isLoading: isLoadingNfts } = useSuiClientQuery(
+        'getOwnedObjects', 
+        { owner: ownerAddress!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ExperienceNFT` }, options: { showContent: true, showDisplay: true } }, 
+        { enabled: !!ownerAddress }
+    );
+    const { data: poesData, isLoading: isLoadingPoes } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ProofOfExperience` }, options: { showContent: true } }, { enabled: !!ownerAddress });
+    const { data: receiptsData, isLoading: isLoadingReceipts } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress!, filter: { StructType: `${suiConfig.packageId}::experience_nft::PurchaseReceipt` }, options: { showContent: true } }, { enabled: !!ownerAddress });
+    const { data: rentalListingsData, isLoading: isLoadingListings } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress!, filter: { StructType: `${suiConfig.rentalPackageId}::rental_market::RentalListing` }, options: { showContent: true } }, { enabled: !!ownerAddress });
+    const { data: rentedReceiptsData, isLoading: isLoadingReceiptsRental } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress!, filter: { StructType: `${suiConfig.rentalPackageId}::rental_market::RentalReceipt` }, options: { showContent: true } }, { enabled: !!ownerAddress });
+
     const { data: allLoanRequests, isLoading: isLoadingRequests } = useGetLoanRequests();
     const { data: allActiveLoans, isLoading: isLoadingLoans } = useGetActiveLoans();
 
-    const isLoading = isLoadingProfile || isLoadingNfts || isLoadingPoes || isLoadingReceipts || isLoadingListings || isLoadingReceiptsRental || isLoadingRequests || isLoadingLoans;
+    // El estado de carga ahora funciona correctamente porque los hooks siempre están presentes.
+    const isLoading = (!!ownerAddress && (isLoadingProfile || isLoadingNfts || isLoadingPoes || isLoadingReceipts || isLoadingListings || isLoadingReceiptsRental || isLoadingRequests || isLoadingLoans));
 
     const isProvider = useMemo(() => !!providerData?.data && providerData.data.length > 0, [providerData]);
     
@@ -266,11 +274,12 @@ export default function DashboardClient() {
     const myBorrowedLoans = useMemo(() => allActiveLoans?.filter(loan => loan.borrower === ownerAddress) ?? [], [allActiveLoans, ownerAddress]);
     const myLendedLoans = useMemo(() => allActiveLoans?.filter(loan => loan.lender === ownerAddress) ?? [], [allActiveLoans, ownerAddress]);
     
+    // 3. La lógica de renderizado condicional ahora solo afecta al JSX.
     return (
         <div className="min-h-screen pt-24 pb-12 bg-background">
             <AnimatedBackground />
             <div className="container mx-auto px-4 relative z-10">
-                {isLoading ? (
+                {!ownerAddress || isLoading ? (
                     <div className="flex items-center justify-center pt-24"><Loader2 className="animate-spin h-10 w-10" /></div>
                 ) : (
                     isProvider && providerProfile ? 
