@@ -25,18 +25,22 @@ import { ProviderInfoCard } from '@/components/provider/ProviderInfoCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 /**
- * Esta función intercepta las solicitudes de red del SDK de Walrus.
- * En lugar de llamar directamente a Walrus (lo que causa un error de CORS),
- * redirige la solicitud a nuestra propia API Route que actúa como un proxy.
+ * --- LA CORRECCIÓN ESTÁ AQUÍ ---
+ * Esta función intercepta las llamadas de Walrus y las redirige a nuestro backend.
+ * Ahora maneja los encabezados de forma segura para TypeScript.
  */
 const proxyFetch: typeof fetch = async (url, options) => {
   console.log(`[PROXY FETCH] Interceptando llamada a: ${url}`);
+  
+  // Creamos un objeto Headers para normalizar el formato y acceder de forma segura.
+  const requestHeaders = new Headers(options?.headers);
   
   return fetch('/api/walrus-proxy', {
     method: 'POST',
     headers: {
       'X-Walrus-Target-URL': url.toString(), 
-      'Content-Type': options?.headers?.['Content-Type'] || 'application/octet-stream',
+      // Usamos el método .get(), que es seguro y no distingue mayúsculas/minúsculas.
+      'Content-Type': requestHeaders.get('content-type') || 'application/octet-stream',
     },
     body: options?.body,
   });
@@ -55,21 +59,12 @@ export default function RegisterProviderClient() {
 
     useEffect(() => {
         if (suiClient && currentWallet && (activeChain === 'sui:testnet' || activeChain === 'sui:mainnet')) {
-            console.log(`[EFFECT] Estado estable en ${activeChain}. Creando Walrus Client con relé y proxy.`);
-            
             const client = new WalrusClient({
                 suiClient,
                 network: activeChain.slice(4) as 'testnet' | 'mainnet',
-                // Configuramos el relé al que nuestro proxy llamará
-                uploadRelay: {
-                    host: 'https://upload-relay.testnet.walrus.space',
-                },
-                // Forzamos al SDK a usar nuestra función `proxyFetch` para todas las solicitudes
-                storageNodeClientOptions: {
-                    fetch: proxyFetch,
-                },
+                uploadRelay: { host: 'https://upload-relay.testnet.walrus.space' },
+                storageNodeClientOptions: { fetch: proxyFetch },
             });
-
             setWalrusClient(client);
         } else {
             setWalrusClient(null);
