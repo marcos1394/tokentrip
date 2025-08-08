@@ -109,10 +109,10 @@ async function main() {
         console.log(`   WAL: ${walAmount.toFixed(2)} WAL`);
 
         // Verificar que tengamos suficientes fondos
-        if (suiAmount < 0.5) {
+        if (suiAmount < 0.1) {
             throw new Error(`Fondos insuficientes de SUI. Necesitas al menos 1.0 SUI, tienes ${suiAmount.toFixed(2)} SUI`);
         }
-        if (walAmount < 1.5) {
+        if (walAmount < 1.9) {
             throw new Error(`Fondos insuficientes de WAL. Necesitas al menos 1.5 WAL, tienes ${walAmount.toFixed(2)} WAL`);
         }
 

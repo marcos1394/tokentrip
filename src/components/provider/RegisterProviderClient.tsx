@@ -35,17 +35,18 @@ const proxyFetch: typeof fetch = async (url, options) => {
   // Creamos un objeto Headers para normalizar el formato y acceder de forma segura.
   const requestHeaders = new Headers(options?.headers);
   
+ // --- CAMBIO CLAVE AQUÍ ---
+  // Nos aseguramos de que la llamada a nuestra propia API use el método correcto.
   return fetch('/api/walrus-proxy', {
-    method: 'POST',
+    method: options?.method || 'POST', // Usamos el método original (PUT, POST, etc.)
     headers: {
-      'X-Walrus-Target-URL': url.toString(), 
-      // Usamos el método .get(), que es seguro y no distingue mayúsculas/minúsculas.
+      'X-Walrus-Target-URL': url.toString(),
+      'X-Original-Method': options?.method || 'POST', // Y también lo enviamos en un encabezado
       'Content-Type': requestHeaders.get('content-type') || 'application/octet-stream',
     },
     body: options?.body,
   });
 };
-
 
 /**
  * Componente principal que maneja los estados de conexión de la wallet
