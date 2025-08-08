@@ -38,7 +38,7 @@ export function useGetActiveLoans() {
     queryFn: async (): Promise<ActiveLoan[]> => {
       const GQL_QUERY = `
         query getActiveLoans($loanType: String!) {
-          objects(filter: { type: $loanType }, first: 50, orderBy: { field: VERSION, direction: DESC }) {
+          objects(filter: { type: $loanType }, first: 50){
             nodes {
               objectId: address
               asMoveObject { contents { json } }

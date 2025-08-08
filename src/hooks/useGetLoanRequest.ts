@@ -38,7 +38,7 @@ export function useGetLoanRequests() {
     queryFn: async (): Promise<LoanRequest[]> => {
       const GQL_QUERY = `
         query getLoanRequests($requestType: String!) {
-          objects(filter: { type: $requestType }, first: 50, orderBy: { field: VERSION, direction: DESC }) {
+          objects(filter: { type: $requestType }, first: 50){
             nodes {
               objectId: address
               asMoveObject { contents { json } }

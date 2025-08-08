@@ -280,10 +280,10 @@ export default function DashboardPage() {
     const receipts = (receiptsData?.data as PurchaseReceipt[]) ?? [];
     const rentalListings = (rentalListingsData?.data as RentalListing[]) ?? [];
     const rentedReceipts = (rentedReceiptsData?.data as RentalReceipt[]) ?? [];
-    const isLoading = isLoadingProfile || isLoadingNfts || isLoadingPoes || isLoadingReceipts || isLoadingListings || isLoadingReceiptsRental;
 
     const { data: allLoanRequests, isLoading: isLoadingRequests } = useGetLoanRequests();
     const { data: allActiveLoans, isLoading: isLoadingLoans } = useGetActiveLoans();
+    const isLoading = isLoadingProfile || isLoadingNfts || isLoadingPoes || isLoadingReceipts || isLoadingListings || isLoadingReceiptsRental || isLoadingRequests || isLoadingLoans;
 
     // 2. Se filtran los datos para obtener solo los que pertenecen al usuario actual
     const myLoanRequests = useMemo(() => 
