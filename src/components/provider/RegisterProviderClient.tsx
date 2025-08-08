@@ -176,7 +176,7 @@ function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClient | n
             
             await flow.encode();
             toast({ title: "Subiendo imagen (1/3)..." });
-            const registerTx = flow.register({ epochs: 53, owner: currentAccount.address, deletable: false });
+            const registerTx = flow.register({ epochs: 5, owner: currentAccount.address, deletable: false });
             const registerResult = await signAndExecuteTransaction({ transaction: registerTx, account: currentAccount });
 
             toast({ title: "Subiendo imagen (2/3)..." });
