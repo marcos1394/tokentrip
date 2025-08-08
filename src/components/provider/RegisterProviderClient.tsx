@@ -59,17 +59,22 @@ export default function RegisterProviderClient() {
 
     useEffect(() => {
         if (suiClient && currentWallet && (activeChain === 'sui:testnet' || activeChain === 'sui:mainnet')) {
+
+            // --- LA CORRECCIÓN ESTÁ AQUÍ ---
+            // Eliminamos la configuración 'uploadRelay' para forzar el uso de nuestro 'proxyFetch'.
             const client = new WalrusClient({
                 suiClient,
                 network: activeChain.slice(4) as 'testnet' | 'mainnet',
-                uploadRelay: { host: 'https://upload-relay.testnet.walrus.space' },
-                storageNodeClientOptions: { fetch: proxyFetch },
+                storageNodeClientOptions: {
+                    fetch: proxyFetch,
+                },
             });
             setWalrusClient(client);
         } else {
             setWalrusClient(null);
         }
     }, [suiClient, currentWallet, activeChain]);
+
 
     if (connectionStatus === 'connecting') {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>;
