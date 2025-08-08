@@ -152,19 +152,23 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
 }) {
     const queryClient = useQueryClient();
     
-    // 1. VERIFICACIÓN DE SEGURIDAD: Usamos optional chaining para acceder a los campos de forma segura.
+    // Acceso seguro a los campos del perfil para evitar errores con 'undefined'.
     const providerProfileFields = providerProfile?.data?.content?.fields;
 
-    // Si los campos aún no están disponibles, mostramos un estado de carga. ¡ESTO EVITA EL CRASH!
+    // Si los campos del perfil no están listos, muestra un estado de carga.
+    // Esta es la verificación de seguridad principal que previene el crash.
     if (!providerProfileFields) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>;
     }
 
+    // Aseguramos que 'active_listings' sea un array antes de usarlo.
+    const activeListingIds = providerProfileFields.active_listings || [];
+
     const { data: activeListings, isLoading: isLoadingActiveListings } = useSuiClientQuery('multiGetObjects', { 
-        ids: providerProfileFields.active_listings, 
+        ids: activeListingIds, 
         options: { showContent: true } 
     }, { 
-        enabled: !!providerProfileFields && providerProfileFields.active_listings.length > 0 
+        enabled: activeListingIds.length > 0 
     });
     
     const handleActionSuccess = () => { 
@@ -180,7 +184,7 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
         <div className="space-y-8">
             <h1 className="text-4xl md:text-5xl font-bold mb-8 text-foreground">Provider Dashboard</h1>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <StatCard title="Active Listings" value={providerProfileFields.active_listings.length ?? 0} icon={Store} />
+                <StatCard title="Active Listings" value={activeListingIds.length} icon={Store} />
                 <StatCard title="Total Reviews" value={totalReviews} icon={Star} />
                 <StatCard title="Average Rating" value={averageRating} icon={BarChart2} />
                 <StatCard title="Lifetime Sales (SUI)" value="Coming Soon" icon={Coins} />
@@ -198,9 +202,8 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
                     {isLoadingActiveListings && <LoadingSkeletonGrid />}
                     {activeListings && activeListings.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {/* 2. MAPEO SEGURO: Verificamos que listing.data.content exista */}
                             {activeListings.map((listing: any) => (
-                                listing.data?.content && 
+                                listing?.data?.content && 
                                 <ListableNftCard 
                                     key={listing.data.objectId} 
                                     nft={listing.data.content.fields.nft} 
@@ -242,41 +245,48 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
                             {rentalListings.length === 0 && <EmptyState icon={Key} title="You have no items listed for rent" description="List a fraction or NFT from your inventory to start earning." />}
                         </div>
                         <div>
-                            <h3 className="text-2xl font-bold mt-8 mb-4">Items I've Rented</h3>
+                             <h3 className="text-2xl font-bold mt-8 mb-4">Items Rented From Me</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{rentedReceipts.map((receipt) => ( <RentedReceiptCard key={receipt.data.objectId} receipt={receipt.data} /> ))}</div>
-                            {rentedReceipts.length === 0 && <EmptyState icon={Key} title="You haven't rented any items" description="Rented items will appear here." />}
+                            {rentedReceipts.length === 0 && <EmptyState icon={Key} title="No items have been rented from you" description="Rented items will appear here." />}
                         </div>
                     </div>
                 </TabsContent>
                 
-               <TabsContent value="loans" className="mt-6">
-    <div className="space-y-8">
-        <div>
-            <h3 className="text-2xl font-bold mb-4">My Loan Requests</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {myLoanRequests.map(req => <LoanRequestManagementCard key={req.requestId} request={req} onActionSuccess={handleActionSuccess} />)}
-            </div>
-            {myLoanRequests.length === 0 && <EmptyState icon={Landmark} title="No Active Loan Requests" description="You can request a loan from your collection." />}
-        </div>
-        
-        <div>
-            <h3 className="text-2xl font-bold mt-8 mb-4">Loans I've Borrowed</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {myBorrowedLoans.map(loan => <ActiveLoanCard key={loan.loanId} loan={loan} role="borrower" onActionSuccess={handleActionSuccess} />)}
-            </div>
-            {myBorrowedLoans.length === 0 && <EmptyState icon={Landmark} title="No Active Borrows" description="Loans you take will appear here." />}
-        </div>
-        
-        <div>
-            <h3 className="text-2xl font-bold mt-8 mb-4">Loans I've Lended</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {myLendedLoans.map(loan => <ActiveLoanCard key={loan.loanId} loan={loan} role="lender" onActionSuccess={handleActionSuccess} />)}
-            </div>
-            {myLendedLoans.length === 0 && <EmptyState icon={Landmark} title="No Active Loans" description="Loans you fund will appear here." />}
-        </div>
-    </div>
-</TabsContent>
+                {/* --- SECCIÓN DE PRÉSTAMOS RESTAURADA --- */}
+                <TabsContent value="loans" className="mt-6">
+                    <div className="space-y-8">
+                        <div>
+                            <h3 className="text-2xl font-bold mb-4">My Loan Requests</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {myLoanRequests.map(req => <LoanRequestManagementCard key={req.requestId} request={req} onActionSuccess={handleActionSuccess} />)}
+                            </div>
+                            {myLoanRequests.length === 0 && <EmptyState icon={Landmark} title="No Active Loan Requests" description="You can request a loan from your collection." />}
+                        </div>
+                        
+                        <div>
+                            <h3 className="text-2xl font-bold mt-8 mb-4">Loans I've Borrowed</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {myBorrowedLoans.map(loan => <ActiveLoanCard key={loan.loanId} loan={loan} role="borrower" onActionSuccess={handleActionSuccess} />)}
+                            </div>
+                            {myBorrowedLoans.length === 0 && <EmptyState icon={Landmark} title="No Active Borrows" description="Loans you take will appear here." />}
+                        </div>
+                        
+                        <div>
+                            <h3 className="text-2xl font-bold mt-8 mb-4">Loans I've Lended</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {myLendedLoans.map(loan => <ActiveLoanCard key={loan.loanId} loan={loan} role="lender" onActionSuccess={handleActionSuccess} />)}
+                            </div>
+                            {myLendedLoans.length === 0 && <EmptyState icon={Landmark} title="No Active Loans" description="Loans you fund will appear here." />}
+                        </div>
+                    </div>
+                </TabsContent>
                 
+                {/* --- SECCIÓN DE "MEMORIES" TAMBIÉN RESTAURADA --- */}
+                <TabsContent value="memories" className="mt-6">
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{poes.map((poe) => ( <ProofOfExperienceCard key={poe.data.objectId} poe={poe.data} /> ))}</div>
+                   {poes.length === 0 && <EmptyState icon={History} title="You have no Memories yet" description="Redeem an experience NFT after a customer attends to add to your collection." />}
+                </TabsContent>
+
                 <TabsContent value="reviews" className="mt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{receipts.map((receipt) => ( <PurchaseReceiptCard key={receipt.data.objectId} receipt={receipt.data} /> ))}</div>
                     {receipts.length === 0 && <EmptyState icon={Edit} title="No Pending Reviews" description="After a customer buys from you, their receipt will appear here until they leave a review." />}
@@ -285,6 +295,7 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
         </div>
     );
 }
+
 
 // --- COMPONENTE CLIENTE CORREGIDO ---
 export default function DashboardClient() {
