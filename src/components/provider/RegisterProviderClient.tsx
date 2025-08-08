@@ -35,16 +35,21 @@ const proxyFetch: typeof fetch = async (url, options) => {
   // Creamos un objeto Headers para normalizar el formato y acceder de forma segura.
   const requestHeaders = new Headers(options?.headers);
   
- // --- CAMBIO CLAVE AQUÍ ---
-  // Nos aseguramos de que la llamada a nuestra propia API use el método correcto.
+
+  // Determinamos el método. Si no se especifica, asumimos GET, que es lo más seguro.
+  const originalMethod = options?.method || 'GET';
+  
   return fetch('/api/walrus-proxy', {
-    method: options?.method || 'POST', // Usamos el método original (PUT, POST, etc.)
+    method: originalMethod, // Usa el método original (GET, POST, PUT, etc.)
     headers: {
       'X-Walrus-Target-URL': url.toString(),
-      'X-Original-Method': options?.method || 'POST', // Y también lo enviamos en un encabezado
-      'Content-Type': requestHeaders.get('content-type') || 'application/octet-stream',
+      // 'Content-Type' solo se necesita para métodos que envían datos
+      ...( (originalMethod === 'POST' || originalMethod === 'PUT') && {
+        'Content-Type': new Headers(options?.headers).get('content-type') || 'application/octet-stream'
+      })
     },
-    body: options?.body,
+    // El 'body' solo se envía si el método no es GET
+    body: originalMethod === 'GET' ? undefined : options?.body,
   });
 };
 
