@@ -24,23 +24,50 @@ import { Textarea } from '@/components/ui/textarea';
 import { ProviderInfoCard } from '@/components/provider/ProviderInfoCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-type WalrusClientInstance = WalrusClient;
+/**
+ * Esta función intercepta las solicitudes de red del SDK de Walrus.
+ * En lugar de llamar directamente a Walrus (lo que causa un error de CORS),
+ * redirige la solicitud a nuestra propia API Route que actúa como un proxy.
+ */
+const proxyFetch: typeof fetch = async (url, options) => {
+  console.log(`[PROXY FETCH] Interceptando llamada a: ${url}`);
+  
+  return fetch('/api/walrus-proxy', {
+    method: 'POST',
+    headers: {
+      'X-Walrus-Target-URL': url.toString(), 
+      'Content-Type': options?.headers?.['Content-Type'] || 'application/octet-stream',
+    },
+    body: options?.body,
+  });
+};
 
+
+/**
+ * Componente principal que maneja los estados de conexión de la wallet
+ * y la inicialización segura del WalrusClient a través de nuestro proxy.
+ */
 export default function RegisterProviderClient() {
     const { currentWallet, connectionStatus } = useCurrentWallet();
     const suiClient = useSuiClient();
     const activeChain = currentWallet?.accounts[0]?.chains[0];
-    const [walrusClient, setWalrusClient] = useState<WalrusClientInstance | null>(null);
+    const [walrusClient, setWalrusClient] = useState<WalrusClient | null>(null);
 
     useEffect(() => {
         if (suiClient && currentWallet && (activeChain === 'sui:testnet' || activeChain === 'sui:mainnet')) {
-            console.log(`[EFFECT] Estado estable en ${activeChain}. Creando Walrus Client con el constructor directo...`);
+            console.log(`[EFFECT] Estado estable en ${activeChain}. Creando Walrus Client con relé y proxy.`);
             
-           // --- CAMBIO FINAL Y CLAVE ---
-            // Creamos el cliente de la forma más simple posible, SIN el uploadRelay.
             const client = new WalrusClient({
                 suiClient,
                 network: activeChain.slice(4) as 'testnet' | 'mainnet',
+                // Configuramos el relé al que nuestro proxy llamará
+                uploadRelay: {
+                    host: 'https://upload-relay.testnet.walrus.space',
+                },
+                // Forzamos al SDK a usar nuestra función `proxyFetch` para todas las solicitudes
+                storageNodeClientOptions: {
+                    fetch: proxyFetch,
+                },
             });
 
             setWalrusClient(client);
@@ -48,7 +75,6 @@ export default function RegisterProviderClient() {
             setWalrusClient(null);
         }
     }, [suiClient, currentWallet, activeChain]);
-
 
     if (connectionStatus === 'connecting') {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>;
@@ -70,8 +96,10 @@ export default function RegisterProviderClient() {
     return <RegisterFormProvider walrusClient={walrusClient} />;
 }
 
-
-function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClientInstance | null }) {
+/**
+ * Componente que contiene la lógica y el JSX del formulario.
+ */
+function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClient | null }) {
     const { currentWallet } = useCurrentWallet();
     const currentAccount = currentWallet?.accounts[0]!;
     const router = useRouter();
@@ -97,7 +125,6 @@ function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClientInst
         limit: 1,
     }, { enabled: !!currentAccount });
     
-    // --- LA CORRECCIÓN PARA EL BOTÓN "CHECKING WALLET..." ---
     const checkWalBalance = useCallback(async () => {
         if (!currentAccount) {
             setIsCheckingWal(false);
@@ -106,8 +133,8 @@ function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClientInst
         setIsCheckingWal(true);
         try {
             const balance = await suiClient.getBalance({ owner: currentAccount.address, coinType: WAL_COIN_TYPE });
-            if(parseInt(balance.totalBalance) > 0) console.log("User has WAL.", balance);
-            else console.log("User does not have WAL.");
+            if(parseInt(balance.totalBalance) > 0) { console.log("User has WAL.", balance); } 
+            else { console.log("User does not have WAL."); }
         } catch (error) {
             console.error("Failed to check WAL balance:", error);
         } finally {
@@ -115,10 +142,7 @@ function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClientInst
         }
     }, [currentAccount, suiClient]);
 
-    useEffect(() => {
-        checkWalBalance();
-    }, [checkWalBalance]);
-
+    useEffect(() => { checkWalBalance(); }, [checkWalBalance]);
     useEffect(() => {
         if (imageFile) {
             const previewUrl = URL.createObjectURL(imageFile);
@@ -146,7 +170,6 @@ function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClientInst
             const imageArrayBuffer = await imageFile.arrayBuffer();
             const uint8Array = new Uint8Array(imageArrayBuffer);
 
-            // Llamamos directamente al método, sin ".walrus"
             const flow = walrusClient.writeFilesFlow({
                 files: [WalrusFile.from({ contents: uint8Array, identifier: imageFile.name })],
             });
@@ -192,36 +215,31 @@ function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClientInst
 
     if (isLoadingProfile) { return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>; }
     if (isAlreadyProvider) {
-        return ( <div className="min-h-screen flex items-center justify-center text-center p-4"> {/* ... JSX ... */} </div> );
+        return (
+            <div className="min-h-screen flex items-center justify-center text-center p-4">
+                <AnimatedBackground />
+                <Card className="max-w-md mx-auto glass-card p-8 relative z-10">
+                    <CardHeader><BadgeCheck className="w-16 h-16 mx-auto text-green-500" /><CardTitle className="text-2xl mt-4">You're Already a Provider!</CardTitle></CardHeader>
+                    <CardContent className='flex flex-col gap-4 mt-4'><Button asChild size="lg" className="w-full btn-sui"><Link href="/dashboard">Go to Dashboard</Link></Button></CardContent>
+                </Card>
+            </div>
+        );
     }
 
     return (
         <div className="min-h-screen pt-24 pb-12 bg-background">
             <AnimatedBackground />
             <div className="container mx-auto px-4 relative z-10">
-                <div className="mb-8">
-                    <Button asChild variant="outline" className="glass-card"><Link href="/"><ArrowLeft className="w-4 h-4 mr-2" /> Back to Home</Link></Button>
-                </div>
+                <div className="mb-8"><Button asChild variant="outline" className="glass-card"><Link href="/"><ArrowLeft className="w-4 h-4 mr-2" /> Back to Home</Link></Button></div>
                 <div className="max-w-6xl mx-auto">
-                    <div className="text-center mb-12">
-                        <h1 className="text-4xl font-bold heading-gradient text-balance">Become a Provider</h1>
-                        <p className="text-muted-foreground mt-2">Create your profile to start selling unique experiences on TokenTrip.</p>
-                    </div>
+                    <div className="text-center mb-12"><h1 className="text-4xl font-bold heading-gradient">Become a Provider</h1><p className="text-muted-foreground mt-2">Create your profile to start selling experiences.</p></div>
                     <div className="grid lg:grid-cols-2 gap-12">
                         <Card className="glass-card">
-                            <CardHeader><CardTitle>Your Profile Details</CardTitle><CardDescription>This information will be public.</CardDescription></CardHeader>
+                            <CardHeader><CardTitle>Your Profile Details</CardTitle><CardDescription>This will be public.</CardDescription></CardHeader>
                             <CardContent className="space-y-6">
                                 <div className="space-y-2"><Label>Store or Brand Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} disabled={isPending} /></div>
                                 <div className="space-y-2"><Label>Provider Category</Label>
-                                    <Select onValueChange={setCategory} value={category}>
-                                        <SelectTrigger disabled={isPending}><SelectValue placeholder="Select a category..." /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Events">🎟️ Events</SelectItem>
-                                            <SelectItem value="Hospitality">🏨 Hospitality</SelectItem>
-                                            <SelectItem value="Tours">🗺️ Tours</SelectItem>
-                                            <SelectItem value="Digital">🖥️ Digital</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    <Select onValueChange={setCategory} value={category}><SelectTrigger disabled={isPending}><SelectValue placeholder="Select a category..." /></SelectTrigger><SelectContent><SelectItem value="Events">🎟️ Events</SelectItem><SelectItem value="Hospitality">🏨 Hospitality</SelectItem><SelectItem value="Tours">🗺️ Tours</SelectItem><SelectItem value="Digital">🖥️ Digital</SelectItem></SelectContent></Select>
                                 </div>
                                 <div className="space-y-2"><Label>Short Bio</Label><Textarea value={bio} onChange={(e) => setBio(e.target.value)} disabled={isPending} /></div>
                                 <div className="space-y-2"><Label>Logo or Profile Image</Label><Input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} disabled={isPending} className="pt-2"/></div>
@@ -240,7 +258,7 @@ function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClientInst
             </div>
             <Dialog open={isAcquireWalModalOpen} onOpenChange={setIsAcquireWalModalOpen}>
                 <DialogContent className="glass-card">
-                    <DialogHeader><DialogTitle>Storage Token (WAL) Required</DialogTitle><DialogDescription className="pt-2">You need WAL tokens to store your image. You can swap SUI for WAL here.</DialogDescription></DialogHeader>
+                    <DialogHeader><DialogTitle>Storage Token (WAL) Required</DialogTitle><DialogDescription className="pt-2">You need WAL tokens to store your image.</DialogDescription></DialogHeader>
                     <MiniSwap fromCoinType='0x2::sui::SUI' toCoinType={WAL_COIN_TYPE} onSwapSuccess={handleSwapSuccess}/>
                 </DialogContent>
             </Dialog>
