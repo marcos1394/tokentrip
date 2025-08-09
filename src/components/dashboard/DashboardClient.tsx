@@ -217,26 +217,30 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
                 </TabsContent>
 
                 <TabsContent value="inventory" className="mt-6">
-                    {(() => {
-                        const filteredNfts = nfts.filter(nft => nft.data?.display);
-                        return filteredNfts.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {filteredNfts.map((nft) => (
+                    {nfts.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {nfts.map((nftSuiObject) => {
+                                // 1. Verificamos que el objeto tenga el formato correcto
+                                if (nftSuiObject.data?.content?.dataType !== 'moveObject') return null;
+                                
+                                // 2. Extraemos los campos crudos, igual que en MyExperiences
+                                const nftData = nftSuiObject.data;
+                                
+                                return (
                                     <ListableNftCard 
-                                        key={nft.data.objectId} 
-                                        nft={nft.data} 
+                                        key={nftData.objectId} 
+                                        nft={nftData} // Pasamos el objeto 'data' completo
                                         onActionSuccess={handleActionSuccess} 
                                         providerProfileId={providerProfile.data.objectId}
                                         isFraction={false}
                                     />
-                                ))}
-                            </div>
-                        ) : (
-                            <EmptyState icon={Inbox} title="Your inventory is empty" description="As an admin, mint a new experience to this address to see it here." />
-                        )
-                    })()}
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <EmptyState icon={Inbox} title="Your inventory is empty" description="Mint a new experience to see it here." />
+                    )}
                 </TabsContent>
-
                 <TabsContent value="rentals" className="mt-6">
                     <div className="space-y-8">
                         <div>
