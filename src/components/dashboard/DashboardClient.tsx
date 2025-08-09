@@ -152,6 +152,7 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
 }) {
     const queryClient = useQueryClient();
     
+    
     // Acceso seguro a los campos del perfil para evitar errores con 'undefined'.
     const providerProfileFields = providerProfile?.data?.content?.fields;
 
@@ -216,7 +217,8 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
                     ) : (!isLoadingActiveListings && <EmptyState icon={PackageOpen} title="You have no active listings" description="List an item from your inventory to get started!" />)}
                 </TabsContent>
 
-         <TabsContent value="inventory" className="mt-6">
+                {/* --- PESTAÑA "MY INVENTORY" CORREGIDA --- */}
+                <TabsContent value="inventory" className="mt-6">
                     {nfts.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                             {nfts.map((nft) => (
