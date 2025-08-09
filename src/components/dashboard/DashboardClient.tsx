@@ -216,32 +216,24 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
                     ) : (!isLoadingActiveListings && <EmptyState icon={PackageOpen} title="You have no active listings" description="List an item from your inventory to get started!" />)}
                 </TabsContent>
 
-             <TabsContent value="inventory" className="mt-6">
-                    {(() => {
-                        // --- LA CORRECCIÓN ESTÁ AQUÍ ---
-                        // Filtramos de la misma manera que en tu componente `MyExperiences`
-                        // Simplemente verificamos que `nft.data.content.type` exista y coincida.
-                        const filteredNfts = nfts.filter(nft => 
-                            nft.data?.content?.type === `${suiConfig.packageId}::experience_nft::ExperienceNFT`
-                        );
-                        
-                        return filteredNfts.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {filteredNfts.map((nft) => (
-                                    <ListableNftCard 
-                                        key={nft.data.objectId} 
-                                        nft={nft.data} 
-                                        onActionSuccess={handleActionSuccess} 
-                                        providerProfileId={providerProfile.data.objectId}
-                                        isFraction={false}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <EmptyState icon={Inbox} title="Your inventory is empty" description="Mint a new experience to see it here." />
-                        )
-                    })()}
+         <TabsContent value="inventory" className="mt-6">
+                    {nfts.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {nfts.map((nft) => (
+                                <ListableNftCard 
+                                    key={nft.data.objectId} 
+                                    nft={nft.data} 
+                                    onActionSuccess={handleActionSuccess} 
+                                    providerProfileId={providerProfile.data.objectId}
+                                    isFraction={false}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <EmptyState icon={Inbox} title="Your inventory is empty" description="Mint a new experience to see it here." />
+                    )}
                 </TabsContent>
+                
                 <TabsContent value="rentals" className="mt-6">
                     <div className="space-y-8">
                         <div>
