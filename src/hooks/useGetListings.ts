@@ -2,20 +2,32 @@ import { useSuiClient } from '@mysten/dapp-kit';
 import { useQuery } from '@tanstack/react-query';
 import { suiConfig } from '@/config/sui';
 
-// --- INTERFACES ---
+// --- INTERFACES CORREGIDAS PARA COINCIDIR CON LA ESTRUCTURA REAL ---
 
-// Representa los campos del struct ExperienceNFT anidado dentro de un Listing
+// El tipo UID de Move se deserializa a { id: "0x..." }
+interface Uid {
+  id: string;
+}
+
+// El tipo Url de Move se deserializa a { fields: { url: "..." } }
+interface SuiUrl {
+  fields: {
+    url: string;
+  };
+}
+
+// Representa los campos del struct ExperienceNFT anidado
 interface ExperienceNftFields {
-  id: { id: string }; // El tipo UID de Move se deserializa a { id: "0x..." }
+  id: Uid;
   name: string;
   description: string;
-  image_url: { fields: { url: string } }; // El tipo Url de Move se deserializa a { fields: { url: "..." } }
+  image_url: SuiUrl;
   provider_address: string;
 }
 
 // Representa los campos del struct Listing
 interface ListingFields {
-  id: { id: string };
+  id: Uid;
   nft: ExperienceNftFields;
   price: string;
   is_available: boolean;
@@ -41,15 +53,11 @@ export interface NftListing {
   };
 }
 
-// 1. CORRECCIÓN: Apuntar a la URL de GraphQL de Testnet
 const SUI_TESTNET_GRAPHQL_URL = 'https://sui-testnet.mystenlabs.com/graphql';
 
 export function useGetListings() {
-  const suiClient = useSuiClient();
-
   return useQuery({
-    // La query key ahora incluye el packageId para que se refresque si cambia
-    queryKey: ['get-all-listings', suiConfig.packageId], 
+    queryKey: ['get-all-listings', suiConfig.packageId],
     queryFn: async (): Promise<NftListing[]> => {
       const GQL_QUERY = `
         query getListings($listingType: String!) {
@@ -62,20 +70,18 @@ export function useGetListings() {
         }`;
 
       try {
-        const response = await fetch(SUI_TESTNET_GRAPHQL_URL, { // Usamos la URL correcta
+        const response = await fetch(SUI_TESTNET_GRAPHQL_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             query: GQL_QUERY,
             variables: {
-              // 2. CORRECCIÓN: Usa el packageId más reciente desde suiConfig
               listingType: `${suiConfig.packageId}::experience_nft::Listing`,
             },
           }),
         });
         
         const result = await response.json();
-        
         if (result.errors) { throw new Error(`Error en GraphQL: ${JSON.stringify(result.errors)}`); }
         
         const listingsData = result.data.objects.nodes;
@@ -83,10 +89,10 @@ export function useGetListings() {
         const listingsWithDetails: NftListing[] = listingsData
           .map((node: any) => {
             const fields = node.asMoveObject?.contents?.json as ListingFields;
-            // Filtramos los que no están disponibles
             if (!fields || !fields.is_available) { return null; }
 
-            // 3. CORRECCIÓN: Extraemos los datos de la estructura anidada correcta
+            // --- CORRECCIÓN FINAL AQUÍ ---
+            // Se actualizan las rutas para acceder a los datos anidados correctamente
             return {
               listingId: node.objectId,
               price: Number(fields.price) / (10 ** 9),
@@ -95,15 +101,15 @@ export function useGetListings() {
               seller: fields.seller,
               providerId: fields.provider_id,
               nft: {
-                id: fields.nft.id.id, // Se accede a `id.id`
+                id: fields.nft.id.id,
                 name: fields.nft.name,
                 description: fields.nft.description,
-                imageUrl: fields.nft.image_url.fields.url, // Se accede a `image_url.fields.url`
+                imageUrl: fields.nft.image_url.fields.url, // Correcto: fields.url
                 provider_address: fields.nft.provider_address,
               },
             };
           })
-          .filter((listing: NftListing | null): listing is NftListing => listing !== null);
+          .filter((listing): listing is NftListing => listing !== null);
 
         console.log('✅ Listings procesados:', listingsWithDetails);
         return listingsWithDetails;
