@@ -1,39 +1,39 @@
 import { useSuiClient } from '@mysten/dapp-kit';
 import { useQuery } from '@tanstack/react-query';
-import { suiConfig } from '@/config/sui'; 
+import { suiConfig } from '@/config/sui';
 
-// --- INTERFACES ACTUALIZADAS ---
+// --- INTERFACES ---
 
-// La interfaz de lo que esperamos del `nft` anidado.
+// Representa los campos del struct ExperienceNFT anidado dentro de un Listing
 interface ExperienceNftFields {
-  id: string; 
+  id: { id: string }; // El tipo UID de Move se deserializa a { id: "0x..." }
   name: string;
   description: string;
-  image_url: { url: string };
-  provider_address: string; // La dirección del creador original
+  image_url: { fields: { url: string } }; // El tipo Url de Move se deserializa a { fields: { url: "..." } }
+  provider_address: string;
 }
 
-// La interfaz de lo que esperamos del objeto `Listing` completo.
+// Representa los campos del struct Listing
 interface ListingFields {
   id: { id: string };
   nft: ExperienceNftFields;
   price: string;
   is_available: boolean;
   is_tkt_listing: boolean;
-  seller: string; // La dirección del vendedor actual
-  provider_id: string; // El ID del perfil del creador original
+  seller: string;
+  provider_id: string;
 }
 
-// La interfaz del objeto "limpio" que nuestro hook le entregará a la UI.
+// La estructura de datos limpia que el hook devuelve a la UI
 export interface NftListing {
   listingId: string;
   price: number;
   currency: 'SUI' | 'TKT';
   isTktListing: boolean;
-  seller: string; // Se añade el vendedor
-  providerId: string; // Se añade el ID del perfil del proveedor
+  seller: string;
+  providerId: string;
   nft: {
-    id:string;
+    id: string;
     name: string;
     description: string;
     imageUrl: string;
@@ -41,13 +41,15 @@ export interface NftListing {
   };
 }
 
-const SUI_DEVNET_GRAPHQL_URL = 'https://sui-devnet.mystenlabs.com/graphql';
+// 1. CORRECCIÓN: Apuntar a la URL de GraphQL de Testnet
+const SUI_TESTNET_GRAPHQL_URL = 'https://sui-testnet.mystenlabs.com/graphql';
 
 export function useGetListings() {
   const suiClient = useSuiClient();
 
   return useQuery({
-    queryKey: ['get-all-listings-graphql-v5-secondary-market'],
+    // La query key ahora incluye el packageId para que se refresque si cambia
+    queryKey: ['get-all-listings', suiConfig.packageId], 
     queryFn: async (): Promise<NftListing[]> => {
       const GQL_QUERY = `
         query getListings($listingType: String!) {
@@ -60,12 +62,13 @@ export function useGetListings() {
         }`;
 
       try {
-        const response = await fetch(SUI_DEVNET_GRAPHQL_URL, {
+        const response = await fetch(SUI_TESTNET_GRAPHQL_URL, { // Usamos la URL correcta
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             query: GQL_QUERY,
             variables: {
+              // 2. CORRECCIÓN: Usa el packageId más reciente desde suiConfig
               listingType: `${suiConfig.packageId}::experience_nft::Listing`,
             },
           }),
@@ -80,28 +83,29 @@ export function useGetListings() {
         const listingsWithDetails: NftListing[] = listingsData
           .map((node: any) => {
             const fields = node.asMoveObject?.contents?.json as ListingFields;
+            // Filtramos los que no están disponibles
             if (!fields || !fields.is_available) { return null; }
 
+            // 3. CORRECCIÓN: Extraemos los datos de la estructura anidada correcta
             return {
               listingId: node.objectId,
               price: Number(fields.price) / (10 ** 9),
               currency: fields.is_tkt_listing ? 'TKT' : 'SUI',
               isTktListing: fields.is_tkt_listing,
-              // --- NUEVO: Se añaden los datos del vendedor y proveedor ---
               seller: fields.seller,
               providerId: fields.provider_id,
               nft: {
-                id: fields.nft.id,
+                id: fields.nft.id.id, // Se accede a `id.id`
                 name: fields.nft.name,
                 description: fields.nft.description,
-                imageUrl: fields.nft.image_url.url,
+                imageUrl: fields.nft.image_url.fields.url, // Se accede a `image_url.fields.url`
                 provider_address: fields.nft.provider_address,
               },
             };
           })
           .filter((listing: NftListing | null): listing is NftListing => listing !== null);
 
-        console.log('✅ Listings procesados (con datos de vendedor):', listingsWithDetails);
+        console.log('✅ Listings procesados:', listingsWithDetails);
         return listingsWithDetails;
         
       } catch (error) {
