@@ -26,7 +26,8 @@ interface PurchaseReceiptFields {
   nft_image_url: { url: string };
 }
 
-// --- Sub-componentes (Sin cambios) ---
+// --- Sub-componentes para mejorar la legibilidad ---
+
 function ResaleButton({ nftId, onResale, isPending }: { nftId: string, onResale: (id: string, price: string) => void, isPending: boolean }) {
     const [isOpen, setIsOpen] = useState(false);
     const [price, setPrice] = useState('');
@@ -79,15 +80,12 @@ export function MyExperiences() {
     const { toast } = useToast();
     const { mutateAsync: executeResale, isPending: isResalePending } = useSignAndExecuteTransaction();
 
-    // --- CAMBIO 1: CONSULTAS OPTIMIZADAS ---
-    // Usamos `filter` para pedirle a la blockchain solo los objetos que necesitamos,
-    // en lugar de traer todo y filtrarlo en el navegador. Esto es mucho más eficiente.
     const { data: nftsData, isLoading: isLoadingNfts, refetch: refetchNfts } = useSuiClientQuery(
         'getOwnedObjects', 
         { 
             owner: currentAccount?.address!,
             filter: { StructType: `${suiConfig.packageId}::experience_nft::ExperienceNFT` },
-            options: { showDisplay: true } // Solo necesitamos el `display`
+            options: { showDisplay: true, showContent: true } // Pedimos display Y content para depurar
         },
         { enabled: !!currentAccount }
     );
@@ -102,6 +100,13 @@ export function MyExperiences() {
         { enabled: !!currentAccount }
     );
     
+    // --- LOG 1: VER LA RESPUESTA COMPLETA DE LA API ---
+    useEffect(() => {
+        if (nftsData) {
+            console.log("%cRespuesta completa de la consulta de NFTs:", "color: blue; font-weight: bold;", nftsData);
+        }
+    }, [nftsData]);
+
     const isLoading = isLoadingNfts || isLoadingReceipts;
     const ownedNfts = nftsData?.data ?? [];
     const reviewablePurchases = receiptsData?.data ?? [];
@@ -162,9 +167,15 @@ export function MyExperiences() {
                 {ownedNfts.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                         {ownedNfts.map((nft, index) => {
-                            // --- CAMBIO 2: USAR EL OBJETO DISPLAY ---
-                            // Leemos el nombre y la imagen desde `nft.data.display`, que es el estándar.
-                            // Usamos optional chaining (?.) y fallbacks (||) para más seguridad.
+                            // --- LOG 2: INSPECCIONAR CADA NFT INDIVIDUALMENTE ---
+                            console.groupCollapsed(`--- Inspeccionando NFT #${index} (ID: ${nft.data?.objectId}) ---`);
+                            console.log("Objeto NFT completo:", nft);
+                            console.log("Contenido de 'nft.data':", nft.data);
+                            console.log("✅ Contenido de 'nft.data.display':", nft.data?.display);
+                            console.log("📦 Contenido de 'nft.data.content':", nft.data?.content);
+                            console.groupEnd();
+
+
                             const objectId = nft.data?.objectId;
                             const name = nft.data?.display?.data?.name || 'Untitled NFT';
                             const imageUrl = nft.data?.display?.data?.image_url || '';
