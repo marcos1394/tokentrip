@@ -65,8 +65,7 @@ export default function MintExperienceClient() {
     const { data: providerData, isLoading: isLoadingProfile } = useSuiClientQuery('getOwnedObjects', { owner: account?.address!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ProviderProfile` }, limit: 1, options: {showContent: true} }, { enabled: !!account });
     const providerProfile = providerData?.data?.[0] as ProviderProfile | undefined;
     
-    // Reemplaza tu función handleMint con esta versión final y definitiva
-const handleMint = async () => {
+    const handleMint = async () => {
     if (!account || !providerProfile || !walrusClient) {
         toast({ variant: 'destructive', title: "Error", description: "Wallet not connected or client not ready." });
         return;
@@ -77,7 +76,6 @@ const handleMint = async () => {
     }
     setIsMinting(true);
     try {
-        // ... (Toda la lógica de subida de Walrus se mantiene igual)
         toast({ title: "1/4: Uploading image..." });
         const imageArrayBuffer = await imageFile.arrayBuffer();
         const uint8Array = new Uint8Array(imageArrayBuffer);
@@ -85,14 +83,18 @@ const handleMint = async () => {
             files: [ WalrusFile.from({ contents: uint8Array, identifier: imageFile.name }) ],
         });
         await flow.encode();
+        
         toast({ title: "2/4: Approving storage transaction..." });
         const registerTx = flow.register({ epochs: 5, owner: account.address, deletable: false });
         const registerResult = await signAndExecuteTx({ transaction: registerTx, account });
+        
         toast({ title: "3/4: Transferring data..." });
         await flow.upload({ digest: registerResult.digest });
+        
         toast({ title: "4/4: Approving certification transaction..." });
         const certifyTx = flow.certify();
         await signAndExecuteTx({ transaction: certifyTx, account });
+
         const files = await flow.listFiles();
         const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`;
         console.log('✅ [MINT] Image uploaded successfully. URL:', finalImageUrl);
@@ -100,51 +102,45 @@ const handleMint = async () => {
         toast({ title: "Preparing mint transaction..." });
         const tx = new Transaction();
 
-        // Preparar los datos como antes (arrays de Uint8Array)
+        // Los arrays ahora son simplemente de strings, que es lo que espera `tx.pure.vector`
         const attributesForContract: Attribute[] = [{ key: "Example", value: "Value" }];
-        const attributeKeys = attributesForContract.map(attr => new TextEncoder().encode(attr.key));
-        const attributeValues = attributesForContract.map(attr => new TextEncoder().encode(attr.value));
+        const attributeKeys = attributesForContract.map(attr => attr.key);
+        const attributeValues = attributesForContract.map(attr => attr.value);
+        
         const ruleTriggerTypes = evolutionRules.map(rule => Number(rule.trigger_type));
         const ruleTriggerValues = evolutionRules.map(rule => rule.trigger_value.toString());
-        const ruleNewImageUrls = evolutionRules.map(rule => new TextEncoder().encode(rule.new_image_url));
-        const ruleNewDescriptions = evolutionRules.map(rule => new TextEncoder().encode(rule.new_description));
+        const ruleNewImageUrls = evolutionRules.map(rule => rule.new_image_url);
+        const ruleNewDescriptions = evolutionRules.map(rule => rule.new_description);
         
-        // --- LA CORRECCIÓN ESTÁ AQUÍ: SERIALIZACIÓN MANUAL ---
-        // 1. Definimos el tipo BCS para un vector de vectores de bytes
-        const vecVecU8 = bcs.vector(bcs.vector(bcs.u8()));
-
-        // 2. Serializamos nuestros arrays de JS a un único array de bytes
-        const serializedAttributeKeys = vecVecU8.serialize(attributeKeys).toBytes();
-        const serializedAttributeValues = vecVecU8.serialize(attributeValues).toBytes();
-        const serializedRuleNewImageUrls = vecVecU8.serialize(ruleNewImageUrls).toBytes();
-        const serializedRuleNewDescriptions = vecVecU8.serialize(ruleNewDescriptions).toBytes();
-        
+        // --- LA LLAMADA AHORA ES SIMPLE, LIMPIA Y CORRECTA ---
         tx.moveCall({
             target: `${suiConfig.packageId}::experience_nft::provider_mint_experience`,
             arguments: [
                 tx.object(providerProfile.data.objectId),
-                tx.pure(new TextEncoder().encode(name)),
-                tx.pure(new TextEncoder().encode(description)),
-                tx.pure(new TextEncoder().encode(finalImageUrl)),
-                tx.pure(new TextEncoder().encode(eventName)),
-                tx.pure(new TextEncoder().encode(eventCity)),
-                tx.pure(new TextEncoder().encode(validityDetails)),
-                tx.pure(new TextEncoder().encode(experienceType)),
-                tx.pure(new TextEncoder().encode(tier)),
-                tx.pure.u64(Number(serialNumber)),
-                tx.pure(new TextEncoder().encode(collectionName)),
                 
-                // 3. Pasamos los bytes ya serializados a tx.pure()
-                tx.pure(serializedAttributeKeys),
-                tx.pure(serializedAttributeValues),
+                // Para los argumentos `String` de Move, usamos el método simple y natural del SDK
+                tx.pure.string(name),
+                tx.pure.string(description),
+                tx.pure.string(finalImageUrl),
+                tx.pure.string(eventName),
+                tx.pure.string(eventCity),
+                tx.pure.string(validityDetails),
+                tx.pure.string(experienceType),
+                tx.pure.string(tier),
+                tx.pure.u64(Number(serialNumber)),
+                tx.pure.string(collectionName),
+                
+                // Para los `vector<String>`, usamos el helper .vector()
+                tx.pure.vector('string', attributeKeys),
+                tx.pure.vector('string', attributeValues),
                 
                 tx.pure.bool(isRedeemable),
                 tx.pure.u64((expiration?.getTime() || 0).toString()),
 
                 tx.pure.vector('u8', ruleTriggerTypes),
                 tx.pure.vector('u64', ruleTriggerValues),
-                tx.pure(serializedRuleNewImageUrls),
-                tx.pure(serializedRuleNewDescriptions),
+                tx.pure.vector('string', ruleNewImageUrls),
+                tx.pure.vector('string', ruleNewDescriptions),
             ],
         });
         
