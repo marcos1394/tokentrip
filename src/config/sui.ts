@@ -1,10 +1,10 @@
 // src/config/sui.ts
 
-// Configuración final actualizada para Testnet
+// Configuración final y verificada para Testnet
 export const suiConfig = {
-  // --- IDs de los PAQUETES (Actualizados de tus logs de publicación) ---
-  packageId: "0xcea6a3334cb989a2a7462c1fc22a43f87484bde7e51c6acf4a7e72ac1da04368", // tokentrip_experiences
-  auctionsPackageId: "0xb0b85843bc219692ee6c35cdf43606568cdb23fe66a78ab9d6b753d8ec59c47c",
+  // --- IDs de los PAQUETES (Corregidos según el último despliegue) ---
+  packageId: "0x7c58a8f35419a88cdb406993397ea17b68f7e082b79ad187b4d6e084025b4267", // tokentrip_experiences
+  auctionsPackageId: "0x395c38b7485fb889ab107288a3f85199aefb88d936945d1e31881d868b45641f",
   lendingPackageId: "0x44a1a9d319e18b55d1b700401fdc9d9ea0622a28e173df46658c180363c35835",
   rentalPackageId: "0xd0619b97e155e8a20e5aded82c8617e3bb910e9496518873ea14df8f71b94edc",
   
@@ -16,8 +16,8 @@ export const suiConfig = {
   // --- IDs de OBJETOS creados por la función init ---
 
   // Creados por la última versión de `tokentrip_experiences` (packageId)
-  adminCapId: "0x9130b9cdbf04339db4805557ba594b39472b853724a63b05c7ec1b508cc63387",
-  vipRegistryId: "0x8fce36011d91ca8996a47538dc69803fc024d52993b891cfec3ba1c260fb6f96",
+  adminCapId: "0xcb576a164d8946d0941d265e3e47bb24849b5dc20fb820df6433f4c424700237",
+  vipRegistryId: "0x89437b91ff4abfdec5bacc790e405df02d36d650be40ddf7b3a6d01c43599b73",
 
   // IDs de objetos de otros paquetes (asumiendo que no se han vuelto a publicar)
   stakingPoolId: "0x1f10f55a350e29250a99bf76cf7d448df10474c190e87c9e1a974b58ebc06b67",
