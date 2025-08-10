@@ -3,20 +3,16 @@ import { useQuery } from '@tanstack/react-query';
 import { suiConfig } from '@/config/sui';
 
 // --- INTERFACES CORREGIDAS PARA COINCIDIR CON LA ESTRUCTURA REAL ---
-
-// El tipo UID de Move se deserializa a { id: "0x..." }
 interface Uid {
   id: string;
 }
 
-// El tipo Url de Move se deserializa a { fields: { url: "..." } }
 interface SuiUrl {
   fields: {
     url: string;
   };
 }
 
-// Representa los campos del struct ExperienceNFT anidado
 interface ExperienceNftFields {
   id: Uid;
   name: string;
@@ -25,7 +21,6 @@ interface ExperienceNftFields {
   provider_address: string;
 }
 
-// Representa los campos del struct Listing
 interface ListingFields {
   id: Uid;
   nft: ExperienceNftFields;
@@ -36,7 +31,6 @@ interface ListingFields {
   provider_id: string;
 }
 
-// La estructura de datos limpia que el hook devuelve a la UI
 export interface NftListing {
   listingId: string;
   price: number;
@@ -89,10 +83,10 @@ export function useGetListings() {
         const listingsWithDetails: NftListing[] = listingsData
           .map((node: any) => {
             const fields = node.asMoveObject?.contents?.json as ListingFields;
-            if (!fields || !fields.is_available) { return null; }
+            if (!fields || !fields.is_available || !fields.nft) { return null; }
 
-            // --- CORRECCIÓN FINAL AQUÍ ---
-            // Se actualizan las rutas para acceder a los datos anidados correctamente
+            // --- CORRECCIÓN FINAL Y DEFINITIVA AQUÍ ---
+            // Aseguramos que la ruta al objeto 'url' sea la correcta
             return {
               listingId: node.objectId,
               price: Number(fields.price) / (10 ** 9),
@@ -104,12 +98,12 @@ export function useGetListings() {
                 id: fields.nft.id.id,
                 name: fields.nft.name,
                 description: fields.nft.description,
-                imageUrl: fields.nft.image_url.fields.url, // Correcto: fields.url
+                imageUrl: fields.nft.image_url?.fields?.url || '', // Acceso seguro a la URL
                 provider_address: fields.nft.provider_address,
               },
             };
           })
-          .filter((listing: NftListing | null): listing is NftListing => listing !== null);
+          .filter((listing): listing is NftListing => listing !== null);
 
         console.log('✅ Listings procesados:', listingsWithDetails);
         return listingsWithDetails;
