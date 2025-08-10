@@ -7,7 +7,7 @@ import { Transaction } from '@mysten/sui/transactions';
 import { suiConfig } from '@/config/sui';
 import Link from 'next/link';
 
-// Componentes
+// Componentes y UI
 import { AnimatedBackground } from "@/components/animated-background";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/toaster";
@@ -17,27 +17,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { EvolutionCard } from '@/components/EvolutionCard';
 
-// Interfaces para las props que recibe el componente
-interface NftFields {
-  id: { id: string };
+// --- INTERFACES HOMOLOGADAS ---
+// Estas interfaces definen la estructura de datos "limpia" que el componente recibe como props.
+
+interface NormalizedNft {
+  id: string;
   name: string;
   description: string;
-  image_url: { fields: { url: string } };
+  imageUrl: string;
   provider_address: string;
   provider_id: string;
   evolution_rules: any[];
 }
+
+// ListingFields sigue siendo necesario para tipar el objeto 'listing' que puede ser nulo
 interface ListingFields {
   price: string;
   is_available: boolean;
   is_tkt_listing: boolean;
   seller: string;
   provider_id: string;
-  nft: { fields: NftFields };
 }
+
 interface ExperienceDetailClientProps {
-  nft: NftFields;
-  listing: ListingFields | null; // <-- CORRECCIÓN APLICADA AQUÍ
+  nft: NormalizedNft;
+  listing: ListingFields | null;
   providerProfile: any;
   objectId: string; 
 }
@@ -111,9 +115,15 @@ export function ExperienceDetailClient({ nft, listing, providerProfile, objectId
             <div className="container mx-auto px-4 relative z-10">
                 <div className="mb-8"><Button asChild variant="outline" className="glass-card"><Link href="/"><ArrowLeft className="w-4 h-4 mr-2" /> Back to Marketplace</Link></Button></div>
                 <div className="grid lg:grid-cols-5 gap-8 lg:gap-12">
-                    <div className="lg:col-span-3"><Card className="overflow-hidden shadow-2xl rounded-2xl"><img src={nft.image_url.fields.url} alt={nft.name} className="w-full h-auto object-cover aspect-video" /></Card></div>
+                    <div className="lg:col-span-3">
+                        <Card className="overflow-hidden shadow-2xl rounded-2xl">
+                            {/* --- CORRECCIÓN: Usa la prop simple `nft.imageUrl` --- */}
+                            <img src={nft.imageUrl} alt={nft.name} className="w-full h-auto object-cover aspect-video" />
+                        </Card>
+                    </div>
                     <div className="lg:col-span-2 space-y-6">
                         <Card className="glass-card">
+                            {/* --- CORRECCIÓN: Usa las props simples `nft.name` y `nft.description` --- */}
                             <CardHeader><CardTitle className="text-4xl font-bold pt-4 text-foreground">{nft.name}</CardTitle><CardDescription className="text-base pt-2">{nft.description}</CardDescription></CardHeader>
                             <CardContent>
                                 <div className="p-4 border rounded-lg bg-background/50 space-y-2">
@@ -154,7 +164,8 @@ export function ExperienceDetailClient({ nft, listing, providerProfile, objectId
                             <div className="space-y-4">
                                 <h3 className="text-xl font-bold text-foreground">Evolutions</h3>
                                 {nft.evolution_rules.map((rule, index) => (
-                                    <EvolutionCard key={index} rule={rule} nftId={nft.id.id} providerProfile={providerProfile} currentImageUrl={nft.image_url.fields.url} onEvolveSuccess={() => queryClient.invalidateQueries({ queryKey: ['getObject', objectId]})} />
+                                    // --- CORRECCIÓN: Usa las props simples ---
+                                    <EvolutionCard key={index} rule={rule} nftId={nft.id} providerProfile={providerProfile} currentImageUrl={nft.imageUrl} onEvolveSuccess={() => queryClient.invalidateQueries({ queryKey: ['getObject', objectId]})} />
                                 ))}
                             </div>
                         )}

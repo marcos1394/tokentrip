@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { AlertCircle } from 'lucide-react';
 import { suiConfig } from '@/config/sui';
 
-// Interfaces para tipar los datos que esperamos de la blockchain
+// --- Interfaces para tipado ---
 interface SuiUrl {
   fields?: { url: string };
   url?: string;
@@ -48,32 +48,33 @@ async function getExperienceData(id: string) {
 
     const object = objectResponse.data;
     const type = object.content?.dataType === 'moveObject' ? object.content.type : '';
-    const fields = object.content?.dataType === 'moveObject' ? object.content.fields as any : null;
+    const fields = object.content?.dataType === 'moveObject' ? object.content.fields : null;
 
     if (!type || !fields) {
         return null;
     }
 
-    let nftData, listingData, providerProfile;
+    let nftData: NftFields | null = null;
+    let listingData: ListingFields | null = null;
 
     // CASO 1: El ID corresponde a un Listing (desde el Marketplace)
     if (type.includes('::experience_nft::Listing')) {
-      listingData = fields as ListingFields;
-      // --- CORRECCIÓN AQUÍ ---
-      // Añadimos una comprobación de seguridad antes de acceder a campos anidados
-      if (listingData && listingData.nft && listingData.nft.fields) {
-        nftData = listingData.nft.fields;
-      } else {
-        console.error("Invalid Listing object structure received:", fields);
-        return null;
+      const currentListing = fields as unknown as ListingFields;
+      listingData = currentListing;
+      if (currentListing.nft && currentListing.nft.fields) {
+        nftData = currentListing.nft.fields;
       }
     // CASO 2: El ID corresponde a un NFT puro (desde "My Experiences")
     } else if (type.includes('::experience_nft::ExperienceNFT')) {
-      nftData = fields as NftFields;
-      listingData = null; // No hay datos de venta
-    } else {
-      console.warn("Object type not supported:", type);
-      return null; // El tipo de objeto no es ni un Listing ni un ExperienceNFT
+      nftData = fields as unknown as NftFields;
+      listingData = null;
+    }
+
+    // --- CORRECCIÓN CLAVE: VERIFICACIÓN DE SEGURIDAD ---
+    // Si después de la lógica anterior no hemos podido extraer `nftData`, el objeto no es válido.
+    if (!nftData) {
+        console.error("Could not extract NFT data from object:", object);
+        return null;
     }
 
     // --- NORMALIZACIÓN DE DATOS ---
@@ -95,7 +96,7 @@ async function getExperienceData(id: string) {
       id: nftData.provider_id,
       options: { showContent: true },
     });
-    providerProfile = providerObject.data?.content?.dataType === 'moveObject' ? providerObject.data.content.fields : null;
+    const providerProfile = providerObject.data?.content?.dataType === 'moveObject' ? providerObject.data.content.fields : null;
 
     return { nft: normalizedNft, listing: listingData, providerProfile };
 
