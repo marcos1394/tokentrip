@@ -117,26 +117,36 @@ export function MyExperiences() {
         }
     }, [nftsData, receiptsData]);
 
-    const handleResale = async (nftId: string, price: string) => {
-        const priceAsNumber = parseFloat(price);
-        if (isNaN(priceAsNumber) || priceAsNumber <= 0) {
-            toast({ variant: 'destructive', title: 'Invalid Price' });
-            return;
-        }
-        const tx = new Transaction();
-        tx.moveCall({
-            target: `${suiConfig.packageId}::experience_nft::list_for_resale`,
-            arguments: [ tx.object(nftId), tx.pure.u64(BigInt(priceAsNumber * 1_000_000_000)) ]
-        });
+    // En MyExperiences.tsx
 
-        try {
-            await executeResale({ transaction: tx });
-            toast({ title: '✅ Success!', description: 'Your experience is now listed for resale.'});
-            refetchNfts(); // Volver a cargar solo los NFTs
-        } catch (err: any) {
-            toast({ variant: 'destructive', title: '❌ Resale Failed', description: err.message });
-        }
+const handleResale = async (nftId: string, price: string) => {
+    const priceAsNumber = parseFloat(price);
+    if (isNaN(priceAsNumber) || priceAsNumber <= 0) {
+        toast({ variant: 'destructive', title: 'Invalid Price' });
+        return;
     }
+    const tx = new Transaction();
+
+    // El objeto Clock de Sui siempre tiene esta dirección fija
+    const SUI_CLOCK_OBJECT_ID = '0x6';
+
+    tx.moveCall({
+        target: `${suiConfig.packageId}::experience_nft::list_for_resale`,
+        arguments: [ 
+            tx.object(nftId), 
+            tx.pure.u64(BigInt(priceAsNumber * 1_000_000_000)),
+            tx.object(SUI_CLOCK_OBJECT_ID) // <-- 3. AÑADE ESTE ARGUMENTO
+        ]
+    });
+
+    try {
+        await executeResale({ transaction: tx });
+        toast({ title: '✅ Success!', description: 'Your experience is now listed for resale.'});
+        refetchNfts();
+    } catch (err: any) {
+        toast({ variant: 'destructive', title: '❌ Resale Failed', description: err.message });
+    }
+}
 
     if (!currentAccount) return null;
     if (isLoading) return ( <div className="py-16"><LoadingSkeleton /></div> );
