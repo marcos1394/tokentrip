@@ -86,7 +86,6 @@ function LoadingSkeleton() {
 export function MyExperiences() {
     const currentAccount = useCurrentAccount();
     const params = useParams();
-    const locale = params.locale as string || 'en';
     const [cardsVisible, setCardsVisible] = useState(false);
     const { toast } = useToast();
     const { mutateAsync: executeTransaction, isPending: isTransactionPending } = useSignAndExecuteTransaction();
@@ -212,7 +211,7 @@ export function MyExperiences() {
 
                             return (
                                 <div key={objectId} className={`flex flex-col gap-2 transform transition-all duration-700 ${cardsVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`} style={{ transitionDelay: `${index * 100}ms` }}>
-                                    <ExperienceNftCard nftId={objectId} name={name} imageUrl={imageUrl} locale={locale} />
+                                    <ExperienceNftCard nftId={objectId} name={name} imageUrl={imageUrl} />
                                     <div className="grid grid-cols-2 gap-2">
                                         <Button asChild variant="outline" className="w-full card-hover glass-card">
                                             <Link href={`/${locale}/fractionalize/${objectId}`}><Sprout className="w-4 h-4 mr-2" /> Fractionalize</Link>
