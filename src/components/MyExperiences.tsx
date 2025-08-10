@@ -186,7 +186,7 @@ export function MyExperiences() {
                                 <div key={objectId} className={`flex flex-col gap-2 transform transition-all duration-700 ${cardsVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`} style={{ transitionDelay: `${index * 100}ms` }}>
                                     <ExperienceNftCard nftId={objectId} name={name} imageUrl={imageUrl} />
                                     <div className="grid grid-cols-2 gap-2">
-                                        <Button asChild variant="outline" className="w-full card-hover glass-card"><Link href={`/fractionalize/${objectId}`}><Sprout className="w-4 h-4 mr-2" /> Fractionalize</Link></Button>
+                                        <Button asChild variant="outline" className="w-full card-hover glass-card"><Link href={`/es/fractionalize/${objectId}`}><Sprout className="w-4 h-4 mr-2" /> Fractionalize</Link></Button>
                                         <ResaleButton nftId={objectId} onResale={handleResale} isPending={isResalePending} />
                                     </div>
                                 </div>
