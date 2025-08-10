@@ -1,11 +1,10 @@
-// Se ha eliminado 'use client', convirtiéndolo en un Componente de Servidor más rápido,
-// ya que no necesita hooks del lado del cliente.
+// ExperienceNftCard.tsx
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ShoppingCart } from "lucide-react";
 import Link from 'next/link';
 
-// La interfaz se mantiene flexible
+// Interfaz sin la prop 'locale'
 interface ExperienceNftCardProps {
     listingId?: string;
     nftId: string;
@@ -24,8 +23,9 @@ export function ExperienceNftCard({
     listingId 
 }: ExperienceNftCardProps) {
 
-    // El enlace ahora es estático, sin el 'locale'
-    const targetUrl = `/experience/${listingId || nftId}`;
+    // --- CAMBIO CLAVE AQUÍ ---
+    // Se ha añadido "/es" directamente a la URL para fijar el idioma.
+    const targetUrl = `/es/experience/${listingId || nftId}`;
 
     return (
         <Link href={targetUrl} className="group block h-full">
@@ -43,22 +43,20 @@ export function ExperienceNftCard({
                     <CardTitle className="text-lg text-foreground line-clamp-2 leading-tight h-[56px]">{name}</CardTitle>
                 </CardContent>
                 
-                {/* El footer solo se muestra si hay un precio, lo cual es una excelente lógica */}
                 {price !== undefined && (
                     <CardFooter className="p-4 bg-muted/20 border-t">
-                         <div className="flex items-center justify-between w-full">
-                             <div className="flex flex-col">
-                                 <span className="text-xs text-muted-foreground">Price</span>
-                                 <span className="text-xl font-bold text-foreground">
+                        <div className="flex items-center justify-between w-full">
+                            <div className="flex flex-col">
+                                <span className="text-xs text-muted-foreground">Price</span>
+                                <span className="text-xl font-bold text-foreground">
                                     {price.toLocaleString('en-US', { maximumFractionDigits: 2 })} {currency}
-                                 </span>
-                             </div>
-                             {/* CTA Mejorado */}
-                             <Badge className="bg-primary/90 text-primary-foreground">
-                                 <ShoppingCart className="w-4 h-4 mr-2" />
-                                 <span className="font-semibold">Buy Now</span>
-                             </Badge>
-                         </div>
+                                </span>
+                            </div>
+                            <Badge className="bg-primary/90 text-primary-foreground">
+                                <ShoppingCart className="w-4 h-4 mr-2" />
+                                <span className="font-semibold">Buy Now</span>
+                            </Badge>
+                        </div>
                     </CardFooter>
                 )}
             </Card>
