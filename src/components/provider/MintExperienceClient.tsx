@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Attribute } from "@/lib/types";
+import { bcs } from '@mysten/sui/bcs';
 
 interface ProviderProfile {
     data: { objectId: string; }
@@ -64,108 +65,110 @@ export default function MintExperienceClient() {
     const { data: providerData, isLoading: isLoadingProfile } = useSuiClientQuery('getOwnedObjects', { owner: account?.address!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ProviderProfile` }, limit: 1, options: {showContent: true} }, { enabled: !!account });
     const providerProfile = providerData?.data?.[0] as ProviderProfile | undefined;
     
-    const handleMint = async () => {
-        if (!account || !providerProfile || !walrusClient) {
-            toast({ variant: 'destructive', title: "Error", description: "Wallet not connected or client not ready." });
-            return;
+    // Reemplaza tu función handleMint con esta versión final y definitiva
+const handleMint = async () => {
+    if (!account || !providerProfile || !walrusClient) {
+        toast({ variant: 'destructive', title: "Error", description: "Wallet not connected or client not ready." });
+        return;
+    }
+    if (!name || !description || !imageFile) {
+        toast({ variant: 'destructive', title: "Incomplete Form", description: "Please fill in the name, description, and select an image." });
+        return;
+    }
+    setIsMinting(true);
+    try {
+        // ... (Toda la lógica de subida de Walrus se mantiene igual)
+        toast({ title: "1/4: Uploading image..." });
+        const imageArrayBuffer = await imageFile.arrayBuffer();
+        const uint8Array = new Uint8Array(imageArrayBuffer);
+        const flow = walrusClient.writeFilesFlow({
+            files: [ WalrusFile.from({ contents: uint8Array, identifier: imageFile.name }) ],
+        });
+        await flow.encode();
+        toast({ title: "2/4: Approving storage transaction..." });
+        const registerTx = flow.register({ epochs: 5, owner: account.address, deletable: false });
+        const registerResult = await signAndExecuteTx({ transaction: registerTx, account });
+        toast({ title: "3/4: Transferring data..." });
+        await flow.upload({ digest: registerResult.digest });
+        toast({ title: "4/4: Approving certification transaction..." });
+        const certifyTx = flow.certify();
+        await signAndExecuteTx({ transaction: certifyTx, account });
+        const files = await flow.listFiles();
+        const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`;
+        console.log('✅ [MINT] Image uploaded successfully. URL:', finalImageUrl);
+
+        toast({ title: "Preparing mint transaction..." });
+        const tx = new Transaction();
+
+        // Preparar los datos como antes (arrays de Uint8Array)
+        const attributesForContract: Attribute[] = [{ key: "Example", value: "Value" }];
+        const attributeKeys = attributesForContract.map(attr => new TextEncoder().encode(attr.key));
+        const attributeValues = attributesForContract.map(attr => new TextEncoder().encode(attr.value));
+        const ruleTriggerTypes = evolutionRules.map(rule => Number(rule.trigger_type));
+        const ruleTriggerValues = evolutionRules.map(rule => rule.trigger_value.toString());
+        const ruleNewImageUrls = evolutionRules.map(rule => new TextEncoder().encode(rule.new_image_url));
+        const ruleNewDescriptions = evolutionRules.map(rule => new TextEncoder().encode(rule.new_description));
+        
+        // --- LA CORRECCIÓN ESTÁ AQUÍ: SERIALIZACIÓN MANUAL ---
+        // 1. Definimos el tipo BCS para un vector de vectores de bytes
+        const vecVecU8 = bcs.vector(bcs.vector(bcs.u8()));
+
+        // 2. Serializamos nuestros arrays de JS a un único array de bytes
+        const serializedAttributeKeys = vecVecU8.serialize(attributeKeys).toBytes();
+        const serializedAttributeValues = vecVecU8.serialize(attributeValues).toBytes();
+        const serializedRuleNewImageUrls = vecVecU8.serialize(ruleNewImageUrls).toBytes();
+        const serializedRuleNewDescriptions = vecVecU8.serialize(ruleNewDescriptions).toBytes();
+        
+        tx.moveCall({
+            target: `${suiConfig.packageId}::experience_nft::provider_mint_experience`,
+            arguments: [
+                tx.object(providerProfile.data.objectId),
+                tx.pure(new TextEncoder().encode(name)),
+                tx.pure(new TextEncoder().encode(description)),
+                tx.pure(new TextEncoder().encode(finalImageUrl)),
+                tx.pure(new TextEncoder().encode(eventName)),
+                tx.pure(new TextEncoder().encode(eventCity)),
+                tx.pure(new TextEncoder().encode(validityDetails)),
+                tx.pure(new TextEncoder().encode(experienceType)),
+                tx.pure(new TextEncoder().encode(tier)),
+                tx.pure.u64(Number(serialNumber)),
+                tx.pure(new TextEncoder().encode(collectionName)),
+                
+                // 3. Pasamos los bytes ya serializados a tx.pure()
+                tx.pure(serializedAttributeKeys),
+                tx.pure(serializedAttributeValues),
+                
+                tx.pure.bool(isRedeemable),
+                tx.pure.u64((expiration?.getTime() || 0).toString()),
+
+                tx.pure.vector('u8', ruleTriggerTypes),
+                tx.pure.vector('u64', ruleTriggerValues),
+                tx.pure(serializedRuleNewImageUrls),
+                tx.pure(serializedRuleNewDescriptions),
+            ],
+        });
+        
+        toast({ title: "Please approve the final transaction in your wallet." });
+        const mintResult = await signAndExecuteTx({ transaction: tx, account });
+        
+        const txResult = await suiClient.waitForTransaction({
+            digest: mintResult.digest,
+            options: { showEffects: true }
+        });
+
+        if (txResult.effects?.status.status === 'success') {
+            toast({ title: "✅ Experience Minted Successfully!" });
+        } else {
+            throw new Error("The minting transaction failed on-chain.");
         }
-        if (!name || !description || !imageFile) {
-            toast({ variant: 'destructive', title: "Incomplete Form", description: "Please fill in the name, description, and select an image." });
-            return;
-        }
-        setIsMinting(true);
-        try {
-            toast({ title: "1/4: Uploading image..." });
-            const imageArrayBuffer = await imageFile.arrayBuffer();
-            const uint8Array = new Uint8Array(imageArrayBuffer);
-            const flow = walrusClient.writeFilesFlow({
-                files: [ WalrusFile.from({ contents: uint8Array, identifier: imageFile.name }) ],
-            });
-            await flow.encode();
-            
-            toast({ title: "2/4: Approving storage transaction..." });
-            const registerTx = flow.register({ epochs: 5, owner: account.address, deletable: false }); // Epochs reducidos para pruebas
-            const registerResult = await signAndExecuteTx({ transaction: registerTx, account });
-            
-            toast({ title: "3/4: Transferring data..." });
-            await flow.upload({ digest: registerResult.digest });
-            
-            toast({ title: "4/4: Approving certification transaction..." });
-            const certifyTx = flow.certify();
-            await signAndExecuteTx({ transaction: certifyTx, account });
+    } catch (error: any) {
+        toast({ variant: "destructive", title: "❌ Minting Failed", description: error.message || "An unexpected error occurred." });
+        console.error("❌ [MINT] Process failed:", error);
+    } finally {
+        setIsMinting(false);
+    }
+};
 
-            const files = await flow.listFiles();
-            const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`;
-            console.log('✅ [MINT] Image uploaded successfully. URL:', finalImageUrl);
-
-            toast({ title: "Preparing mint transaction..." });
-            const tx = new Transaction();
-
-            // --- LA CORRECCIÓN ESTÁ AQUÍ ---
-            // 1. Desglosamos los atributos en arrays paralelos
-            const attributesForContract: Attribute[] = [{ key: "Example", value: "Value" }];
-            const attributeKeys = attributesForContract.map(attr => attr.key);
-            const attributeValues = attributesForContract.map(attr => attr.value);
-
-            // 2. Desglosamos las reglas de evolución en arrays paralelos
-            const ruleTriggerTypes = evolutionRules.map(rule => Number(rule.trigger_type));
-            const ruleTriggerValues = evolutionRules.map(rule => rule.trigger_value.toString()); // u64 se pasa como string
-            const ruleNewImageUrls = evolutionRules.map(rule => rule.new_image_url);
-            const ruleNewDescriptions = evolutionRules.map(rule => rule.new_description);
-
-            // 3. Construimos la llamada a la función con los argumentos correctos
-            tx.moveCall({
-                target: `${suiConfig.packageId}::experience_nft::provider_mint_experience`,
-                arguments: [
-                    tx.object(providerProfile.data.objectId),
-                    tx.pure.string(name),
-                    tx.pure.string(description),
-                    tx.pure.string(finalImageUrl),
-                    tx.pure.string(eventName),
-                    tx.pure.string(eventCity),
-                    tx.pure.string(validityDetails),
-                    tx.pure.string(experienceType),
-                    tx.pure.string(tier),
-                    tx.pure.u64(Number(serialNumber)),
-                    tx.pure.string(collectionName),
-                    
-                    // Pasamos los arrays paralelos de atributos
-                    tx.pure.vector('string', attributeKeys),
-                    tx.pure.vector('string', attributeValues),
-                    
-                    tx.pure.bool(isRedeemable),
-                    tx.pure.u64((expiration?.getTime() || 0).toString()),
-
-                    // Pasamos los arrays paralelos de reglas de evolución
-                    tx.pure.vector('u8', ruleTriggerTypes),
-                    tx.pure.vector('u64', ruleTriggerValues),
-                    tx.pure.vector('string', ruleNewImageUrls),
-                    tx.pure.vector('string', ruleNewDescriptions),
-                ],
-            });
-            
-            toast({ title: "Please approve the final transaction in your wallet." });
-            const mintResult = await signAndExecuteTx({ transaction: tx, account });
-            
-            const txResult = await suiClient.waitForTransaction({
-                digest: mintResult.digest,
-                options: { showEffects: true }
-            });
-
-            if (txResult.effects?.status.status === 'success') {
-                toast({ title: "✅ Experience Minted Successfully!" });
-                // Limpiar formulario o redirigir
-            } else {
-                throw new Error("The minting transaction failed on-chain.");
-            }
-        } catch (error: any) {
-            toast({ variant: "destructive", title: "❌ Minting Failed", description: error.message || "An unexpected error occurred." });
-            console.error("❌ [MINT] Process failed:", error);
-        } finally {
-            setIsMinting(false);
-        }
-    };
-    
     if (isLoadingProfile) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>
     }
