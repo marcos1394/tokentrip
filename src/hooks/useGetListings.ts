@@ -103,7 +103,7 @@ export function useGetListings() {
               },
             };
           })
-          .filter((listing): listing is NftListing => listing !== null);
+          .filter((listing: NftListing | null): listing is NftListing => listing !== null);
 
         console.log('✅ Listings procesados:', listingsWithDetails);
         return listingsWithDetails;
