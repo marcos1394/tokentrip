@@ -6,13 +6,16 @@ import { Card } from "@/components/ui/card";
 import { AlertCircle } from 'lucide-react';
 import { suiConfig } from '@/config/sui';
 
-// Interfaces para tipar los datos que esperamos de la blockchain
-// Nota: 'any' se usa para campos no esenciales para simplificar
+// Interfaces para mayor claridad
+interface SuiUrl {
+  fields?: { url: string };
+  url?: string;
+}
 interface NftFields {
   id: { id: string };
   name: string;
   description: string;
-  image_url: { fields: { url: string } };
+  image_url: SuiUrl; // Puede tener una de dos estructuras
   provider_address: string;
   provider_id: string;
   evolution_rules: any[];
@@ -27,14 +30,12 @@ interface ListingFields {
 }
 
 /**
- * Función del lado del servidor para obtener y normalizar los datos de la experiencia.
- * Puede manejar tanto un ID de un Listing como el ID de un NFT puro.
+ * Función del lado del servidor, ahora más robusta.
  */
 async function getExperienceData(id: string) {
   try {
     const suiClient = new SuiClient({ url: getFullnodeUrl('testnet') });
     
-    // Pedimos el objeto con su contenido Y su display para manejar ambos casos
     const objectResponse = await suiClient.getObject({
       id: id,
       options: { showContent: true, showDisplay: true },
@@ -49,41 +50,47 @@ async function getExperienceData(id: string) {
     const type = object.content?.dataType === 'moveObject' ? object.content.type : '';
     const fields = object.content?.dataType === 'moveObject' ? object.content.fields as any : null;
 
-    if (!type || !fields) {
-        return null;
-    }
+    if (!type || !fields) return null;
 
-    let nftData, listingData, providerProfile;
+    let nftData: NftFields, listingData: ListingFields | null, providerProfile;
 
-    // CASO 1: El ID corresponde a un Listing (desde el Marketplace)
     if (type.includes('::experience_nft::Listing')) {
-      listingData = fields as ListingFields;
+      listingData = fields;
       nftData = listingData.nft.fields;
-
-    // CASO 2: El ID corresponde a un NFT puro (desde "My Experiences")
     } else if (type.includes('::experience_nft::ExperienceNFT')) {
-      nftData = fields as NftFields;
-      listingData = null; // No hay datos de venta
-
-      // Sobrescribimos con los datos del Display si existen, para consistencia
-      nftData.name = object.display?.data?.name || fields.name;
-      nftData.description = object.display?.data?.description || fields.description;
-      // Creamos una estructura compatible para la URL de la imagen
-      nftData.image_url = { fields: { url: object.display?.data?.image_url || '' } };
-      
+      nftData = fields;
+      listingData = null;
     } else {
       console.warn("Object type not supported:", type);
-      return null; // El tipo de objeto no es ni un Listing ni un ExperienceNFT
+      return null;
     }
 
-    // Obtenemos el perfil del proveedor usando el provider_id del NFT
+    // --- NORMALIZACIÓN DE DATOS ---
+    // Unificamos los datos en una sola estructura predecible para el cliente.
+    
+    // Función helper para extraer la URL de forma segura
+    const getImageUrl = (imgObject: SuiUrl) => {
+        return imgObject?.fields?.url || imgObject?.url || '';
+    }
+    
+    const normalizedNft = {
+        id: nftData.id.id,
+        name: object.display?.data?.name || nftData.name,
+        description: object.display?.data?.description || nftData.description,
+        imageUrl: getImageUrl(nftData.image_url), // Usamos la función segura
+        provider_address: nftData.provider_address,
+        provider_id: nftData.provider_id,
+        evolution_rules: nftData.evolution_rules
+    };
+
     const providerObject = await suiClient.getObject({
       id: nftData.provider_id,
       options: { showContent: true },
     });
     providerProfile = providerObject.data?.content?.dataType === 'moveObject' ? providerObject.data.content.fields : null;
 
-    return { nft: nftData, listing: listingData, providerProfile };
+    // Devolvemos una estructura limpia y predecible
+    return { nft: normalizedNft, listing: listingData, providerProfile };
 
   } catch (error) {
     console.error("Failed to fetch experience data:", error);
@@ -93,10 +100,8 @@ async function getExperienceData(id: string) {
 
 // --- El componente de página (Server Component) ---
 export default async function ExperiencePage({ params }: { params: { nftId: string } }) {
-  // Obtenemos los datos en el servidor
   const data = await getExperienceData(params.nftId);
 
-  // Si no se encuentran los datos, mostramos un estado de error
   if (!data) {
     return (
         <div className="min-h-screen flex items-center justify-center text-center p-4">
@@ -109,7 +114,7 @@ export default async function ExperiencePage({ params }: { params: { nftId: stri
     );
   }
 
-  // Si todo está bien, renderizamos el componente cliente y le pasamos los datos como props
+  // Pasa los datos normalizados al componente cliente
   return (
     <ExperienceDetailClient 
       nft={data.nft} 
