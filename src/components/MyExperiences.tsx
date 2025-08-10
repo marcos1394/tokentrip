@@ -214,7 +214,7 @@ export function MyExperiences() {
                                     <ExperienceNftCard nftId={objectId} name={name} imageUrl={imageUrl} />
                                     <div className="grid grid-cols-2 gap-2">
                                         <Button asChild variant="outline" className="w-full card-hover glass-card">
-                                            <Link href={`/${locale}/fractionalize/${objectId}`}><Sprout className="w-4 h-4 mr-2" /> Fractionalize</Link>
+                                            <Link href={`/es/fractionalize/${objectId}`}><Sprout className="w-4 h-4 mr-2" /> Fractionalize</Link>
                                         </Button>
                                         <SellButton 
                                             nftId={objectId} 
