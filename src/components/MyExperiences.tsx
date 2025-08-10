@@ -3,11 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useSuiClientQuery, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { ExperienceNftCard } from './ExperienceNftCard';
-import { AlertCircle, Loader, Ticket, Sprout, Star, Repeat, Inbox } from 'lucide-react';
+import { Loader, Ticket, Sprout, Star, Repeat, Inbox } from 'lucide-react';
 import { suiConfig } from '@/config/sui';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { SuiObjectResponse } from '@mysten/sui/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -17,16 +17,16 @@ import { Transaction } from '@mysten/sui/transactions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
 
-// --- Interfaces ---
-interface ExperienceNftFields {
-    id: { id: string }; name: string; image_url: { url: string }; description: string;
-}
+// --- Interfaz (Solo para PurchaseReceipt, ya que ExperienceNFT usará Display) ---
 interface PurchaseReceiptFields {
-    id: { id: string }; listing_id: string; provider_id: string; nft_name: string; nft_image_url: { url: string };
+  id: { id: string };
+  listing_id: string;
+  provider_id: string;
+  nft_name: string;
+  nft_image_url: { url: string };
 }
 
-// --- Sub-componentes para mejorar la legibilidad ---
-
+// --- Sub-componentes (Sin cambios) ---
 function ResaleButton({ nftId, onResale, isPending }: { nftId: string, onResale: (id: string, price: string) => void, isPending: boolean }) {
     const [isOpen, setIsOpen] = useState(false);
     const [price, setPrice] = useState('');
@@ -79,17 +79,38 @@ export function MyExperiences() {
     const { toast } = useToast();
     const { mutateAsync: executeResale, isPending: isResalePending } = useSignAndExecuteTransaction();
 
-    const EXPERIENCE_NFT_TYPE = `${suiConfig.packageId}::experience_nft::ExperienceNFT`;
-    const RECEIPT_TYPE = `${suiConfig.packageId}::experience_nft::PurchaseReceipt`;
-
-    const { data, isLoading, isError, error, refetch } = useSuiClientQuery(
-        'getOwnedObjects', { owner: currentAccount?.address!, options: { showContent: true, showDisplay: true } },
-        { enabled: !!currentAccount, queryKey: ['my-assets', currentAccount?.address] }
+    // --- CAMBIO 1: CONSULTAS OPTIMIZADAS ---
+    // Usamos `filter` para pedirle a la blockchain solo los objetos que necesitamos,
+    // en lugar de traer todo y filtrarlo en el navegador. Esto es mucho más eficiente.
+    const { data: nftsData, isLoading: isLoadingNfts, refetch: refetchNfts } = useSuiClientQuery(
+        'getOwnedObjects', 
+        { 
+            owner: currentAccount?.address!,
+            filter: { StructType: `${suiConfig.packageId}::experience_nft::ExperienceNFT` },
+            options: { showDisplay: true } // Solo necesitamos el `display`
+        },
+        { enabled: !!currentAccount }
     );
 
+    const { data: receiptsData, isLoading: isLoadingReceipts, refetch: refetchReceipts } = useSuiClientQuery(
+        'getOwnedObjects', 
+        { 
+            owner: currentAccount?.address!,
+            filter: { StructType: `${suiConfig.packageId}::experience_nft::PurchaseReceipt` },
+            options: { showContent: true } // Los recibos no tienen display, usamos content
+        },
+        { enabled: !!currentAccount }
+    );
+    
+    const isLoading = isLoadingNfts || isLoadingReceipts;
+    const ownedNfts = nftsData?.data ?? [];
+    const reviewablePurchases = receiptsData?.data ?? [];
+
     useEffect(() => {
-        if (data) setTimeout(() => setCardsVisible(true), 100);
-    }, [data]);
+        if (nftsData || receiptsData) {
+            setTimeout(() => setCardsVisible(true), 100);
+        }
+    }, [nftsData, receiptsData]);
 
     const handleResale = async (nftId: string, price: string) => {
         const priceAsNumber = parseFloat(price);
@@ -106,7 +127,7 @@ export function MyExperiences() {
         try {
             await executeResale({ transaction: tx });
             toast({ title: '✅ Success!', description: 'Your experience is now listed for resale.'});
-            refetch();
+            refetchNfts(); // Volver a cargar solo los NFTs
         } catch (err: any) {
             toast({ variant: 'destructive', title: '❌ Resale Failed', description: err.message });
         }
@@ -114,11 +135,6 @@ export function MyExperiences() {
 
     if (!currentAccount) return null;
     if (isLoading) return ( <div className="py-16"><LoadingSkeleton /></div> );
-    if (isError) return ( <div className="text-center py-10 text-destructive">{error?.message}</div> );
-
-    const allOwnedObjects = data?.data ?? [];
-    const ownedNfts = allOwnedObjects.filter((obj: SuiObjectResponse) => obj.data?.content?.dataType === 'moveObject' && obj.data.content.type === EXPERIENCE_NFT_TYPE);
-    const reviewablePurchases = allOwnedObjects.filter((obj: SuiObjectResponse) => obj.data?.content?.dataType === 'moveObject' && obj.data.content.type === RECEIPT_TYPE);
 
     if (ownedNfts.length === 0 && reviewablePurchases.length === 0) {
         return (
@@ -146,12 +162,18 @@ export function MyExperiences() {
                 {ownedNfts.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                         {ownedNfts.map((nft, index) => {
-                            if (nft.data?.content?.dataType !== 'moveObject') return null;
-                            const fields = nft.data.content.fields as unknown as ExperienceNftFields;
-                            const objectId = nft.data.objectId;
+                            // --- CAMBIO 2: USAR EL OBJETO DISPLAY ---
+                            // Leemos el nombre y la imagen desde `nft.data.display`, que es el estándar.
+                            // Usamos optional chaining (?.) y fallbacks (||) para más seguridad.
+                            const objectId = nft.data?.objectId;
+                            const name = nft.data?.display?.data?.name || 'Untitled NFT';
+                            const imageUrl = nft.data?.display?.data?.image_url || '';
+
+                            if (!objectId) return null; // Saltear si el objeto no es válido
+
                             return (
                                 <div key={objectId} className={`flex flex-col gap-2 transform transition-all duration-700 ${cardsVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`} style={{ transitionDelay: `${index * 100}ms` }}>
-                                    <ExperienceNftCard nftId={objectId} name={fields.name} imageUrl={fields.image_url.url} />
+                                    <ExperienceNftCard nftId={objectId} name={name} imageUrl={imageUrl} />
                                     <div className="grid grid-cols-2 gap-2">
                                         <Button asChild variant="outline" className="w-full card-hover glass-card"><Link href={`/fractionalize/${objectId}`}><Sprout className="w-4 h-4 mr-2" /> Fractionalize</Link></Button>
                                         <ResaleButton nftId={objectId} onResale={handleResale} isPending={isResalePending} />
@@ -161,7 +183,7 @@ export function MyExperiences() {
                         })}
                     </div>
                 ) : (
-                     <div className="text-center text-muted-foreground py-16 flex flex-col items-center gap-4 border-2 border-dashed rounded-lg">
+                    <div className="text-center text-muted-foreground py-16 flex flex-col items-center gap-4 border-2 border-dashed rounded-lg">
                         <Inbox className="w-12 h-12" />
                         <p className="text-lg font-semibold">Your Collection is Empty</p>
                         <p>Purchase an experience from the marketplace to start.</p>
@@ -193,7 +215,7 @@ export function MyExperiences() {
                         })}
                     </div>
                  ) : (
-                     <div className="text-center text-muted-foreground py-16 flex flex-col items-center gap-4 border-2 border-dashed rounded-lg">
+                    <div className="text-center text-muted-foreground py-16 flex flex-col items-center gap-4 border-2 border-dashed rounded-lg">
                         <Star className="w-12 h-12" />
                         <p className="text-lg font-semibold">All Caught Up!</p>
                         <p>You have no pending reviews.</p>

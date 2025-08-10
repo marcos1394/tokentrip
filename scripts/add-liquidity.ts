@@ -109,17 +109,17 @@ async function main() {
         console.log(`   WAL: ${walAmount.toFixed(2)} WAL`);
 
         // Verificar que tengamos suficientes fondos
-        if (suiAmount < 0.1) {
+        if (suiAmount < 0.3) {
             throw new Error(`Fondos insuficientes de SUI. Necesitas al menos 1.0 SUI, tienes ${suiAmount.toFixed(2)} SUI`);
         }
-        if (walAmount < 1.9) {
+        if (walAmount < 2.1) {
             throw new Error(`Fondos insuficientes de WAL. Necesitas al menos 1.5 WAL, tienes ${walAmount.toFixed(2)} WAL`);
         }
 
         // Definir cuánta liquidez quieres añadir (ajustado a tus fondos)
         const amountSUI = Math.min(1.0, suiAmount * 0.8); // Usar 80% del balance o 1.0, lo que sea menor
-        const amountWAL = Math.min(1.5, walAmount * 0.8); // Usar 80% del balance o 1.5, lo que sea menor
-        
+        // Línea corregida
+        const amountWAL = walAmount * 0.95; // Usar el 95% de tu balance total de WAL como límite máximo        
         console.log(`\n💧 Preparando para añadir liquidez:`);
         console.log(`   Añadir: ${amountSUI.toFixed(2)} SUI`);
         console.log(`   Añadir: ${amountWAL.toFixed(2)} WAL`);
@@ -166,11 +166,11 @@ async function main() {
         console.log(`📊 Tick spacing: ${pool.tickSpacing}`);
         console.log(`📊 Current sqrt price: ${pool.current_sqrt_price}`);
 
-        // Calcular ticks para el rango de liquidez
-        // Usar ticks inicializables cercanos al precio actual (como en la documentación)
-        const tickLower = Math.floor(Number(pool.current_tick_index) / Number(pool.tickSpacing)) * Number(pool.tickSpacing) - Number(pool.tickSpacing);
-        const tickUpper = Math.ceil(Number(pool.current_tick_index) / Number(pool.tickSpacing)) * Number(pool.tickSpacing) + Number(pool.tickSpacing);
-        
+        // Líneas corregidas (rango 10 veces más amplio)
+const tickMultiplier = 10; // <<--- AÑADE ESTA LÍNEA
+const tickLower = Math.floor(Number(pool.current_tick_index) / Number(pool.tickSpacing)) * Number(pool.tickSpacing) - (Number(pool.tickSpacing) * tickMultiplier);
+const tickUpper = Math.ceil(Number(pool.current_tick_index) / Number(pool.tickSpacing)) * Number(pool.tickSpacing) + (Number(pool.tickSpacing) * tickMultiplier);
+
         console.log(`\n📐 Rango de ticks calculado:`);
         console.log(`   Tick lower: ${tickLower}`);
         console.log(`   Tick upper: ${tickUpper}`);
