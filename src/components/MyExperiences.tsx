@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useSuiClientQuery, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { ExperienceNftCard } from './ExperienceNftCard';
-import { Loader, Ticket, Sprout, Star, Repeat, Inbox } from 'lucide-react';
+import { Loader, Ticket, Sprout, Star, Repeat, Inbox, Store } from 'lucide-react';
 import { suiConfig } from '@/config/sui';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { SuiObjectResponse } from '@mysten/sui/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -16,8 +16,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Transaction } from '@mysten/sui/transactions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
+import { useParams } from 'next/navigation';
 
-// --- Interfaz (Solo para PurchaseReceipt, ya que ExperienceNFT usará Display) ---
+// --- Interfaces ---
 interface PurchaseReceiptFields {
   id: { id: string };
   listing_id: string;
@@ -25,29 +26,38 @@ interface PurchaseReceiptFields {
   nft_name: string;
   nft_image_url: { url: string };
 }
+interface ProviderProfile {
+  id: { id: string };
+}
 
-// --- Sub-componentes para mejorar la legibilidad ---
-
-function ResaleButton({ nftId, onResale, isPending }: { nftId: string, onResale: (id: string, price: string) => void, isPending: boolean }) {
+// --- Nuevo Componente de Botón "Sell" Inteligente ---
+function SellButton({ nftId, isProvider, onSell, isPending }: { nftId: string, isProvider: boolean, onSell: (id: string, price: string) => void, isPending: boolean }) {
     const [isOpen, setIsOpen] = useState(false);
     const [price, setPrice] = useState('');
+
+    const buttonText = isProvider ? "Sell" : "Resell";
+    const buttonIcon = isProvider ? <Store className="w-4 h-4 mr-2" /> : <Repeat className="w-4 h-4 mr-2" />;
+    const dialogTitle = isProvider ? "List for Sale" : "List for Resale";
+    const dialogDescription = isProvider ? "Set the initial price in SUI for this experience." : "Set the price in SUI to resell this experience.";
+
     const handleConfirm = () => {
-        onResale(nftId, price);
+        onSell(nftId, price);
         setIsOpen(false);
     }
+    
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" className="w-full card-hover glass-card"><Repeat className="w-4 h-4 mr-2" /> Resell</Button>
+                <Button variant="outline" className="w-full card-hover glass-card">{buttonIcon} {buttonText}</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px] glass-effect">
                 <DialogHeader>
-                    <DialogTitle className="text-foreground">List for Resale</DialogTitle>
-                    <DialogDescription>Set the price in SUI to resell this experience.</DialogDescription>
+                    <DialogTitle className="text-foreground">{dialogTitle}</DialogTitle>
+                    <DialogDescription>{dialogDescription}</DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
-                    <Label htmlFor="price" className="text-muted-foreground">Resale Price (SUI)</Label>
-                    <Input id="price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-2" placeholder="e.g., 150.0" />
+                    <Label htmlFor="price" className="text-muted-foreground">Price (SUI)</Label>
+                    <Input id="price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-2" placeholder="e.g., 50.0" />
                 </div>
                 <DialogFooter>
                     <Button onClick={handleConfirm} disabled={isPending} className="w-full btn-sui">
@@ -64,7 +74,7 @@ function LoadingSkeleton() {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {Array.from({ length: 3 }).map((_, index) => (
-                 <div key={index} className="flex flex-col gap-2">
+                <div key={index} className="flex flex-col gap-2">
                     <Skeleton className="h-48 w-full rounded-lg" />
                     <Skeleton className="h-10 w-full rounded-lg" />
                 </div>
@@ -73,19 +83,30 @@ function LoadingSkeleton() {
     );
 }
 
-
 export function MyExperiences() {
     const currentAccount = useCurrentAccount();
+    const params = useParams();
+    const locale = params.locale as string || 'en';
     const [cardsVisible, setCardsVisible] = useState(false);
     const { toast } = useToast();
-    const { mutateAsync: executeResale, isPending: isResalePending } = useSignAndExecuteTransaction();
+    const { mutateAsync: executeTransaction, isPending: isTransactionPending } = useSignAndExecuteTransaction();
 
+    // 1. OBTENEMOS EL PERFIL DE PROVEEDOR DEL USUARIO (SI EXISTE)
+    const { data: providerData, isLoading: isLoadingProfile } = useSuiClientQuery('getOwnedObjects', {
+        owner: currentAccount?.address!,
+        filter: { StructType: `${suiConfig.packageId}::experience_nft::ProviderProfile` },
+        limit: 1,
+        options: { showContent: true }
+    }, { enabled: !!currentAccount });
+    
+    const providerProfileId = useMemo(() => providerData?.data?.[0]?.data?.objectId, [providerData]);
+    
     const { data: nftsData, isLoading: isLoadingNfts, refetch: refetchNfts } = useSuiClientQuery(
         'getOwnedObjects', 
         { 
             owner: currentAccount?.address!,
             filter: { StructType: `${suiConfig.packageId}::experience_nft::ExperienceNFT` },
-            options: { showDisplay: true, showContent: true } // Pedimos display Y content para depurar
+            options: { showDisplay: true }
         },
         { enabled: !!currentAccount }
     );
@@ -95,19 +116,12 @@ export function MyExperiences() {
         { 
             owner: currentAccount?.address!,
             filter: { StructType: `${suiConfig.packageId}::experience_nft::PurchaseReceipt` },
-            options: { showContent: true } // Los recibos no tienen display, usamos content
+            options: { showContent: true }
         },
         { enabled: !!currentAccount }
     );
     
-    // --- LOG 1: VER LA RESPUESTA COMPLETA DE LA API ---
-    useEffect(() => {
-        if (nftsData) {
-            console.log("%cRespuesta completa de la consulta de NFTs:", "color: blue; font-weight: bold;", nftsData);
-        }
-    }, [nftsData]);
-
-    const isLoading = isLoadingNfts || isLoadingReceipts;
+    const isLoading = isLoadingNfts || isLoadingReceipts || isLoadingProfile;
     const ownedNfts = nftsData?.data ?? [];
     const reviewablePurchases = receiptsData?.data ?? [];
 
@@ -116,37 +130,50 @@ export function MyExperiences() {
             setTimeout(() => setCardsVisible(true), 100);
         }
     }, [nftsData, receiptsData]);
+    
+    const handleSell = async (nftId: string, price: string) => {
+        const priceAsNumber = parseFloat(price);
+        if (isNaN(priceAsNumber) || priceAsNumber <= 0) {
+            toast({ variant: 'destructive', title: 'Invalid Price' });
+            return;
+        }
 
-    // En MyExperiences.tsx
+        const tx = new Transaction();
+        const SUI_CLOCK_OBJECT_ID = '0x6';
+        
+        let targetFunction: string;
+        let args: any[];
 
-const handleResale = async (nftId: string, price: string) => {
-    const priceAsNumber = parseFloat(price);
-    if (isNaN(priceAsNumber) || priceAsNumber <= 0) {
-        toast({ variant: 'destructive', title: 'Invalid Price' });
-        return;
-    }
-    const tx = new Transaction();
+        // Si el usuario tiene un perfil de proveedor, usa la venta primaria.
+        if (providerProfileId) {
+            targetFunction = `${suiConfig.packageId}::experience_nft::list_for_sale`;
+            args = [
+                tx.object(providerProfileId),
+                tx.object(nftId),
+                tx.pure.u64(BigInt(priceAsNumber * 1_000_000_000)),
+                tx.object(SUI_CLOCK_OBJECT_ID)
+            ];
+            toast({ title: 'Listing for primary sale...' });
+        } else { // Si no, usa la reventa
+            targetFunction = `${suiConfig.packageId}::experience_nft::list_for_resale`;
+            args = [
+                tx.object(nftId),
+                tx.pure.u64(BigInt(priceAsNumber * 1_000_000_000)),
+                tx.object(SUI_CLOCK_OBJECT_ID)
+            ];
+            toast({ title: 'Listing for resale...' });
+        }
 
-    // El objeto Clock de Sui siempre tiene esta dirección fija
-    const SUI_CLOCK_OBJECT_ID = '0x6';
+        tx.moveCall({ target: targetFunction, arguments: args });
 
-    tx.moveCall({
-        target: `${suiConfig.packageId}::experience_nft::list_for_resale`,
-        arguments: [ 
-            tx.object(nftId), 
-            tx.pure.u64(BigInt(priceAsNumber * 1_000_000_000)),
-            tx.object(SUI_CLOCK_OBJECT_ID) // <-- 3. AÑADE ESTE ARGUMENTO
-        ]
-    });
-
-    try {
-        await executeResale({ transaction: tx });
-        toast({ title: '✅ Success!', description: 'Your experience is now listed for resale.'});
-        refetchNfts();
-    } catch (err: any) {
-        toast({ variant: 'destructive', title: '❌ Resale Failed', description: err.message });
-    }
-}
+        try {
+            await executeTransaction({ transaction: tx });
+            toast({ title: '✅ Success!', description: 'Your experience is now listed.' });
+            refetchNfts();
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: '❌ Listing Failed', description: err.message });
+        }
+    };
 
     if (!currentAccount) return null;
     if (isLoading) return ( <div className="py-16"><LoadingSkeleton /></div> );
@@ -177,27 +204,25 @@ const handleResale = async (nftId: string, price: string) => {
                 {ownedNfts.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                         {ownedNfts.map((nft, index) => {
-                            // --- LOG 2: INSPECCIONAR CADA NFT INDIVIDUALMENTE ---
-                            console.groupCollapsed(`--- Inspeccionando NFT #${index} (ID: ${nft.data?.objectId}) ---`);
-                            console.log("Objeto NFT completo:", nft);
-                            console.log("Contenido de 'nft.data':", nft.data);
-                            console.log("✅ Contenido de 'nft.data.display':", nft.data?.display);
-                            console.log("📦 Contenido de 'nft.data.content':", nft.data?.content);
-                            console.groupEnd();
-
-
                             const objectId = nft.data?.objectId;
                             const name = nft.data?.display?.data?.name || 'Untitled NFT';
                             const imageUrl = nft.data?.display?.data?.image_url || '';
 
-                            if (!objectId) return null; // Saltear si el objeto no es válido
+                            if (!objectId) return null;
 
                             return (
                                 <div key={objectId} className={`flex flex-col gap-2 transform transition-all duration-700 ${cardsVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`} style={{ transitionDelay: `${index * 100}ms` }}>
-                                    <ExperienceNftCard nftId={objectId} name={name} imageUrl={imageUrl} />
+                                    <ExperienceNftCard nftId={objectId} name={name} imageUrl={imageUrl} locale={locale} />
                                     <div className="grid grid-cols-2 gap-2">
-                                        <Button asChild variant="outline" className="w-full card-hover glass-card"><Link href={`/es/fractionalize/${objectId}`}><Sprout className="w-4 h-4 mr-2" /> Fractionalize</Link></Button>
-                                        <ResaleButton nftId={objectId} onResale={handleResale} isPending={isResalePending} />
+                                        <Button asChild variant="outline" className="w-full card-hover glass-card">
+                                            <Link href={`/${locale}/fractionalize/${objectId}`}><Sprout className="w-4 h-4 mr-2" /> Fractionalize</Link>
+                                        </Button>
+                                        <SellButton 
+                                            nftId={objectId} 
+                                            isProvider={!!providerProfileId} 
+                                            onSell={handleSell} 
+                                            isPending={isTransactionPending} 
+                                        />
                                     </div>
                                 </div>
                             );
