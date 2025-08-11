@@ -67,15 +67,13 @@ export function MiniSwap({
         }
         
         setIsFetchingQuote(true);
-
-        // Preparamos los datos que enviaremos a nuestra API
         const requestBody = {
-            poolId: poolId,
-            fromCoinType: fromCoinType,
-            toCoinType: toCoinType,
-            amount: fromAmount, // Usamos el estado actual del input
-            fromCoinDecimals: fromCoinDecimals,
-            toCoinDecimals: toCoinDecimals,
+            poolId,
+            fromCoinType,
+            toCoinType,
+            amount: fromAmount,
+            fromCoinDecimals,
+            toCoinDecimals,
         };
         
         console.log("🚀 [MINISWAP] Enviando a la API para cotización:", requestBody);
@@ -106,6 +104,7 @@ export function MiniSwap({
         } finally {
             setIsFetchingQuote(false);
         }
+    // --- CORRECCIÓN CLAVE: AÑADIR `fromAmount` A LAS DEPENDENCIAS ---
     }, [fromAmount, account, poolId, fromCoinType, toCoinType, fromCoinDecimals, toCoinDecimals]);
 
     useEffect(() => {
@@ -145,7 +144,7 @@ export function MiniSwap({
                             description: `You received ~${toAmount} ${toCoinSymbol}.` 
                         });
                         onSwapSuccess();
-                        getUserBalance(); // Refresh balance after swap
+                        getUserBalance();
                     },
                     onError: (error) => {
                         toast({ 
