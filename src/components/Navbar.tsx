@@ -1,10 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-// --- CORRECCIÓN: Se importa useParams ---
 import { usePathname, useParams } from 'next/navigation';
 import { useState } from 'react';
-import { Plane, Menu, X, User, LogOut, LayoutDashboard, Settings, HandCoins, ArrowLeftRight  } from 'lucide-react'; // Importa Swap
+import { Plane, Menu, X, User, LogOut, LayoutDashboard, Settings, HandCoins, ArrowLeftRight } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from './ui/button';
 import { ConnectModal } from './ConnectModal'; 
@@ -18,7 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuGroup
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { 
   Sheet,
@@ -26,18 +25,22 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
-import { MiniSwap } from './MiniSwap'; // Asegúrate de la ruta correcta
+} from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // <-- Importar Tabs
+import { MiniSwap } from './MiniSwap';
+import { suiConfig } from '@/config/sui'; // <-- Importar la configuración
 
+// Definimos los tipos de moneda fuera del componente
+const SUI_COIN_TYPE = '0x2::sui::SUI';
 const WAL_COIN_TYPE = '0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL';
+const TKT_COIN_TYPE = `${suiConfig.tktPackageId}::tkt::TKT`;
+
 
 export function Navbar() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isSwapSheetOpen, setIsSwapSheetOpen] = useState(false); // Estado para el Sheet del MiniSwap
+  const [isSwapSheetOpen, setIsSwapSheetOpen] = useState(false);
   
-  // --- CORRECCIÓN: Se obtiene el locale actual de la URL ---
   const params = useParams();
   const locale = params.locale;
 
@@ -56,7 +59,6 @@ export function Navbar() {
     }
   }
 
-  // --- CORRECCIÓN: Los enlaces ahora son dinámicos ---
   const navLinks = [
     { href: `/${locale}/auctions`, label: 'Auctions' },
     { href: `/${locale}/governance`, label: 'DAO' },
@@ -82,14 +84,12 @@ export function Navbar() {
                 </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {/* --- NUEVO: Enlace al MiniSwap en el menú de usuario --- */}
             <DropdownMenuItem onClick={() => setIsSwapSheetOpen(true)}>
                 <ArrowLeftRight className="mr-2 h-4 w-4" />
                 <span>Swap Tokens</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              {/* --- CORRECCIÓN: Los enlaces ahora son dinámicos --- */}
               <Link href={`/${locale}/dashboard`}>
                 <DropdownMenuItem>
                   <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -122,7 +122,6 @@ export function Navbar() {
     <>
       <nav className="fixed top-0 w-full z-50 glass-effect border-b border-white/10">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          {/* --- CORRECCIÓN: El enlace del logo ahora es dinámico --- */}
           <Link href={`/${locale}`} className="flex items-center space-x-3">
             <div className="w-9 h-9 sui-gradient rounded-lg flex items-center justify-center shadow-lg shadow-primary/30">
               <Plane className="w-5 h-5 text-white" />
@@ -136,7 +135,6 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-            {/* --- NUEVO: Botón de Swap en la barra de navegación desktop --- */}
             {currentAccount && (
               <Button 
                 variant="outline" 
@@ -164,32 +162,55 @@ export function Navbar() {
         </div>
       </nav>
 
-      {/* --- NUEVO: Sheet para el MiniSwap --- */}
+      {/* --- SHEET MODIFICADO CON TABS PARA EL MINISWAP --- */}
       <Sheet open={isSwapSheetOpen} onOpenChange={setIsSwapSheetOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Swap Tokens</SheetTitle>
             <SheetDescription>
-              Swap SUI for WAL or vice versa.
+              Intercambia SUI por los tokens del ecosistema TokenTrip.
             </SheetDescription>
           </SheetHeader>
           <div className="py-6">
-            {/* Solo renderiza el MiniSwap si hay una cuenta conectada */}
             {currentAccount ? (
-              <MiniSwap
-                fromCoinType='0x2::sui::SUI'
-                toCoinType={WAL_COIN_TYPE}
-                onSwapSuccess={() => {
-                  console.log("Swap successful from Navbar");
-                  setIsSwapSheetOpen(false); // Cierra el sheet al finalizar
-                }}
-              />
+              <Tabs defaultValue="tkt" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="tkt">Get TKT</TabsTrigger>
+                  <TabsTrigger value="wal">Get WAL</TabsTrigger>
+                </TabsList>
+                <TabsContent value="tkt">
+                  <div className="mt-4">
+                    <MiniSwap
+                        poolId={suiConfig.suiTktPoolId}
+                        fromCoinType={SUI_COIN_TYPE}
+                        fromCoinDecimals={9}
+                        fromCoinSymbol="SUI"
+                        toCoinType={TKT_COIN_TYPE}
+                        toCoinDecimals={9}
+                        toCoinSymbol="TKT"
+                        onSwapSuccess={() => setIsSwapSheetOpen(false)}
+                    />
+                  </div>
+                </TabsContent>
+                <TabsContent value="wal">
+                    <div className="mt-4">
+                        <MiniSwap
+                            poolId={suiConfig.cetusSuiWalPoolId}
+                            fromCoinType={SUI_COIN_TYPE}
+                            fromCoinDecimals={9}
+                            fromCoinSymbol="SUI"
+                            toCoinType={WAL_COIN_TYPE}
+                            toCoinDecimals={9}
+                            toCoinSymbol="WAL"
+                            onSwapSuccess={() => setIsSwapSheetOpen(false)}
+                        />
+                    </div>
+                </TabsContent>
+              </Tabs>
             ) : (
               <div className="text-center py-10">
                 <p className="text-muted-foreground">Please connect your wallet to swap tokens.</p>
-                <div className="mt-4">
-                  <ConnectModal />
-                </div>
+                <div className="mt-4"><ConnectModal /></div>
               </div>
             )}
           </div>
@@ -199,15 +220,14 @@ export function Navbar() {
       {isMenuOpen && (
         <div className="md:hidden fixed inset-0 top-[61px] z-40 bg-background/95 backdrop-blur-lg">
            <div className="sm:hidden p-4 border-b border-white/10 flex justify-center">
-              {currentAccount ? <UserButton /> : <ConnectModal />}
-            </div>
+             {currentAccount ? <UserButton /> : <ConnectModal />}
+           </div>
           <div className="container mx-auto px-4 py-8 flex flex-col space-y-6">
             {navLinks.map((link) => (
               <Link key={link.href} href={link.href} className="text-xl font-semibold text-foreground hover:text-primary transition-colors" onClick={() => setIsMenuOpen(false)}>
                 {link.label}
               </Link>
             ))}
-            {/* --- NUEVO: Enlace de Swap en el menú móvil --- */}
             {currentAccount && (
               <button 
                 onClick={() => {
