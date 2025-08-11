@@ -12,8 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowDown } from 'lucide-react';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
-import { normalizeStructTag } from '@mysten/sui/utils';
-import { suiConfig } from '@/config/sui';
 
 interface MiniSwapProps {
     poolId: string;
@@ -43,9 +41,8 @@ export function MiniSwap({
     const [fromAmount, setFromAmount] = useState('1');
     const [toAmount, setToAmount] = useState('');
     const [isFetchingQuote, setIsFetchingQuote] = useState(false);
-    const [preswapResult, setPreswapResult] = useState<any>(null);
+    const [quoteResult, setQuoteResult] = useState<any>(null);
     const [userBalance, setUserBalance] = useState<string | null>(null);
-    const [poolData, setPoolData] = useState<any>(null);
 
     const getUserBalance = useCallback(async () => {
         if (!account) return;
@@ -62,87 +59,71 @@ export function MiniSwap({
         }
     }, [account, fromCoinType]);
 
-    // En src/components/MiniSwap.tsx
-
-const getQuote = useCallback(async () => {
-    if (parseFloat(fromAmount) <= 0 || !account) {
-        setToAmount('');
-        setPreswapResult(null);
-        return;
-    }
-    
-    setIsFetchingQuote(true);
-    console.log(`[QUOTE] Iniciando cotización para ${fromAmount} ${fromCoinSymbol}...`);
-
-    try {
-        const sdk = initCetusSDK({ network: 'testnet' });
-        
-        const pool = await sdk.Pool.getPool(poolId);
-        if (!pool) {
-            throw new Error(`Pool with ID ${poolId} not found.`);
+    const getQuote = useCallback(async () => {
+        if (parseFloat(fromAmount) <= 0 || !account) {
+            setToAmount('');
+            setQuoteResult(null);
+            return;
         }
-        setPoolData(pool);
-        console.log('[QUOTE] Pool encontrado:', pool);
-
-        const amountInMist = new Decimal(fromAmount).mul(new Decimal(10).pow(fromCoinDecimals));
-        const a2b = normalizeStructTag(pool.coinTypeA) === normalizeStructTag(fromCoinType);
-
-        const swapParams = {
-            pool: pool,
-            currentSqrtPrice: pool.current_sqrt_price,
-            coinTypeA: pool.coinTypeA,
-            coinTypeB: pool.coinTypeB,
-            decimalsA: a2b ? fromCoinDecimals : toCoinDecimals,
-            decimalsB: a2b ? toCoinDecimals : fromCoinDecimals,
-            a2b: a2b,
-            byAmountIn: true,
-            amount: amountInMist.toString(),
-        };
-        console.log('[QUOTE] Parámetros para preswap:', swapParams);
-
-        const preswapResultLocal = await sdk.Swap.preswap(swapParams);
         
-        if (!preswapResultLocal) {
-            throw new Error("Could not calculate a valid swap quote.");
+        setIsFetchingQuote(true);
+        try {
+            const response = await fetch('/api/swap/quote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    poolId: poolId,
+                    fromCoinType: fromCoinType,
+                    toCoinType: toCoinType,
+                    amount: fromAmount,
+                    fromCoinDecimals: fromCoinDecimals,
+                    toCoinDecimals: toCoinDecimals,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to fetch quote from API');
+            }
+
+            const result = await response.json();
+            
+            const estimatedAmountOut = new Decimal(result.estimatedAmountOut).div(new Decimal(10).pow(toCoinDecimals));
+            setToAmount(estimatedAmountOut.toFixed(4));
+            setQuoteResult(result);
+
+        } catch (error: any) {
+            console.error("❌ Failed to get quote via API:", error);
+            setToAmount('Error');
+            setQuoteResult(null);
+        } finally {
+            setIsFetchingQuote(false);
         }
-        console.log('[QUOTE] Resultado de preswap:', preswapResultLocal);
-        
-        const estimatedAmountOut = new Decimal(preswapResultLocal.estimatedAmountOut).div(new Decimal(10).pow(toCoinDecimals));
-        setToAmount(estimatedAmountOut.toFixed(4));
-        setPreswapResult(preswapResultLocal);
-        console.log(`[QUOTE] Monto final estimado: ${estimatedAmountOut.toFixed(4)} ${toCoinSymbol}`);
-
-    } catch (error: any) {
-        console.error("❌ Failed to get quote:", error);
-        setToAmount('Error');
-    } finally {
-        setIsFetchingQuote(false);
-    }
-}, [fromAmount, account, poolId, fromCoinType, fromCoinDecimals, toCoinType, toCoinDecimals, fromCoinSymbol, toCoinSymbol]);
+    }, [fromAmount, account, poolId, fromCoinType, toCoinType, fromCoinDecimals, toCoinDecimals]);
 
     useEffect(() => {
         getUserBalance();
-        const debounce = setTimeout(() => getQuote(), 500);
+        const debounce = setTimeout(() => { getQuote() }, 500);
         return () => clearTimeout(debounce);
     }, [fromAmount, getQuote, getUserBalance]);
 
     const handleSwap = async () => {
-        if (!account || !preswapResult || !poolData) return;
+        if (!account || !quoteResult) return;
 
         try {
             const sdk = initCetusSDK({ network: 'testnet' });
             sdk.senderAddress = account.address;
 
-            const amountInBaseUnits = new BN(preswapResult.amount);
-            const estimatedAmountOut = new BN(preswapResult.estimatedAmountOut);
-            const slippage = Percentage.fromDecimal(new Decimal(0.05)); // 5% slippage
+            const amountInBaseUnits = new BN(quoteResult.amount);
+            const estimatedAmountOut = new BN(quoteResult.estimatedAmountOut);
+            const slippage = Percentage.fromDecimal(new Decimal(0.05)); // 5%
             const amountLimit = adjustForSlippage(estimatedAmountOut, slippage, false);
             
             const swapPayload = await sdk.Swap.createSwapTransactionPayload({
-                pool_id: poolData.poolAddress,
-                coinTypeA: poolData.coinTypeA,
-                coinTypeB: poolData.coinTypeB,
-                a2b: preswapResult.a2b,
+                pool_id: quoteResult.poolAddress,
+                coinTypeA: quoteResult.coinTypeA,
+                coinTypeB: quoteResult.coinTypeB,
+                a2b: quoteResult.aToB,
                 by_amount_in: true,
                 amount: amountInBaseUnits.toString(),
                 amount_limit: amountLimit.toString(),
@@ -154,16 +135,16 @@ const getQuote = useCallback(async () => {
                     onSuccess: (result) => {
                         toast({ 
                             title: "✅ Swap Successful!", 
-                            description: `You received ~${toAmount} ${toCoinSymbol}.`
+                            description: `You received ~${toAmount} ${toCoinSymbol}.` 
                         });
                         onSwapSuccess();
-                        getUserBalance(); // Refresh balance after swap
+                        getUserBalance();
                     },
                     onError: (error) => {
                         toast({ 
                             variant: "destructive", 
                             title: "❌ Swap Failed", 
-                            description: error.message || "Transaction failed. Check console for details." 
+                            description: error.message || "Transaction failed." 
                         });
                     }
                 }
@@ -214,7 +195,7 @@ const getQuote = useCallback(async () => {
             <Button 
                 size="lg" 
                 className="w-full btn-sui" 
-                disabled={isPending || !account || !preswapResult || isFetchingQuote || parseFloat(fromAmount) <= 0} 
+                disabled={isPending || !account || !quoteResult || isFetchingQuote || parseFloat(fromAmount) <= 0} 
                 onClick={handleSwap}
             >
                 {isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
