@@ -67,18 +67,24 @@ export function MiniSwap({
         }
         
         setIsFetchingQuote(true);
+
+        // Preparamos los datos que enviaremos a nuestra API
+        const requestBody = {
+            poolId: poolId,
+            fromCoinType: fromCoinType,
+            toCoinType: toCoinType,
+            amount: fromAmount, // Usamos el estado actual del input
+            fromCoinDecimals: fromCoinDecimals,
+            toCoinDecimals: toCoinDecimals,
+        };
+        
+        console.log("🚀 [MINISWAP] Enviando a la API para cotización:", requestBody);
+
         try {
             const response = await fetch('/api/swap/quote', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    poolId: poolId,
-                    fromCoinType: fromCoinType,
-                    toCoinType: toCoinType,
-                    amount: fromAmount,
-                    fromCoinDecimals: fromCoinDecimals,
-                    toCoinDecimals: toCoinDecimals,
-                }),
+                body: JSON.stringify(requestBody),
             });
 
             if (!response.ok) {
@@ -87,13 +93,14 @@ export function MiniSwap({
             }
 
             const result = await response.json();
+            console.log("✅ [MINISWAP] Respuesta recibida de la API:", result);
             
             const estimatedAmountOut = new Decimal(result.estimatedAmountOut).div(new Decimal(10).pow(toCoinDecimals));
             setToAmount(estimatedAmountOut.toFixed(4));
             setQuoteResult(result);
 
         } catch (error: any) {
-            console.error("❌ Failed to get quote via API:", error);
+            console.error("❌ [MINISWAP] Falló la obtención de cotización:", error);
             setToAmount('Error');
             setQuoteResult(null);
         } finally {
@@ -138,7 +145,7 @@ export function MiniSwap({
                             description: `You received ~${toAmount} ${toCoinSymbol}.` 
                         });
                         onSwapSuccess();
-                        getUserBalance();
+                        getUserBalance(); // Refresh balance after swap
                     },
                     onError: (error) => {
                         toast({ 
