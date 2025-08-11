@@ -62,57 +62,63 @@ export function MiniSwap({
         }
     }, [account, fromCoinType]);
 
-    const getQuote = useCallback(async () => {
-        if (parseFloat(fromAmount) <= 0 || !account) {
-            setToAmount('');
-            setPreswapResult(null);
-            return;
-        }
+    // En src/components/MiniSwap.tsx
+
+const getQuote = useCallback(async () => {
+    if (parseFloat(fromAmount) <= 0 || !account) {
+        setToAmount('');
+        setPreswapResult(null);
+        return;
+    }
+    
+    setIsFetchingQuote(true);
+    console.log(`[QUOTE] Iniciando cotización para ${fromAmount} ${fromCoinSymbol}...`);
+
+    try {
+        const sdk = initCetusSDK({ network: 'testnet' });
         
-        setIsFetchingQuote(true);
-        try {
-            const sdk = initCetusSDK({ network: 'testnet' });
-            
-            const pool = await sdk.Pool.getPool(poolId);
-            if (!pool) {
-                throw new Error(`Pool with ID ${poolId} not found.`);
-            }
-            setPoolData(pool);
-
-            const amountInMist = new Decimal(fromAmount).mul(new Decimal(10).pow(fromCoinDecimals));
-            const a2b = normalizeStructTag(pool.coinTypeA) === normalizeStructTag(fromCoinType);
-
-            const preswapResultLocal = await sdk.Swap.preswap({
-                pool: pool,
-                currentSqrtPrice: pool.current_sqrt_price,
-                coinTypeA: pool.coinTypeA,
-                coinTypeB: pool.coinTypeB,
-                decimalsA: a2b ? fromCoinDecimals : toCoinDecimals,
-                decimalsB: a2b ? toCoinDecimals : fromCoinDecimals,
-                a2b: a2b,
-                byAmountIn: true,
-                amount: amountInMist.toString(),
-            });
-
-
-                // --- AÑADE ESTA VERIFICACIÓN ---
-                if (!preswapResultLocal) {
-                    throw new Error("Could not calculate a valid swap quote.");
-                }
-                // --- FIN DE LA CORRECCIÓN ---
-
-                            
-            const estimatedAmountOut = new Decimal(preswapResultLocal.estimatedAmountOut).div(new Decimal(10).pow(toCoinDecimals));
-            setToAmount(estimatedAmountOut.toFixed(4));
-            setPreswapResult(preswapResultLocal);
-
-        } catch (error: any) {
-            console.error("❌ Failed to get quote:", error);
-            setToAmount('Error');
-        } finally {
-            setIsFetchingQuote(false);
+        const pool = await sdk.Pool.getPool(poolId);
+        if (!pool) {
+            throw new Error(`Pool with ID ${poolId} not found.`);
         }
-    }, [fromAmount, account, poolId, fromCoinType, fromCoinDecimals, toCoinType, toCoinDecimals]);
+        setPoolData(pool);
+        console.log('[QUOTE] Pool encontrado:', pool);
+
+        const amountInMist = new Decimal(fromAmount).mul(new Decimal(10).pow(fromCoinDecimals));
+        const a2b = normalizeStructTag(pool.coinTypeA) === normalizeStructTag(fromCoinType);
+
+        const swapParams = {
+            pool: pool,
+            currentSqrtPrice: pool.current_sqrt_price,
+            coinTypeA: pool.coinTypeA,
+            coinTypeB: pool.coinTypeB,
+            decimalsA: a2b ? fromCoinDecimals : toCoinDecimals,
+            decimalsB: a2b ? toCoinDecimals : fromCoinDecimals,
+            a2b: a2b,
+            byAmountIn: true,
+            amount: amountInMist.toString(),
+        };
+        console.log('[QUOTE] Parámetros para preswap:', swapParams);
+
+        const preswapResultLocal = await sdk.Swap.preswap(swapParams);
+        
+        if (!preswapResultLocal) {
+            throw new Error("Could not calculate a valid swap quote.");
+        }
+        console.log('[QUOTE] Resultado de preswap:', preswapResultLocal);
+        
+        const estimatedAmountOut = new Decimal(preswapResultLocal.estimatedAmountOut).div(new Decimal(10).pow(toCoinDecimals));
+        setToAmount(estimatedAmountOut.toFixed(4));
+        setPreswapResult(preswapResultLocal);
+        console.log(`[QUOTE] Monto final estimado: ${estimatedAmountOut.toFixed(4)} ${toCoinSymbol}`);
+
+    } catch (error: any) {
+        console.error("❌ Failed to get quote:", error);
+        setToAmount('Error');
+    } finally {
+        setIsFetchingQuote(false);
+    }
+}, [fromAmount, account, poolId, fromCoinType, fromCoinDecimals, toCoinType, toCoinDecimals, fromCoinSymbol, toCoinSymbol]);
 
     useEffect(() => {
         getUserBalance();
