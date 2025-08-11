@@ -265,7 +265,16 @@ function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClient | n
             <Dialog open={isAcquireWalModalOpen} onOpenChange={setIsAcquireWalModalOpen}>
                 <DialogContent className="glass-card">
                     <DialogHeader><DialogTitle>Storage Token (WAL) Required</DialogTitle><DialogDescription className="pt-2">You need WAL tokens to store your image.</DialogDescription></DialogHeader>
-                    <MiniSwap fromCoinType='0x2::sui::SUI' toCoinType={WAL_COIN_TYPE} onSwapSuccess={handleSwapSuccess}/>
+                    <MiniSwap
+    poolId={suiConfig.cetusSuiWalPoolId} // ID del pool SUI/WAL
+    fromCoinType='0x2::sui::SUI'
+    fromCoinDecimals={9}
+    fromCoinSymbol="SUI"
+    toCoinType={WAL_COIN_TYPE}
+    toCoinDecimals={9}
+    toCoinSymbol="WAL"
+    onSwapSuccess={handleSwapSuccess}
+/>
                 </DialogContent>
             </Dialog>
             <Toaster />
