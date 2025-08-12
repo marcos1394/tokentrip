@@ -6,13 +6,13 @@ interface NftFromListing {
   id: string; 
   name: string;
   description: string;
-  image_url: { url: string }; // La URL está en un objeto { url: "..." }
+  image_url: { url: string }; 
   provider_address: string;
 }
 
 interface ListingFields {
-  id: string;
-  nft: NftFromListing; // El NFT es un objeto directo, no está en `fields`
+  id: string; 
+  nft: NftFromListing; 
   price: string;
   is_available: boolean;
   is_tkt_listing: boolean;
@@ -41,7 +41,7 @@ const SUI_TESTNET_GRAPHQL_URL = 'https://sui-testnet.mystenlabs.com/graphql';
 
 export function useGetListings() {
   return useQuery({
-    queryKey: ['get-all-listings-v2', suiConfig.packageId], // Cambié la key para evitar caché
+    queryKey: ['get-all-listings-v3', suiConfig.packageId], // Cambié la key para evitar caché
     queryFn: async (): Promise<NftListing[]> => {
       const GQL_QUERY = `
         query getListings($listingType: String!) {
@@ -79,13 +79,23 @@ export function useGetListings() {
             const fields = node.asMoveObject?.contents?.json as ListingFields;
             console.log(`[useGetListings] 3. Procesando Nodo #${index}:`, { fields });
             
-            // La condición ahora es más simple
             if (!fields || !fields.is_available || !fields.nft) { 
-                console.warn(`[useGetListings] 4. ¡OMITIENDO Nodo #${index} por estructura inválida o no disponible!`);
+                console.warn(`[useGetListings] 4. ¡OMITIENDO Nodo #${index} por estructura inválida o no estar disponible!`);
                 return null; 
             }
+            
+            // --- CORRECCIÓN DE LA URL DE WALRUS ---
+            const originalUrl = fields.nft.image_url.url;
+            let finalImageUrl = originalUrl;
 
-            // Mapeamos la estructura correcta según el log
+            if (originalUrl && originalUrl.includes('gateway.walrus.space/blobs/')) {
+                const blobId = originalUrl.split('/').pop();
+                if (blobId) {
+                    finalImageUrl = `https://${blobId}.w3s.link`;
+                    console.log(`[useGetListings] URL de Walrus corregida para Nodo #${index}: ${finalImageUrl}`);
+                }
+            }
+
             return {
               listingId: node.objectId,
               price: Number(fields.price) / (10 ** 9),
@@ -97,7 +107,7 @@ export function useGetListings() {
                 id: fields.nft.id,
                 name: fields.nft.name,
                 description: fields.nft.description,
-                imageUrl: fields.nft.image_url.url,
+                imageUrl: finalImageUrl,
                 provider_address: fields.nft.provider_address,
               },
             };
