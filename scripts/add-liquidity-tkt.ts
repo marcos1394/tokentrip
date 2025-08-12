@@ -3,21 +3,27 @@
 import { initCetusSDK, TickMath } from '@cetusprotocol/cetus-sui-clmm-sdk';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { Transaction } from '@mysten/sui/transactions';
 import BN from 'bn.js';
 import 'dotenv/config';
 import { suiConfig } from '../src/config/sui';
 
-// --- CONFIGURACIÓN ---
+// --- CONFIGURACIÓN DE LIQUIDEZ ---
+const SUI_TO_DEPOSIT = 1.0;
+const TKT_TO_DEPOSIT = 500000;
+
+// --- CONFIGURACIÓN DE TOKENS (No tocar) ---
 const SUI_COIN_TYPE = '0x2::sui::SUI';
 const TKT_COIN_TYPE = `${suiConfig.tktPackageId}::tkt::TKT`;
 const POOL_ID = suiConfig.suiTktPoolId;
-const SUI_TO_DEPOSIT = 1.0;
+const SUI_DECIMALS = 9;
+const TKT_DECIMALS = 9;
 
 async function main() {
-    console.log(`🚀 Añadiendo ${SUI_TO_DEPOSIT} SUI de liquidez al pool...`);
+    console.log(`🚀 Añadiendo ${SUI_TO_DEPOSIT} SUI y ${TKT_TO_DEPOSIT} TKT de liquidez al pool...`);
     
     const privateKey = process.env.PROVIDER_PRIVATE_KEY;
-    if (!privateKey) throw new Error("PROVIDER_PRIVATE_KEY no está definido en tu archivo .env");
+    if (!privateKey) throw new Error("PROVIDER_PRIVATE_KEY no está definido en tu .env");
     
     const keypair = Ed25519Keypair.fromSecretKey(privateKey);
     const userAddress = keypair.getPublicKey().toSuiAddress();
@@ -32,37 +38,32 @@ async function main() {
         console.log('\n🔍 Obteniendo información del pool...');
         const pool = await sdk.Pool.getPool(POOL_ID);
         
-        // --- CÁLCULO DE TICKS CORREGIDO Y ROBUSTO ---
+        const suiAmountBase = new BN(SUI_TO_DEPOSIT * (10 ** SUI_DECIMALS));
+        const tktAmountBase = new BN(TKT_TO_DEPOSIT * (10 ** TKT_DECIMALS));
 
-        // 1. Usamos el precio actual real del pool
+        // --- CORRECCIÓN FINAL: CÁLCULO DE TICKS ALREDEDOR DEL PRECIO ACTUAL ---
         const currentSqrtPrice = new BN(pool.current_sqrt_price);
-        const current_tick_index = TickMath.sqrtPriceX64ToTickIndex(currentSqrtPrice);
+        const current_tick_index = Number(TickMath.sqrtPriceX64ToTickIndex(currentSqrtPrice));
         const tick_spacing = Number(pool.tickSpacing);
         
-        // 2. Usamos las funciones del SDK para encontrar los ticks válidos más cercanos
-        const nearestLowerTick = TickMath.getPrevInitializableTickIndex(Number(current_tick_index), tick_spacing);
-        const nearestUpperTick = TickMath.getNextInitializableTickIndex(Number(current_tick_index), tick_spacing);
-        
-        // 3. Creamos un rango amplio a partir de esos ticks válidos
-        const tickMultiplier = 30; // Un rango aún más amplio para asegurar
-        const tick_lower = nearestLowerTick - (tick_spacing * tickMultiplier);
-        const tick_upper = nearestUpperTick + (tick_spacing * tickMultiplier);
-        
-        console.log(`   Rango de Ticks calculado: [${tick_lower}, ${tick_upper}]`);
-        
-        const amountSuiBase = new BN(SUI_TO_DEPOSIT * (10 ** 9));
+        // Creamos un rango muy amplio ALREDEDOR DEL PRECIO ACTUAL para asegurar que sea válido
+        const tickMultiplier = 1000; // Un número grande para crear un rango amplio
+        const tick_lower = Math.floor(current_tick_index / tick_spacing) * tick_spacing - (tick_spacing * tickMultiplier);
+        const tick_upper = Math.ceil(current_tick_index / tick_spacing) * tick_spacing + (tick_spacing * tickMultiplier);
 
+        console.log(`   Usando rango de ticks válido y amplio: [${tick_lower}, ${tick_upper}]`);
+        
         const addLiquidityParams = {
             pool_id: pool.poolAddress,
             coinTypeA: pool.coinTypeA,
             coinTypeB: pool.coinTypeB,
             tick_lower: tick_lower,
             tick_upper: tick_upper,
-            amount_a: (pool.coinTypeA === SUI_COIN_TYPE ? amountSuiBase : new BN(0)).toString(),
-            amount_b: (pool.coinTypeB === SUI_COIN_TYPE ? amountSuiBase : new BN(0)).toString(),
+            amount_a: (pool.coinTypeA === SUI_COIN_TYPE ? suiAmountBase : tktAmountBase).toString(),
+            amount_b: (pool.coinTypeB === SUI_COIN_TYPE ? suiAmountBase : tktAmountBase).toString(),
             fix_amount_a: pool.coinTypeA === SUI_COIN_TYPE,
             is_open: true,
-            slippage: 0.05,
+            slippage: 0.1, // 10% de slippage
             collect_fee: false,
             rewarder_coin_types: [] as string[],
             pos_id: '',
@@ -87,7 +88,7 @@ async function main() {
 
         await client.waitForTransaction({ digest: result.digest });
         
-        console.log('\n🎉 ¡Liquidez añadida exitosamente al pool SUI/TKT!');
+        console.log('\n🎉 ¡Liquidez añadida exitosamente!');
         console.log(`   Digest: ${result.digest}`);
 
     } catch (error: any) {
