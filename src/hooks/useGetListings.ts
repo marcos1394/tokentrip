@@ -1,31 +1,28 @@
 import { useQuery } from '@tanstack/react-query';
 import { suiConfig } from '@/config/sui';
 
-// --- Interfaces (sin cambios) ---
-interface Uid {
-  id: string;
-}
-interface SuiUrl {
-  fields: {
-    url: string;
-  };
-}
-interface ExperienceNftFields {
-  id: Uid;
+// --- INTERFACES SIMPLIFICADAS Y CORREGIDAS ---
+// Reflejan la estructura JSON que realmente devuelve la API
+
+interface NftFields {
+  id: { id: string };
   name: string;
   description: string;
-  image_url: SuiUrl;
+  image_url: string; // La API devuelve la URL como un string simple en esta estructura
   provider_address: string;
 }
+
 interface ListingFields {
-  id: Uid;
-  nft: { fields: ExperienceNftFields };
+  id: { id: string };
+  nft: { fields: NftFields }; // El NFT está anidado dentro de 'fields'
   price: string;
   is_available: boolean;
   is_tkt_listing: boolean;
   seller: string;
   provider_id: string;
 }
+
+// Estructura de datos final que usa la UI
 export interface NftListing {
   listingId: string;
   price: number;
@@ -59,8 +56,6 @@ export function useGetListings() {
         }`;
 
       try {
-        console.log(`[useGetListings] Buscando listings para el packageId: ${suiConfig.packageId}`);
-        
         const response = await fetch(SUI_TESTNET_GRAPHQL_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -73,22 +68,19 @@ export function useGetListings() {
         });
         
         const result = await response.json();
-        // --- LOG 1: VER LA RESPUESTA CRUDA DE LA API ---
-        console.log('[useGetListings] Raw result from GraphQL:', result);
-
         if (result.errors) { throw new Error(`Error en GraphQL: ${JSON.stringify(result.errors)}`); }
         
         const listingsData = result.data.objects.nodes;
-        // --- LOG 2: VER LOS OBJETOS EXTRAÍDOS ---
-        console.log('[useGetListings] Extracted nodes:', listingsData);
-
-        const listingsBeforeFilter = listingsData.map((node: any) => {
+        
+        const listingsWithDetails: NftListing[] = listingsData
+          .map((node: any) => {
             const fields = node.asMoveObject?.contents?.json as ListingFields;
+            // La condición de filtro ahora es más simple
             if (!fields || !fields.is_available || !fields.nft?.fields) { 
-                console.warn('[useGetListings] Omitiendo listing inválido o no disponible:', node);
                 return null; 
             }
 
+            // Mapeamos directamente la estructura simple que recibimos
             return {
               listingId: node.objectId,
               price: Number(fields.price) / (10 ** 9),
@@ -100,24 +92,18 @@ export function useGetListings() {
                 id: fields.nft.fields.id.id,
                 name: fields.nft.fields.name,
                 description: fields.nft.fields.description,
-                imageUrl: fields.nft.fields.image_url.fields.url,
+                imageUrl: fields.nft.fields.image_url, // Se accede directamente
                 provider_address: fields.nft.fields.provider_address,
               },
             };
-        });
-
-        // --- LOG 3: VER LA LISTA ANTES DE FILTRAR LOS NULOS ---
-        console.log('[useGetListings] Listings before filtering:', listingsBeforeFilter);
-
-        const listingsWithDetails = listingsBeforeFilter
+          })
           .filter((listing: NftListing | null): listing is NftListing => listing !== null);
 
-        // --- LOG 4: VER EL RESULTADO FINAL ---
-        console.log('✅ [useGetListings] Listings procesados finales:', listingsWithDetails);
+        console.log('✅ Listings procesados:', listingsWithDetails);
         return listingsWithDetails;
         
       } catch (error) {
-        console.error("❌ [useGetListings] Falló la obtención de datos:", error);
+        console.error("❌ Falló la obtención de datos con GraphQL:", error);
         throw error;
       }
     },
