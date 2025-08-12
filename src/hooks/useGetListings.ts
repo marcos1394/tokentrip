@@ -2,20 +2,17 @@ import { useQuery } from '@tanstack/react-query';
 import { suiConfig } from '@/config/sui';
 
 // --- INTERFACES CORREGIDAS PARA EL JSON REAL DE LA API ---
-
-// La API devuelve el NFT anidado con esta estructura específica
 interface NftFromListing {
-  id: string; // El ID del NFT es un string
+  id: string; 
   name: string;
   description: string;
   image_url: { url: string }; // La URL está en un objeto { url: "..." }
   provider_address: string;
 }
 
-// La API devuelve el Listing con esta estructura
 interface ListingFields {
-  id: string; // El ID del Listing es un string
-  nft: NftFromListing; 
+  id: string;
+  nft: NftFromListing; // El NFT es un objeto directo, no está en `fields`
   price: string;
   is_available: boolean;
   is_tkt_listing: boolean;
@@ -23,7 +20,7 @@ interface ListingFields {
   provider_id: string;
 }
 
-// Estructura de datos final que usa la UI (sin cambios)
+// Estructura de datos final que usa la UI
 export interface NftListing {
   listingId: string;
   price: number;
@@ -44,7 +41,7 @@ const SUI_TESTNET_GRAPHQL_URL = 'https://sui-testnet.mystenlabs.com/graphql';
 
 export function useGetListings() {
   return useQuery({
-    queryKey: ['get-all-listings', suiConfig.packageId],
+    queryKey: ['get-all-listings-v2', suiConfig.packageId], // Cambié la key para evitar caché
     queryFn: async (): Promise<NftListing[]> => {
       const GQL_QUERY = `
         query getListings($listingType: String!) {
@@ -70,7 +67,8 @@ export function useGetListings() {
         });
         
         const result = await response.json();
-        console.log('[useGetListings] 1. Resultado CRUDO de GraphQL:', result);
+        console.log('[useGetListings] 1. Resultado CRUDO de GraphQL:', JSON.parse(JSON.stringify(result)));
+
         if (result.errors) { throw new Error(`Error en GraphQL: ${JSON.stringify(result.errors)}`); }
         
         const listingsData = result.data.objects.nodes;
@@ -81,13 +79,13 @@ export function useGetListings() {
             const fields = node.asMoveObject?.contents?.json as ListingFields;
             console.log(`[useGetListings] 3. Procesando Nodo #${index}:`, { fields });
             
-            // La condición de filtro ahora es más robusta
+            // La condición ahora es más simple
             if (!fields || !fields.is_available || !fields.nft) { 
-                console.warn(`[useGetListings] 4. ¡OMITIENDO Nodo #${index} por estructura inválida o no estar disponible!`);
+                console.warn(`[useGetListings] 4. ¡OMITIENDO Nodo #${index} por estructura inválida o no disponible!`);
                 return null; 
             }
 
-            // Mapeamos la estructura correcta según el JSON del log
+            // Mapeamos la estructura correcta según el log
             return {
               listingId: node.objectId,
               price: Number(fields.price) / (10 ** 9),
@@ -99,7 +97,7 @@ export function useGetListings() {
                 id: fields.nft.id,
                 name: fields.nft.name,
                 description: fields.nft.description,
-                imageUrl: fields.nft.image_url.url, // Se accede a la URL correcta
+                imageUrl: fields.nft.image_url.url,
                 provider_address: fields.nft.provider_address,
               },
             };
