@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { suiConfig } from '@/config/sui';
 
-// Interfaces
+// Interfaces (No necesitan cambios)
 interface NftFromListing {
   id: string; 
   name: string;
@@ -9,7 +9,6 @@ interface NftFromListing {
   image_url: { url: string }; 
   provider_address: string;
 }
-
 interface ListingFields {
   id: string; 
   nft: NftFromListing; 
@@ -19,7 +18,6 @@ interface ListingFields {
   seller: string;
   provider_id: string;
 }
-
 export interface NftListing {
   listingId: string;
   price: number;
@@ -40,7 +38,7 @@ const SUI_TESTNET_GRAPHQL_URL = 'https://sui-testnet.mystenlabs.com/graphql';
 
 export function useGetListings() {
   return useQuery({
-    queryKey: ['get-all-listings-v4', suiConfig.packageId],
+    queryKey: ['get-all-listings-v5', suiConfig.packageId],
     queryFn: async (): Promise<NftListing[]> => {
       const GQL_QUERY = `
         query getListings($listingType: String!) {
@@ -76,15 +74,15 @@ export function useGetListings() {
                 return null; 
             }
 
-            // --- CORRECCIÓN DEFINITIVA DE LA URL DE WALRUS ---
+            // --- CORRECCIÓN FINAL Y DEFINITIVA BASADA EN LA DOCUMENTACIÓN ---
             const originalUrl = fields.nft.image_url.url;
             let finalImageUrl = originalUrl;
 
-            // Si la URL es la de Walrus (incluso si el dominio está mal), la corregimos
             if (originalUrl && originalUrl.includes('/blobs/')) {
-                const blobId = originalUrl.split('/blobs/')[1]; // Extraemos solo el ID del archivo
+                const blobId = originalUrl.split('/blobs/')[1];
                 if (blobId) {
-                    finalImageUrl = `https://gw.framer.space/blobs/${blobId}`;
+                    // Reconstruimos la URL con el aggregator correcto y la ruta /v1/
+                    finalImageUrl = `https://aggregator.walrus-testnet.walrus.space/v1/blobs/${blobId}`;
                 }
             }
 
@@ -99,14 +97,14 @@ export function useGetListings() {
                 id: fields.nft.id,
                 name: fields.nft.name,
                 description: fields.nft.description,
-                imageUrl: finalImageUrl, // Pasamos la URL final y corregida
+                imageUrl: finalImageUrl,
                 provider_address: fields.nft.provider_address,
               },
             };
           })
           .filter((listing: NftListing | null): listing is NftListing => listing !== null);
 
-        console.log('✅ Listings procesados (con URL corregida):', listingsWithDetails);
+        console.log('✅ Listings procesados (con URL de Aggregator correcta):', listingsWithDetails);
         return listingsWithDetails;
         
       } catch (error) {
