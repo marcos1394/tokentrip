@@ -1,29 +1,19 @@
-import { useSuiClient } from '@mysten/dapp-kit';
 import { useQuery } from '@tanstack/react-query';
 import { suiConfig } from '@/config/sui';
 
-// --- INTERFACES CORREGIDAS PARA COINCIDIR CON LA ESTRUCTURA REAL ---
-interface Uid {
-  id: string;
-}
-
-interface SuiUrl {
-  fields: {
-    url: string;
-  };
-}
-
-interface ExperienceNftFields {
-  id: Uid;
+// --- INTERFACES SIMPLIFICADAS ---
+// Reflejan la estructura JSON devuelta por la API para los `fields`
+interface NftFields {
+  id: { id: string };
   name: string;
   description: string;
-  image_url: SuiUrl;
+  image_url: string; // La API devuelve la URL como un string simple aquí
   provider_address: string;
 }
 
 interface ListingFields {
-  id: Uid;
-  nft: ExperienceNftFields;
+  id: { id: string };
+  nft: { fields: NftFields }; // El NFT está anidado dentro de 'fields'
   price: string;
   is_available: boolean;
   is_tkt_listing: boolean;
@@ -31,6 +21,7 @@ interface ListingFields {
   provider_id: string;
 }
 
+// Estructura de datos final que usa la UI
 export interface NftListing {
   listingId: string;
   price: number;
@@ -83,10 +74,9 @@ export function useGetListings() {
         const listingsWithDetails: NftListing[] = listingsData
           .map((node: any) => {
             const fields = node.asMoveObject?.contents?.json as ListingFields;
-            if (!fields || !fields.is_available || !fields.nft) { return null; }
+            if (!fields || !fields.is_available || !fields.nft?.fields) { return null; }
 
-            // --- CORRECCIÓN FINAL Y DEFINITIVA AQUÍ ---
-            // Aseguramos que la ruta al objeto 'url' sea la correcta
+            // --- CORRECCIÓN FINAL AQUÍ ---
             return {
               listingId: node.objectId,
               price: Number(fields.price) / (10 ** 9),
@@ -95,11 +85,11 @@ export function useGetListings() {
               seller: fields.seller,
               providerId: fields.provider_id,
               nft: {
-                id: fields.nft.id.id,
-                name: fields.nft.name,
-                description: fields.nft.description,
-                imageUrl: fields.nft.image_url?.fields?.url || '', // Acceso seguro a la URL
-                provider_address: fields.nft.provider_address,
+                id: fields.nft.fields.id.id,
+                name: fields.nft.fields.name,
+                description: fields.nft.fields.description,
+                imageUrl: fields.nft.fields.image_url, // Accedemos directamente a la URL
+                provider_address: fields.nft.fields.provider_address,
               },
             };
           })

@@ -14,7 +14,7 @@ import { ArrowRight, Sparkles, Loader2, CheckCircle } from 'lucide-react';
 interface EvolutionRule {
     trigger_type: number;
     trigger_value: string;
-    new_image_url: { fields: { url: string } };
+    new_image_url: string; // <-- Ahora es un string simple
     new_description: string;
     is_triggered: boolean;
 }
@@ -92,7 +92,7 @@ export function EvolutionCard({ rule, nftId, providerProfile, currentImageUrl, o
                 <div className="flex items-center justify-center gap-4">
                     <img src={currentImageUrl} className="w-24 h-24 rounded-md border" alt="Current State" />
                     <ArrowRight className="w-8 h-8 text-muted-foreground" />
-                    <img src={rule.new_image_url.fields.url} className="w-24 h-24 rounded-md border" alt="Evolved State" />
+                    <img src={rule.new_image_url} className="w-24 h-24 rounded-md border" alt="Evolved State" />
                 </div>
                 {isConditionMet && !rule.is_triggered && (
                     <Button className="w-full btn-sui" onClick={handleEvolve} disabled={isPending || !account}>
