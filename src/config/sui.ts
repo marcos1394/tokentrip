@@ -3,10 +3,11 @@
 // Configuración final y verificada para Testnet
 export const suiConfig = {
   // --- IDs de los PAQUETES (Corregidos según el último despliegue) ---
-  packageId: "0x7c58a8f35419a88cdb406993397ea17b68f7e082b79ad187b4d6e084025b4267", // tokentrip_experiences
-  auctionsPackageId: "0x395c38b7485fb889ab107288a3f85199aefb88d936945d1e31881d868b45641f",
-  lendingPackageId: "0x44a1a9d319e18b55d1b700401fdc9d9ea0622a28e173df46658c180363c35835",
-  rentalPackageId: "0xd0619b97e155e8a20e5aded82c8617e3bb910e9496518873ea14df8f71b94edc",
+    // --- IDs de los PAQUETES (Actualizados de tus logs de publicación) ---
+  packageId: "0x098d0eaaf37e58802bf7f540303411eb5b724ffd64e078761c6785f24caf2aa2", // tokentrip_experiences
+  auctionsPackageId: "0x3f4e1dd8bcd73c32eba9334b608f12f7edafa4cac3d6129f0f9b16e94b3f7c5e",
+  lendingPackageId: "0xeafa5efcb85f83cf6ac6e8886e7f91eeb4a49f7edba6f7450c8d444698e0c8c7",
+  rentalPackageId: "0x17479d2b50ccf5dfc3ac69bb452716bf23c3a28c8aa22c82f48abd321a86a639",
   
   // --- IDs de paquetes que NO cambiaron (dependencias) ---
   tktPackageId: "0xed46584d450fc173a7796cdbc934248df25f0d46700a3a852fb025f1d9a000b3",
@@ -16,8 +17,8 @@ export const suiConfig = {
   // --- IDs de OBJETOS creados por la función init ---
 
   // Creados por la última versión de `tokentrip_experiences` (packageId)
-  adminCapId: "0xcb576a164d8946d0941d265e3e47bb24849b5dc20fb820df6433f4c424700237",
-  vipRegistryId: "0x89437b91ff4abfdec5bacc790e405df02d36d650be40ddf7b3a6d01c43599b73",
+  adminCapId: "0xc6f110e1a73d4d5bdcc9567c30a41cc96381c6f5d3d98cb857a9aea83db7ab9e",
+  vipRegistryId: "0x96ae339f6c6eae2426e6e126ca0739472fd86ccc58310e9e5e2c4e54644bf51d",
 
   // IDs de objetos de otros paquetes (asumiendo que no se han vuelto a publicar)
   stakingPoolId: "0x1f10f55a350e29250a99bf76cf7d448df10474c190e87c9e1a974b58ebc06b67",
