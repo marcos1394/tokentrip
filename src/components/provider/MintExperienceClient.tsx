@@ -102,7 +102,9 @@ export default function MintExperienceClient() {
         toast({ title: "Preparing mint transaction..." });
         const tx = new Transaction();
 
-        // Los arrays ahora son simplemente de strings, que es lo que espera `tx.pure.vector`
+        // --- 1. OBTENER EL TIPO DE CONTENIDO DEL ARCHIVO ---
+        const contentType = imageFile.type || 'application/octet-stream'; // Ej: "image/png", "video/mp4"
+
         const attributesForContract: Attribute[] = [{ key: "Example", value: "Value" }];
         const attributeKeys = attributesForContract.map(attr => attr.key);
         const attributeValues = attributesForContract.map(attr => attr.value);
@@ -112,16 +114,14 @@ export default function MintExperienceClient() {
         const ruleNewImageUrls = evolutionRules.map(rule => rule.new_image_url);
         const ruleNewDescriptions = evolutionRules.map(rule => rule.new_description);
         
-        // --- LA LLAMADA AHORA ES SIMPLE, LIMPIA Y CORRECTA ---
         tx.moveCall({
             target: `${suiConfig.packageId}::experience_nft::provider_mint_experience`,
             arguments: [
                 tx.object(providerProfile.data.objectId),
-                
-                // Para los argumentos `String` de Move, usamos el método simple y natural del SDK
                 tx.pure.string(name),
                 tx.pure.string(description),
                 tx.pure.string(finalImageUrl),
+                tx.pure.string(contentType), // <-- 2. AÑADIR EL NUEVO ARGUMENTO
                 tx.pure.string(eventName),
                 tx.pure.string(eventCity),
                 tx.pure.string(validityDetails),
@@ -129,14 +129,10 @@ export default function MintExperienceClient() {
                 tx.pure.string(tier),
                 tx.pure.u64(Number(serialNumber)),
                 tx.pure.string(collectionName),
-                
-                // Para los `vector<String>`, usamos el helper .vector()
                 tx.pure.vector('string', attributeKeys),
                 tx.pure.vector('string', attributeValues),
-                
                 tx.pure.bool(isRedeemable),
                 tx.pure.u64((expiration?.getTime() || 0).toString()),
-
                 tx.pure.vector('u8', ruleTriggerTypes),
                 tx.pure.vector('u64', ruleTriggerValues),
                 tx.pure.vector('string', ruleNewImageUrls),
