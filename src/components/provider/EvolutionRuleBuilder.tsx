@@ -13,6 +13,7 @@ import { DatePicker } from "../ui/date-picker";
 
 // La estructura de la regla en el frontend
 export interface EvolutionRuleFE {
+    new_image_blob_object_id: any;
     trigger_type: '0' | '1';
     trigger_value: string;
     new_image_url: string; // Por ahora una URL, luego podemos integrar Walrus
