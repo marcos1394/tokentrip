@@ -1,49 +1,66 @@
-// Archivo: src/app/api/walrus-proxy/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 
-async function handler(request: NextRequest) {
-  const targetUrl = request.headers.get('X-Walrus-Target-URL');
-  const originalMethod = request.headers.get('X-Original-Method') || request.method;
+export const runtime = 'nodejs';
+
+async function handler(req: NextRequest) {
+  const targetUrl = req.headers.get('X-Walrus-Target-URL');
 
   if (!targetUrl) {
-    return new NextResponse(
-      JSON.stringify({ error: 'Missing X-Walrus-Target-URL header' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
-    );
+    return NextResponse.json({ error: 'Missing X-Walrus-Target-URL header' }, { status: 400 });
   }
 
   try {
-    console.log(`[PROXY] Reenviando a: ${targetUrl} con método: ${originalMethod}`);
+    // --- LÓGICA DIFERENCIADA POR MÉTODO ---
 
-    const walrusResponse = await fetch(targetUrl, {
-      method: originalMethod,
-      headers: {
-        'Content-Type': request.headers.get('Content-Type') || 'application/octet-stream',
-      },
-      body: originalMethod === 'GET' ? undefined : request.body, // Las peticiones GET no deben tener body
-      // @ts-ignore
-      duplex: originalMethod === 'GET' ? undefined : 'half',
-    });
+    if (req.method === 'GET') {
+      // CASO 1: Obtener una imagen para mostrarla
+      console.log(`[PROXY GET] Obteniendo imagen desde: ${targetUrl}`);
+      
+      const walrusResponse = await fetch(targetUrl);
+      if (!walrusResponse.ok) {
+        return new NextResponse(await walrusResponse.text(), { status: walrusResponse.status });
+      }
+      
+      // Descargamos la imagen completa y la enviamos con las cabeceras correctas
+      const imageBuffer = await walrusResponse.arrayBuffer();
+      const contentType = walrusResponse.headers.get('content-type') || 'application/octet-stream';
+      
+      const headers = new Headers();
+      headers.set('Content-Type', contentType);
+      headers.set('Content-Length', imageBuffer.byteLength.toString());
 
-    if (!walrusResponse.ok) {
-      const errorBody = await walrusResponse.text();
-      console.error(`[PROXY] Error desde Walrus (${walrusResponse.status}): ${errorBody}`);
-      return new NextResponse(errorBody, { status: walrusResponse.status });
+      return new NextResponse(imageBuffer, { status: 200, headers });
+
+    } else {
+      // CASO 2: Subir un archivo (POST o PUT)
+      console.log(`[PROXY ${req.method}] Reenviando subida a: ${targetUrl}`);
+
+      const walrusResponse = await fetch(targetUrl, {
+        method: req.method,
+        headers: {
+          'Content-Type': req.headers.get('Content-Type') || 'application/octet-stream',
+        },
+        body: req.body,
+        // @ts-ignore - 'duplex' es necesario para el streaming en Node.js
+        duplex: 'half',
+      });
+
+      if (!walrusResponse.ok) {
+        const errorBody = await walrusResponse.text();
+        console.error(`[PROXY] Error en subida desde Walrus (${walrusResponse.status}): ${errorBody}`);
+        return new NextResponse(errorBody, { status: walrusResponse.status });
+      }
+      
+      // Devolvemos la respuesta JSON de Walrus
+      const responseJson = await walrusResponse.json();
+      return NextResponse.json(responseJson, { status: walrusResponse.status });
     }
-    
-    return new NextResponse(walrusResponse.body, { status: walrusResponse.status });
 
   } catch (error: any) {
     console.error('[PROXY] Fallo crítico:', error);
-    return new NextResponse(
-      JSON.stringify({ error: 'Proxy internal error', details: error.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return NextResponse.json({ error: 'Proxy internal error', details: error.message }, { status: 500 });
   }
 }
 
-// Exportamos el mismo handler para todos los métodos que el SDK pueda necesitar
-export const POST = handler;
-export const PUT = handler;
-export const GET = handler; // <-- ESTA LÍNEA ES LA CLAVE
+// Exportamos el mismo handler para todos los métodos
+export { handler as GET, handler as POST, handler as PUT };
