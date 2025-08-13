@@ -1,23 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { suiConfig } from '@/config/sui';
 
-// --- INTERFACES FINALES ALINEADAS CON EL JSON REAL DE LA API ---
+// --- INTERFACES CORREGIDAS PARA EL JSON REAL DE LA API ---
 
-interface NftFields {
-  id: { id: string };
-  image_blob_object_id: string; 
+interface NftFromListing {
+  id: string; 
   name: string;
   description: string;
-  image_url: string; 
+  image_url: { url: string }; 
   provider_address: string;
+  image_blob_object_id: string; 
 }
 
 interface ListingFields {
-  id: { id: string };
-  nft: { 
-    type: string;
-    fields: NftFields; 
-  };
+  id: { id: string }; 
+  nft: NftFromListing; 
   price: string;
   is_available: boolean;
   is_tkt_listing: boolean;
@@ -46,7 +43,7 @@ const SUI_TESTNET_GRAPHQL_URL = 'https://sui-testnet.mystenlabs.com/graphql';
 
 export function useGetListings() {
   return useQuery({
-    queryKey: ['get-all-listings-final', suiConfig.packageId],
+    queryKey: ['get-all-listings-final-v2', suiConfig.packageId],
     queryFn: async (): Promise<NftListing[]> => {
       const GQL_QUERY = `
         query getListings($listingType: String!) {
@@ -60,7 +57,6 @@ export function useGetListings() {
 
       try {
         console.log(`[useGetListings] Buscando listings para el packageId: ${suiConfig.packageId}`);
-        
         const response = await fetch(SUI_TESTNET_GRAPHQL_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -85,20 +81,14 @@ export function useGetListings() {
             const fields = node.asMoveObject?.contents?.json as ListingFields;
             console.log(`[useGetListings] 3. Procesando Nodo #${index}:`, { fields });
             
-            if (!fields || !fields.is_available || !fields.nft?.fields) { 
-                console.warn(`[useGetListings] 4. ¡OMITIENDO Nodo #${index} por estructura inválida o no estar disponible!`);
+            // La condición ahora es más simple y correcta
+            if (!fields || !fields.is_available || !fields.nft) { 
+                console.warn(`[useGetListings] 4. ¡OMITIENDO Nodo #${index} por estructura inválida o no disponible!`);
                 return null; 
             }
 
-            // --- LÓGICA FINAL PARA LA URL ---
-            const imageBlobObjectId = fields.nft.fields.image_blob_object_id;
-            
-            // Limpiamos el ID del objeto, quitando el prefijo "0x" que causa el error en Walrus
-            const cleanBlobObjectId = imageBlobObjectId.startsWith('0x') 
-                ? imageBlobObjectId.substring(2) 
-                : imageBlobObjectId;
-            
-            // Construimos la URL que sí funciona para renderizar, usando el ID del Blob
+            const imageBlobObjectId = fields.nft.image_blob_object_id;
+            const cleanBlobObjectId = imageBlobObjectId.startsWith('0x') ? imageBlobObjectId.substring(2) : imageBlobObjectId;
             const finalImageUrl = `https://aggregator.walrus-testnet.walrus.space/v1/blobs/by-object-id/${cleanBlobObjectId}`;
 
             return {
@@ -109,11 +99,11 @@ export function useGetListings() {
               seller: fields.seller,
               providerId: fields.provider_id,
               nft: {
-                id: fields.nft.fields.id.id,
-                name: fields.nft.fields.name,
-                description: fields.nft.fields.description,
+                id: fields.nft.id,
+                name: fields.nft.name,
+                description: fields.nft.description,
                 imageUrl: finalImageUrl,
-                provider_address: fields.nft.fields.provider_address,
+                provider_address: fields.nft.provider_address,
               },
             };
           })
