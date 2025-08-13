@@ -2,26 +2,60 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
-async function handler(req: NextRequest) {
-  const targetUrl = req.headers.get('X-Walrus-Target-URL');
+// --- 1. AUMENTAMOS EL TIMEOUT TOTAL DE LA FUNCIÓN ---
+// Le damos a la API hasta 60 segundos para completarse antes de que Vercel la detenga.
+export const maxDuration = 60;
 
-  if (!targetUrl) {
+// Lista de aggregators públicos de Walrus para la Testnet. Si uno falla, se intentará con el siguiente.
+const WALRUS_AGGREGATORS = [
+    'https://aggregator.testnet.walrus.atalma.io',
+    'https://aggregator.walrus-testnet.h2o-nodes.com',
+    'https://walrus-agg-test.bucketprotocol.io',
+    'https://aggregator.walrus-testnet.walrus.space', // El oficial de Mysten
+];
+
+async function handler(req: NextRequest) {
+  const targetUrlHeader = req.headers.get('X-Walrus-Target-URL');
+
+  if (!targetUrlHeader) {
     return NextResponse.json({ error: 'Missing X-Walrus-Target-URL header' }, { status: 400 });
   }
 
-  try {
-    // --- LÓGICA DIFERENCIADA POR MÉTODO ---
+  // Iteramos sobre nuestra lista de aggregators
+  for (let i = 0; i < WALRUS_AGGREGATORS.length; i++) {
+    const aggregator = WALRUS_AGGREGATORS[i];
+    // Extraemos la ruta del blob (ej. /v1/blobs/by-object-id/...) de la URL original
+    const blobPath = new URL(originalTargetUrl).pathname; 
+    const targetUrl = `${aggregator}${blobPath}`;
 
-    if (req.method === 'GET') {
-      // CASO 1: Obtener una imagen para mostrarla
-      console.log(`[PROXY GET] Obteniendo imagen desde: ${targetUrl}`);
-      
-      const walrusResponse = await fetch(targetUrl);
+    try {
+      console.log(`[PROXY] Intento #${i + 1}: Contactando a ${targetUrl}`);
+
+      // --- 2. AUMENTAMOS EL TIMEOUT POR PETICIÓN ---
+      // Le damos a cada servidor 10 segundos para responder antes de considerarlo fallido.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos
+
+      const walrusResponse = await fetch(targetUrl, {
+          method: req.method,
+          headers: {
+            'Content-Type': req.headers.get('content-type') || 'application/octet-stream',
+          },
+          body: req.method !== 'GET' ? req.body : undefined,
+          // @ts-ignore - 'duplex' es necesario para el streaming en Node.js
+          duplex: req.method !== 'GET' ? 'half' : undefined,
+          signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId); // Si responde, cancelamos el timeout
+
       if (!walrusResponse.ok) {
-        return new NextResponse(await walrusResponse.text(), { status: walrusResponse.status });
+        console.warn(`[PROXY] Aggregator ${aggregator} respondió con error ${walrusResponse.status}. Intentando el siguiente...`);
+        continue; // Pasa al siguiente aggregator
       }
       
-      // Descargamos la imagen completa y la enviamos con las cabeceras correctas
+      console.log(`[PROXY] ¡Éxito con ${aggregator}! Procesando respuesta...`);
+      
       const imageBuffer = await walrusResponse.arrayBuffer();
       const contentType = walrusResponse.headers.get('content-type') || 'application/octet-stream';
       
@@ -29,37 +63,17 @@ async function handler(req: NextRequest) {
       headers.set('Content-Type', contentType);
       headers.set('Content-Length', imageBuffer.byteLength.toString());
 
+      // Si tenemos éxito, devolvemos la respuesta y terminamos.
       return new NextResponse(imageBuffer, { status: 200, headers });
 
-    } else {
-      // CASO 2: Subir un archivo (POST o PUT)
-      console.log(`[PROXY ${req.method}] Reenviando subida a: ${targetUrl}`);
-
-      const walrusResponse = await fetch(targetUrl, {
-        method: req.method,
-        headers: {
-          'Content-Type': req.headers.get('Content-Type') || 'application/octet-stream',
-        },
-        body: req.body,
-        // @ts-ignore - 'duplex' es necesario para el streaming en Node.js
-        duplex: 'half',
-      });
-
-      if (!walrusResponse.ok) {
-        const errorBody = await walrusResponse.text();
-        console.error(`[PROXY] Error en subida desde Walrus (${walrusResponse.status}): ${errorBody}`);
-        return new NextResponse(errorBody, { status: walrusResponse.status });
-      }
-      
-      // Devolvemos la respuesta JSON de Walrus
-      const responseJson = await walrusResponse.json();
-      return NextResponse.json(responseJson, { status: walrusResponse.status });
+    } catch (error: any) {
+      console.warn(`[PROXY] Falló el aggregator ${aggregator}: ${error.name === 'AbortError' ? 'Timeout de 10s' : error.message}. Intentando el siguiente...`);
     }
-
-  } catch (error: any) {
-    console.error('[PROXY] Fallo crítico:', error);
-    return NextResponse.json({ error: 'Proxy internal error', details: error.message }, { status: 500 });
   }
+
+  // Si el bucle termina y ningún aggregator funcionó, devolvemos un error final.
+  console.error('[PROXY] Todos los aggregators fallaron.');
+  return NextResponse.json({ error: 'All Walrus aggregators failed to respond.' }, { status: 504 }); // 504 Gateway Timeout
 }
 
 // Exportamos el mismo handler para todos los métodos
