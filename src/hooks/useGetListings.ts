@@ -1,22 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { suiConfig } from '@/config/sui';
 
-// --- INTERFACES ALINEADAS CON EL NUEVO CONTRATO ---
+// --- INTERFACES ALINEADAS CON LA ESTRUCTURA REAL ---
 
-// El struct NFT anidado ahora contiene el ID del blob
-interface NftFromListing {
+interface NftFields {
   id: { id: string };
-  image_blob_object_id: string; // <-- CAMBIO CLAVE
+  // AÑADIMOS EL CAMPO DEL BLOB ID
+  image_blob_object_id: string; 
   name: string;
   description: string;
   image_url: { fields: { url: string } };
   provider_address: string;
 }
 
-// El struct Listing contiene el NFT anidado
 interface ListingFields {
   id: { id: string };
-  nft: { fields: NftFromListing };
+  nft: { fields: NftFields };
   price: string;
   is_available: boolean;
   is_tkt_listing: boolean;
@@ -24,7 +23,7 @@ interface ListingFields {
   provider_id: string;
 }
 
-// La estructura final para la UI
+// Estructura de datos final para la UI
 export interface NftListing {
   listingId: string;
   price: number;
@@ -45,7 +44,7 @@ const SUI_TESTNET_GRAPHQL_URL = 'https://sui-testnet.mystenlabs.com/graphql';
 
 export function useGetListings() {
   return useQuery({
-    queryKey: ['get-all-listings', suiConfig.packageId],
+    queryKey: ['get-all-listings-final', suiConfig.packageId],
     queryFn: async (): Promise<NftListing[]> => {
       const GQL_QUERY = `
         query getListings($listingType: String!) {
@@ -81,7 +80,7 @@ export function useGetListings() {
                 return null; 
             }
 
-            // --- LÓGICA DE URL FINAL Y CORRECTA ---
+            // --- LÓGICA FINAL PARA LA URL ---
             // Leemos el ID del blob que guardamos en el NFT
             const imageBlobObjectId = fields.nft.fields.image_blob_object_id;
             
@@ -106,11 +105,11 @@ export function useGetListings() {
           })
           .filter((listing: NftListing | null): listing is NftListing => listing !== null);
 
-        console.log('✅ Listings procesados con la nueva estructura:', listingsWithDetails);
+        console.log('✅ Listings procesados:', listingsWithDetails);
         return listingsWithDetails;
         
       } catch (error) {
-        console.error("❌ Falló la obtención de datos con GraphQL:", error);
+        console.error("❌ Falló la obtención de datos:", error);
         throw error;
       }
     },
