@@ -167,57 +167,82 @@ function RegisterFormProvider({ walrusClient }: { walrusClient: WalrusClient | n
     };
 
     const handleRegister = async () => {
-        if (!currentAccount || isFormInvalid || !imageFile || !walrusClient) {
-            toast({ variant: "destructive", title: "Error de Validación", description: "Por favor, completa todos los campos." });
-            return;
+    if (!currentAccount || isFormInvalid || !imageFile || !walrusClient) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Please complete all fields." });
+        return;
+    }
+    setIsPending(true);
+    try {
+        // --- 1. PROCESO DE WALRUS (Subida de archivo) ---
+        toast({ title: "Uploading image (1/3)..." });
+        const imageArrayBuffer = await imageFile.arrayBuffer();
+        const uint8Array = new Uint8Array(imageArrayBuffer);
+        const flow = walrusClient.writeFilesFlow({
+            files: [WalrusFile.from({ contents: uint8Array, identifier: imageFile.name })],
+        });
+        
+        await flow.encode();
+        const registerTx = flow.register({ epochs: 5, owner: currentAccount.address, deletable: false });
+        const registerResult = await signAndExecuteTransaction({ transaction: registerTx, account: currentAccount });
+
+        // --- 2. CAPTURAR EL ID DEL OBJETO BLOB ---
+        const txResultRegister = await suiClient.waitForTransaction({ 
+            digest: registerResult.digest, 
+            options: { showObjectChanges: true } 
+        });
+        const createdBlobObject = txResultRegister.objectChanges?.find(
+            (change) => change.type === 'created' && change.objectType.includes('::blob::Blob')
+        );
+        if (!createdBlobObject || !('objectId' in createdBlobObject)) {
+            throw new Error("Could not find the Blob Object ID after registration.");
         }
-        setIsPending(true);
-        try {
-            const imageArrayBuffer = await imageFile.arrayBuffer();
-            const uint8Array = new Uint8Array(imageArrayBuffer);
+        const imageBlobObjectId = createdBlobObject.objectId;
+        console.log('✅ [REGISTER] Blob Object ID captured:', imageBlobObjectId);
 
-            const flow = walrusClient.writeFilesFlow({
-                files: [WalrusFile.from({ contents: uint8Array, identifier: imageFile.name })],
-            });
-            
-            await flow.encode();
-            toast({ title: "Subiendo imagen (1/3)..." });
-            const registerTx = flow.register({ epochs: 5, owner: currentAccount.address, deletable: false });
-            const registerResult = await signAndExecuteTransaction({ transaction: registerTx, account: currentAccount });
+        // --- CONTINUACIÓN DEL PROCESO DE WALRUS ---
+        toast({ title: "Uploading image (2/3)..." });
+        await flow.upload({ digest: registerResult.digest });
 
-            toast({ title: "Subiendo imagen (2/3)..." });
-            await flow.upload({ digest: registerResult.digest });
+        toast({ title: "Uploading image (3/3)..." });
+        const certifyTx = flow.certify();
+        await signAndExecuteTransaction({ transaction: certifyTx, account: currentAccount });
 
-            toast({ title: "Subiendo imagen (3/3)..." });
-            const certifyTx = flow.certify();
-            await signAndExecuteTransaction({ transaction: certifyTx, account: currentAccount });
+        const files = await flow.listFiles();
+        const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`; // URL de referencia
 
-            const files = await flow.listFiles();
-            const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`;
+        // --- 3. CONSTRUIR LA TRANSACCIÓN FINAL ---
+        toast({ title: "Registering profile on TokenTrip..." });
+        const tx = new Transaction();
+        const contentType = imageFile.type || 'application/octet-stream';
 
-            toast({ title: "Registrando perfil en TokenTrip..." });
-            const tx = new Transaction();
-            tx.moveCall({
-                target: `${suiConfig.packageId}::experience_nft::register_provider`,
-                arguments: [tx.pure.string(name), tx.pure.string(bio), tx.pure.string(finalImageUrl), tx.pure.string(category)],
-            });
+        tx.moveCall({
+            target: `${suiConfig.packageId}::experience_nft::register_provider`,
+            arguments: [
+                tx.pure.string(name),
+                tx.pure.string(bio),
+                tx.pure.string(finalImageUrl),
+                tx.object(imageBlobObjectId), // <-- Argumento 1/2 añadido
+                tx.pure.string(contentType),   // <-- Argumento 2/2 añadido
+                tx.pure.string(category)
+            ],
+        });
 
-            const result = await signAndExecuteTransaction({ transaction: tx, account: currentAccount });
-            const txResult = await suiClient.waitForTransaction({ digest: result.digest, options: { showEffects: true } });
+        const result = await signAndExecuteTransaction({ transaction: tx, account: currentAccount });
+        const txResult = await suiClient.waitForTransaction({ digest: result.digest, options: { showEffects: true } });
 
-            if (txResult.effects?.status.status === 'success') {
-                toast({ title: "✅ ¡Éxito!", description: "Tu perfil ha sido creado." });
-                queryClient.invalidateQueries({ queryKey: ['getOwnedObjects'] });
-                setTimeout(() => { router.push(`/${params.locale}/dashboard`); }, 1500);
-            } else {
-                throw new Error("La transacción de registro falló.");
-            }
-        } catch (error: any) {
-            toast({ variant: "destructive", title: "❌ Fallo en el Registro", description: error.message || "Ocurrió un error." });
-        } finally {
-            setIsPending(false);
+        if (txResult.effects?.status.status === 'success') {
+            toast({ title: "✅ Success!", description: "Your profile has been created." });
+            queryClient.invalidateQueries({ queryKey: ['getOwnedObjects'] });
+            setTimeout(() => { router.push(`/${params.locale}/dashboard`); }, 1500);
+        } else {
+            throw new Error("The registration transaction failed.");
         }
-    };
+    } catch (error: any) {
+        toast({ variant: "destructive", title: "❌ Registration Failed", description: error.message || "An error occurred." });
+    } finally {
+        setIsPending(false);
+    }
+};
 
     if (isLoadingProfile) { return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>; }
     if (isAlreadyProvider) {
