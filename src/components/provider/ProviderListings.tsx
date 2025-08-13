@@ -1,25 +1,31 @@
 // src/components/provider/ProviderListings.tsx
 
-// Se ha eliminado 'use client', convirtiéndolo en un Componente de Servidor más rápido.
 import { SuiObjectData } from "@mysten/sui/client";
 import { ExperienceNftCard } from "@/components/ExperienceNftCard";
 import { PackageOpen, Sailboat } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// --- Interfaces y Sub-componentes ---
-
+// --- INTERFACES ALINEADAS CON LA NUEVA ESTRUCTURA DEL CONTRATO ---
+interface Attribute {
+  fields: {
+    key: string;
+    value: string;
+  }
+}
+interface NftFields {
+  id: { id: string };
+  image_blob_object_id: string; 
+  name: string;
+  attributes: Attribute[];
+  // Se pueden añadir más campos si se necesitan
+}
 interface ListingFields {
-    id: { id: string };
-    nft: { fields: { id: { id: string }, name: string, image_url: { url: string }}};
-    price: string;
-    is_tkt_listing: boolean; // Se añade para determinar la moneda
+  nft: { fields: NftFields };
+  price: string;
+  is_tkt_listing: boolean;
 }
 
-interface ProviderListingsProps {
-    listings: SuiObjectData[];
-    isLoading: boolean;
-}
-
+// --- Sub-componente para el estado de carga (sin cambios) ---
 function LoadingSkeleton() {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -37,6 +43,10 @@ function LoadingSkeleton() {
 }
 
 // --- Componente Principal ---
+interface ProviderListingsProps {
+    listings: SuiObjectData[];
+    isLoading: boolean;
+}
 
 export function ProviderListings({ listings, isLoading }: ProviderListingsProps) {
     if (isLoading) {
@@ -65,7 +75,20 @@ export function ProviderListings({ listings, isLoading }: ProviderListingsProps)
                     if (listing.content?.dataType !== 'moveObject') return null;
 
                     const fields = listing.content.fields as unknown as ListingFields;
-                    if (!fields) return null;
+                    if (!fields || !fields.nft?.fields) return null;
+                    
+                    // --- LÓGICA DE EXTRACCIÓN DE DATOS ACTUALIZADA ---
+                    const nftFields = fields.nft.fields;
+                    
+                    const imageBlobObjectId = nftFields.image_blob_object_id;
+                    const finalImageUrl = imageBlobObjectId 
+                        ? `https://aggregator.testnet.walrus.atalma.io/v1/blobs/by-object-id/${imageBlobObjectId}`
+                        : '';
+
+                    const contentTypeAttr = nftFields.attributes?.find(
+                        (attr: any) => attr.fields.key === 'content-type'
+                    );
+                    const contentType = contentTypeAttr ? contentTypeAttr.fields.value : 'application/octet-stream';
                     
                     const currency = fields.is_tkt_listing ? "TKT" : "SUI";
                     
@@ -73,9 +96,10 @@ export function ProviderListings({ listings, isLoading }: ProviderListingsProps)
                         <ExperienceNftCard
                             key={listing.objectId}
                             listingId={listing.objectId}
-                            nftId={fields.nft.fields.id.id}
-                            name={fields.nft.fields.name}
-                            imageUrl={fields.nft.fields.image_url.url}
+                            nftId={nftFields.id.id}
+                            name={nftFields.name}
+                            imageUrl={finalImageUrl}
+                            contentType={contentType} // <-- Se pasa el contentType
                             price={Number(fields.price) / 1_000_000_000}
                             currency={currency}
                         />
