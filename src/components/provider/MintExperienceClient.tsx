@@ -227,7 +227,7 @@ export default function MintExperienceClient() {
                         <CardDescription>Define rules that will automatically change this NFT's appearance or properties based on time or on-chain events.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <EvolutionRuleBuilder rules={evolutionRules} setRules={setEvolutionRules} />
+                        <EvolutionRuleBuilder rules={evolutionRules} setRules={setEvolutionRules} walrusClient={null} />
                     </CardContent>
                 </Card>
 
