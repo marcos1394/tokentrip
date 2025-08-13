@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { suiConfig } from '@/config/sui';
 
-// --- INTERFACES BASADAS EN LA ESTRUCTURA QUE FUNCIONA ---
+// --- INTERFACES FINALES Y CORREGIDAS ---
+// Basadas en la estructura real que nos mostró el log de la consola.
+
 interface Attribute {
-  fields: {
-    key: string;
-    value: string;
-  }
+  key: string; // La 'key' es una propiedad directa
+  value: string;
 }
 interface NftFromListing {
   id: string; 
@@ -16,10 +16,9 @@ interface NftFromListing {
   attributes: Attribute[];
   provider_address: string;
 }
-
 interface ListingFields {
   id: string; 
-  nft: NftFromListing; 
+  nft: NftFromListing; // El objeto NFT no está anidado en `fields`
   price: string;
   is_available: boolean;
   is_tkt_listing: boolean;
@@ -50,7 +49,7 @@ const WALRUS_AGGREGATOR_URL = 'https://aggregator.testnet.walrus.atalma.io';
 
 export function useGetListings() {
   return useQuery({
-    queryKey: ['get-all-listings-final-debug', suiConfig.packageId],
+    queryKey: ['get-all-listings-final-version', suiConfig.packageId],
     queryFn: async (): Promise<NftListing[]> => {
       const GQL_QUERY = `
         query getListings($listingType: String!) {
@@ -98,28 +97,14 @@ export function useGetListings() {
               ? `${WALRUS_AGGREGATOR_URL}/v1/blobs/by-object-id/${imageBlobObjectId}`
               : '';
             
-            // --- LOGS DETALLADOS PARA CONTENT-TYPE ---
+            // --- BÚSQUEDA CORREGIDA Y SEGURA DEL CONTENT-TYPE ---
             console.log(`[useGetListings] Atributos para Nodo #${index}:`, fields.nft.attributes);
             const contentTypeAttr = Array.isArray(fields.nft.attributes) 
-              ? fields.nft.attributes.find(attr => {
-                  console.log(`[useGetListings] Comprobando key: '${attr?.fields?.key}'`);
-                  return attr?.fields?.key === 'content-type';
-                }) 
+              ? fields.nft.attributes.find(attr => attr?.key === 'content-type') 
               : undefined;
             
-            const contentType = contentTypeAttr ? contentTypeAttr.fields.value : 'application/octet-stream';
+            const contentType = contentTypeAttr ? contentTypeAttr.value : 'application/octet-stream';
             console.log(`[useGetListings] Content-Type encontrado para Nodo #${index}: ${contentType}`);
-
-            const processedNft = {
-              id: fields.nft.id,
-              name: fields.nft.name,
-              description: fields.nft.description,
-              imageUrl: finalImageUrl,
-              contentType: contentType,
-              provider_address: fields.nft.provider_address,
-            };
-            
-            console.log(`[useGetListings] -> Datos procesados para Nodo #${index}:`, processedNft);
 
             return {
               listingId: node.objectId,
@@ -128,7 +113,14 @@ export function useGetListings() {
               isTktListing: fields.is_tkt_listing,
               seller: fields.seller,
               providerId: fields.provider_id,
-              nft: processedNft,
+              nft: {
+                id: fields.nft.id,
+                name: fields.nft.name,
+                description: fields.nft.description,
+                imageUrl: finalImageUrl,
+                contentType: contentType,
+                provider_address: fields.nft.provider_address,
+              },
             };
           })
           .filter((listing: NftListing | null): listing is NftListing => listing !== null);
@@ -137,7 +129,7 @@ export function useGetListings() {
         return listingsWithDetails;
         
       } catch (error) {
-        console.error("❌ Falló la obtención de datos:", error);
+        console.error("❌ [useGetListings] Falló la obtención de datos:", error);
         throw error;
       }
     },
