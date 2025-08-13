@@ -38,7 +38,7 @@ const SUI_TESTNET_GRAPHQL_URL = 'https://sui-testnet.mystenlabs.com/graphql';
 
 export function useGetListings() {
   return useQuery({
-    queryKey: ['get-all-listings-v5', suiConfig.packageId],
+    queryKey: ['get-all-listings-v8', suiConfig.packageId], // Nueva key para evitar caché
     queryFn: async (): Promise<NftListing[]> => {
       const GQL_QUERY = `
         query getListings($listingType: String!) {
@@ -74,17 +74,13 @@ export function useGetListings() {
                 return null; 
             }
 
-            // --- CORRECCIÓN FINAL Y DEFINITIVA BASADA EN LA DOCUMENTACIÓN ---
-            const originalUrl = fields.nft.image_url.url;
-            let finalImageUrl = originalUrl;
-
-            if (originalUrl && originalUrl.includes('/blobs/')) {
-                const blobId = originalUrl.split('/blobs/')[1];
-                if (blobId) {
-                    // Reconstruimos la URL con el aggregator correcto y la ruta /v1/
-                    finalImageUrl = `https://aggregator.walrus-testnet.walrus.space/v1/blobs/${blobId}`;
-                }
-            }
+            // --- CORRECCIÓN FINAL Y DEFINITIVA DE LA URL ---
+            // Obtenemos el Object ID del NFT, que es lo que necesitamos.
+            const nftObjectId = fields.nft.id;
+            
+            // Construimos la URL con la ruta `/by-object-id/` como indica la documentación.
+            // Esto le indica a Walrus que busque los atributos del objeto (como content-type).
+            const finalImageUrl = `https://aggregator.walrus-testnet.walrus.space/v1/blobs/by-object-id/${nftObjectId}`;
 
             return {
               listingId: node.objectId,
@@ -94,7 +90,7 @@ export function useGetListings() {
               seller: fields.seller,
               providerId: fields.provider_id,
               nft: {
-                id: fields.nft.id,
+                id: nftObjectId,
                 name: fields.nft.name,
                 description: fields.nft.description,
                 imageUrl: finalImageUrl,
@@ -104,7 +100,7 @@ export function useGetListings() {
           })
           .filter((listing: NftListing | null): listing is NftListing => listing !== null);
 
-        console.log('✅ Listings procesados (con URL de Aggregator correcta):', listingsWithDetails);
+        console.log('✅ Listings procesados (con URL por Object ID):', listingsWithDetails);
         return listingsWithDetails;
         
       } catch (error) {
