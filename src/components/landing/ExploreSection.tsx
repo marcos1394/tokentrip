@@ -4,9 +4,9 @@ import { useGetListings } from "@/hooks/useGetListings";
 import { ExperienceNftCard } from "@/components/ExperienceNftCard";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader, PackageOpen, AlertTriangle } from "lucide-react";
+import { PackageOpen, AlertTriangle } from "lucide-react";
 
-// --- Sub-componente para el estado de carga ---
+// --- Sub-componente para el estado de carga (sin cambios) ---
 function LoadingSkeleton() {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -59,6 +59,7 @@ export function ExploreSection() {
                                     nftId={listing.nft.id}
                                     name={listing.nft.name}
                                     imageUrl={listing.nft.imageUrl}
+                                    contentType={listing.nft.contentType} // <-- CAMBIO CLAVE AQUÍ
                                     price={listing.price}
                                     currency={listing.currency}
                                 />
