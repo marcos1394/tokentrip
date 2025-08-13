@@ -1,23 +1,30 @@
 import { useQuery } from '@tanstack/react-query';
 import { suiConfig } from '@/config/sui';
 
-// Interfaces (No necesitan cambios)
+// --- INTERFACES ALINEADAS CON EL NUEVO CONTRATO ---
+
+// El struct NFT anidado ahora contiene el ID del blob
 interface NftFromListing {
-  id: string; 
+  id: { id: string };
+  image_blob_object_id: string; // <-- CAMBIO CLAVE
   name: string;
   description: string;
-  image_url: { url: string }; 
+  image_url: { fields: { url: string } };
   provider_address: string;
 }
+
+// El struct Listing contiene el NFT anidado
 interface ListingFields {
-  id: string; 
-  nft: NftFromListing; 
+  id: { id: string };
+  nft: { fields: NftFromListing };
   price: string;
   is_available: boolean;
   is_tkt_listing: boolean;
   seller: string;
   provider_id: string;
 }
+
+// La estructura final para la UI
 export interface NftListing {
   listingId: string;
   price: number;
@@ -38,7 +45,7 @@ const SUI_TESTNET_GRAPHQL_URL = 'https://sui-testnet.mystenlabs.com/graphql';
 
 export function useGetListings() {
   return useQuery({
-    queryKey: ['get-all-listings-v8', suiConfig.packageId], // Nueva key para evitar caché
+    queryKey: ['get-all-listings', suiConfig.packageId],
     queryFn: async (): Promise<NftListing[]> => {
       const GQL_QUERY = `
         query getListings($listingType: String!) {
@@ -70,17 +77,16 @@ export function useGetListings() {
         const listingsWithDetails: NftListing[] = listingsData
           .map((node: any) => {
             const fields = node.asMoveObject?.contents?.json as ListingFields;
-            if (!fields || !fields.is_available || !fields.nft) { 
+            if (!fields || !fields.is_available || !fields.nft?.fields) { 
                 return null; 
             }
 
-            // --- CORRECCIÓN FINAL Y DEFINITIVA DE LA URL ---
-            // Obtenemos el Object ID del NFT, que es lo que necesitamos.
-            const nftObjectId = fields.nft.id;
+            // --- LÓGICA DE URL FINAL Y CORRECTA ---
+            // Leemos el ID del blob que guardamos en el NFT
+            const imageBlobObjectId = fields.nft.fields.image_blob_object_id;
             
-            // Construimos la URL con la ruta `/by-object-id/` como indica la documentación.
-            // Esto le indica a Walrus que busque los atributos del objeto (como content-type).
-            const finalImageUrl = `https://aggregator.walrus-testnet.walrus.space/v1/blobs/by-object-id/${nftObjectId}`;
+            // Construimos la URL que sí funciona para renderizar
+            const finalImageUrl = `https://aggregator.walrus-testnet.walrus.space/v1/blobs/by-object-id/${imageBlobObjectId}`;
 
             return {
               listingId: node.objectId,
@@ -90,17 +96,17 @@ export function useGetListings() {
               seller: fields.seller,
               providerId: fields.provider_id,
               nft: {
-                id: nftObjectId,
-                name: fields.nft.name,
-                description: fields.nft.description,
+                id: fields.nft.fields.id.id,
+                name: fields.nft.fields.name,
+                description: fields.nft.fields.description,
                 imageUrl: finalImageUrl,
-                provider_address: fields.nft.provider_address,
+                provider_address: fields.nft.fields.provider_address,
               },
             };
           })
           .filter((listing: NftListing | null): listing is NftListing => listing !== null);
 
-        console.log('✅ Listings procesados (con URL por Object ID):', listingsWithDetails);
+        console.log('✅ Listings procesados con la nueva estructura:', listingsWithDetails);
         return listingsWithDetails;
         
       } catch (error) {
