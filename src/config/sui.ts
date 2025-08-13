@@ -1,13 +1,12 @@
 // src/config/sui.ts
 
-// Configuración final y verificada para Testnet
+// Configuración final actualizada para Testnet
 export const suiConfig = {
-  // --- IDs de los PAQUETES (Corregidos según el último despliegue) ---
-    // --- IDs de los PAQUETES (Actualizados de tus logs de publicación) ---
-  packageId: "0x098d0eaaf37e58802bf7f540303411eb5b724ffd64e078761c6785f24caf2aa2", // tokentrip_experiences
-  auctionsPackageId: "0x3f4e1dd8bcd73c32eba9334b608f12f7edafa4cac3d6129f0f9b16e94b3f7c5e",
-  lendingPackageId: "0xeafa5efcb85f83cf6ac6e8886e7f91eeb4a49f7edba6f7450c8d444698e0c8c7",
-  rentalPackageId: "0x17479d2b50ccf5dfc3ac69bb452716bf23c3a28c8aa22c82f48abd321a86a639",
+  // --- IDs de los PAQUETES (Actualizados de tus logs de publicación) ---
+  packageId: "0x08408958a63d105c1154f378afd055525db45f060c48e4565ed5432a04a83638", // tokentrip_experiences
+  auctionsPackageId: "0xff7ce28606fd792a48a9b0ad68fc5ee94f3779f3c79742ca1ec9791d86c0a589",
+  lendingPackageId: "0xcfdec512a25fafc773b7d9576524f0e7cf6ff2b679739dee0f44b005ecbcab77",
+  rentalPackageId: "0x0f248cfc7a5555fcb71b7bf8c5197d5534914895de63f109f6038fcedd46aee4",
   
   // --- IDs de paquetes que NO cambiaron (dependencias) ---
   tktPackageId: "0xed46584d450fc173a7796cdbc934248df25f0d46700a3a852fb025f1d9a000b3",
@@ -17,8 +16,8 @@ export const suiConfig = {
   // --- IDs de OBJETOS creados por la función init ---
 
   // Creados por la última versión de `tokentrip_experiences` (packageId)
-  adminCapId: "0xc6f110e1a73d4d5bdcc9567c30a41cc96381c6f5d3d98cb857a9aea83db7ab9e",
-  vipRegistryId: "0x96ae339f6c6eae2426e6e126ca0739472fd86ccc58310e9e5e2c4e54644bf51d",
+  adminCapId: "0x927c89aeace97e1eccda330bf7a19db61c983048ffa58dc510a49264cb9c7940",
+  vipRegistryId: "0x7ebf5cb5cbecd80904a14b6518b3a275aa9913dba1f25e2b9990fcd10aec17ff",
 
   // IDs de objetos de otros paquetes (asumiendo que no se han vuelto a publicar)
   stakingPoolId: "0x1f10f55a350e29250a99bf76cf7d448df10474c190e87c9e1a974b58ebc06b67",
@@ -26,8 +25,7 @@ export const suiConfig = {
   daoTreasuryId: "0xa4340e33c324e4899e372e1760c10561f575a58c8e697a1d7a6d6b0aae5ef9c2",
   tktTreasuryCapId: "0x2e0243fa40a462818771ca439bfd00ec613c27e83c29edc862f6f96ea985dfd1",
 
-  // IDs externos (no cambian)
+  // IDs de Pools de Liquidez (asumiendo que los pools no se han vuelto a crear)
   cetusSuiWalPoolId: "0x72eaf5b60fadc6a7f0ecd81b067824fda96844a049a3c1ddb4bbca00c22fa992",
-  suiTktPoolId: "0x97a0b6e8b06106887c7f85afce869a07f87bf05ebb94ea5ed63a0cbfebfd7590", 
-
+  suiTktPoolId: "0x97a0b6e8b06106887c7f85afce869a07f87bf05ebb94ea5ed63a0cbfebfd7590",
 };
