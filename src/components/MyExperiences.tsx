@@ -8,7 +8,6 @@ import { suiConfig } from '@/config/sui';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
-import { SuiObjectResponse } from '@mysten/sui/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,7 +29,7 @@ interface ProviderProfile {
   id: { id: string };
 }
 
-// --- Nuevo Componente de Botón "Sell" Inteligente ---
+// --- Sub-componente del Botón de Venta ---
 function SellButton({ nftId, isProvider, onSell, isPending }: { nftId: string, isProvider: boolean, onSell: (id: string, price: string) => void, isPending: boolean }) {
     const [isOpen, setIsOpen] = useState(false);
     const [price, setPrice] = useState('');
@@ -70,6 +69,7 @@ function SellButton({ nftId, isProvider, onSell, isPending }: { nftId: string, i
     );
 }
 
+// --- Sub-componente de Carga ---
 function LoadingSkeleton() {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -83,14 +83,15 @@ function LoadingSkeleton() {
     );
 }
 
+// --- Componente Principal ---
 export function MyExperiences() {
     const currentAccount = useCurrentAccount();
     const params = useParams();
+    const locale = params.locale as string || 'en';
     const [cardsVisible, setCardsVisible] = useState(false);
     const { toast } = useToast();
     const { mutateAsync: executeTransaction, isPending: isTransactionPending } = useSignAndExecuteTransaction();
 
-    // 1. OBTENEMOS EL PERFIL DE PROVEEDOR DEL USUARIO (SI EXISTE)
     const { data: providerData, isLoading: isLoadingProfile } = useSuiClientQuery('getOwnedObjects', {
         owner: currentAccount?.address!,
         filter: { StructType: `${suiConfig.packageId}::experience_nft::ProviderProfile` },
@@ -105,12 +106,12 @@ export function MyExperiences() {
         { 
             owner: currentAccount?.address!,
             filter: { StructType: `${suiConfig.packageId}::experience_nft::ExperienceNFT` },
-            options: { showDisplay: true }
+            options: { showDisplay: true, showContent: true } 
         },
         { enabled: !!currentAccount }
     );
 
-    const { data: receiptsData, isLoading: isLoadingReceipts, refetch: refetchReceipts } = useSuiClientQuery(
+    const { data: receiptsData, isLoading: isLoadingReceipts } = useSuiClientQuery(
         'getOwnedObjects', 
         { 
             owner: currentAccount?.address!,
@@ -143,7 +144,6 @@ export function MyExperiences() {
         let targetFunction: string;
         let args: any[];
 
-        // Si el usuario tiene un perfil de proveedor, usa la venta primaria.
         if (providerProfileId) {
             targetFunction = `${suiConfig.packageId}::experience_nft::list_for_sale`;
             args = [
@@ -153,7 +153,7 @@ export function MyExperiences() {
                 tx.object(SUI_CLOCK_OBJECT_ID)
             ];
             toast({ title: 'Listing for primary sale...' });
-        } else { // Si no, usa la reventa
+        } else {
             targetFunction = `${suiConfig.packageId}::experience_nft::list_for_resale`;
             args = [
                 tx.object(nftId),
@@ -204,17 +204,34 @@ export function MyExperiences() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                         {ownedNfts.map((nft, index) => {
                             const objectId = nft.data?.objectId;
-                            const name = nft.data?.display?.data?.name || 'Untitled NFT';
-                            const imageUrl = nft.data?.display?.data?.image_url || '';
-
                             if (!objectId) return null;
+
+                            const displayData = nft.data?.display?.data;
+                            const contentFields = nft.data?.content?.dataType === 'moveObject' ? nft.data.content.fields as any : null;
+                            
+                            const contentTypeAttr = contentFields?.attributes?.find(
+                                (attr: any) => attr.fields.key === 'content-type'
+                            );
+                            const contentType = contentTypeAttr ? contentTypeAttr.fields.value : 'application/octet-stream';
+                            
+                            const imageBlobObjectId = contentFields?.image_blob_object_id;
+                            const imageUrl = imageBlobObjectId 
+                                ? `https://aggregator.testnet.walrus.atalma.io/v1/blobs/by-object-id/${imageBlobObjectId}`
+                                : (displayData?.image_url || '');
+
+                            const name = displayData?.name || 'Untitled NFT';
 
                             return (
                                 <div key={objectId} className={`flex flex-col gap-2 transform transition-all duration-700 ${cardsVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`} style={{ transitionDelay: `${index * 100}ms` }}>
-                                    <ExperienceNftCard nftId={objectId} name={name} imageUrl={imageUrl} />
+                                    <ExperienceNftCard 
+                                        nftId={objectId} 
+                                        name={name} 
+                                        imageUrl={imageUrl}
+                                        contentType={contentType}
+                                    />
                                     <div className="grid grid-cols-2 gap-2">
                                         <Button asChild variant="outline" className="w-full card-hover glass-card">
-                                            <Link href={`/es/fractionalize/${objectId}`}><Sprout className="w-4 h-4 mr-2" /> Fractionalize</Link>
+                                            <Link href={`/${locale}/fractionalize/${objectId}`}><Sprout className="w-4 h-4 mr-2" /> Fractionalize</Link>
                                         </Button>
                                         <SellButton 
                                             nftId={objectId} 
