@@ -93,7 +93,8 @@ export function useGetListings() {
             
             // --- LÓGICA FINAL DE URL (Según el ejemplo oficial) ---
             // El ejemplo que encontraste usa el BLOB ID, no el object id.
-            const finalImageUrl = `${WALRUS_AGGREGATOR_URL}/v1/blobs/${fields.nft.image_blob_object_id}`;
+            const finalImageUrl = `${WALRUS_AGGREGATOR_URL}/v1/blobs/by-object-id/${imageBlobObjectId}`;
+
             
             const contentTypeAttr = Array.isArray(fields.nft.attributes) 
               ? fields.nft.attributes.find(attr => attr?.key === 'content-type') 
