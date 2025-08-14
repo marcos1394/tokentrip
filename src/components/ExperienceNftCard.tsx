@@ -2,7 +2,6 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { ShoppingCart } from "lucide-react";
 import Link from 'next/link';
-import { SafeWalrusImage } from "./SafeWalrusImage";
 
 // Interfaz actualizada para recibir contentType
 interface ExperienceNftCardProps {
@@ -25,23 +24,25 @@ export function ExperienceNftCard({
     listingId 
 }: ExperienceNftCardProps) {
 
-    // --- LOG DETALLADO ---
-    // Verificamos las props que recibe esta tarjeta al ser renderizada
-    console.log(`[ExperienceNftCard] Renderizando tarjeta para "${name}"`, { imageUrl, contentType });
-
     const targetUrl = `/es/experience/${listingId || nftId}`;
+    const isMediaViewable = contentType.startsWith("image/") || contentType.startsWith("video/");
 
     return (
         <Link href={targetUrl} className="group block h-full">
             <Card className="glass-card card-hover h-full flex flex-col overflow-hidden">
                 <CardHeader className="p-0">
-                    <div className="aspect-video overflow-hidden">
-                        <SafeWalrusImage 
-                            src={imageUrl} 
-                            alt={name} 
-                            contentType={contentType}
+                    <div className="aspect-video overflow-hidden bg-muted">
+                        {/* --- LA SOLUCIÓN FINAL: USAR LA ETIQUETA <object> --- */}
+                        <object 
+                            type={isMediaViewable ? contentType : ''} 
+                            data={isMediaViewable ? imageUrl : ''} 
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                        />
+                        >
+                            {/* Fallback por si el navegador no puede renderizar el objeto */}
+                            <div className="w-full h-full flex items-center justify-center">
+                                <p className="text-xs text-muted-foreground">Media not available</p>
+                            </div>
+                        </object>
                     </div>
                 </CardHeader>
                 <CardContent className="p-4 flex-grow">
