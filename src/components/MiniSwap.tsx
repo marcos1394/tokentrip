@@ -76,8 +76,6 @@ export function MiniSwap({
             toCoinDecimals,
         };
         
-        console.log("🚀 [MINISWAP] Enviando a la API para cotización:", requestBody);
-
         try {
             const response = await fetch('/api/swap/quote', {
                 method: 'POST',
@@ -91,8 +89,6 @@ export function MiniSwap({
             }
 
             const result = await response.json();
-            console.log("✅ [MINISWAP] Respuesta recibida de la API:", result);
-            
             const estimatedAmountOut = new Decimal(result.estimatedAmountOut).div(new Decimal(10).pow(toCoinDecimals));
             setToAmount(estimatedAmountOut.toFixed(4));
             setQuoteResult(result);
@@ -113,27 +109,20 @@ export function MiniSwap({
     }, [fromAmount, getQuote, getUserBalance]);
 
     const handleSwap = async () => {
-        if (!account || !quoteResult) {
-            console.error("[SWAP] Faltan datos para el swap (cuenta o cotización)");
-            return;
-        }
+        if (!account || !quoteResult) return;
 
         try {
             console.log("[SWAP] 1. Iniciando swap...");
             
-            // --- LA CORRECCIÓN ESTÁ AQUÍ ---
             const client = new SuiClient({ url: getFullnodeUrl('testnet') });
-            const sdk = initCetusSDK({
-                network: 'testnet',
-                suiClient: client // Pasamos el cliente durante la inicialización
-            });
+            const sdk = initCetusSDK({ network: 'testnet' });
             sdk.senderAddress = account.address;
 
-            console.log("[SWAP] 2. SDK inicializado con SuiClient.");
+            console.log("[SWAP] 2. SDK inicializado.");
 
             const amountInBaseUnits = new BN(quoteResult.amount);
             const estimatedAmountOut = new BN(quoteResult.estimatedAmountOut);
-            const slippage = Percentage.fromDecimal(new Decimal(0.05)); // 5%
+            const slippage = Percentage.fromDecimal(new Decimal(0.05));
             const amountLimit = adjustForSlippage(estimatedAmountOut, slippage, false);
             
             const payloadParams = {
@@ -147,7 +136,11 @@ export function MiniSwap({
             };
             console.log("[SWAP] 3. Parámetros para crear el payload:", payloadParams);
             
-            const swapPayload = await sdk.Swap.createSwapTransactionPayload(payloadParams);
+            // --- LA CORRECCIÓN DEFINITIVA ESTÁ AQUÍ ---
+            const swapPayload = await sdk.Swap.createSwapTransactionPayload(
+                payloadParams,
+                client // Pasamos el cliente como segundo argumento
+            );
             console.log("[SWAP] 4. Payload de transacción creado.", swapPayload);
 
             signAndExecuteTransaction(
