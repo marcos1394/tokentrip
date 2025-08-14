@@ -67,15 +67,10 @@ export function MiniSwap({
         }
         
         setIsFetchingQuote(true);
-        const requestBody = {
-            poolId,
-            fromCoinType,
-            toCoinType,
-            amount: fromAmount,
-            fromCoinDecimals,
-            toCoinDecimals,
-        };
+        const requestBody = { poolId, fromCoinType, toCoinType, amount: fromAmount, fromCoinDecimals, toCoinDecimals };
         
+        console.log("🚀 [MINISWAP] Enviando a la API para cotización:", requestBody);
+
         try {
             const response = await fetch('/api/swap/quote', {
                 method: 'POST',
@@ -89,6 +84,8 @@ export function MiniSwap({
             }
 
             const result = await response.json();
+            console.log("✅ [MINISWAP] Respuesta recibida de la API:", result);
+            
             const estimatedAmountOut = new Decimal(result.estimatedAmountOut).div(new Decimal(10).pow(toCoinDecimals));
             setToAmount(estimatedAmountOut.toFixed(4));
             setQuoteResult(result);
@@ -112,66 +109,66 @@ export function MiniSwap({
         if (!account || !quoteResult) return;
 
         try {
-            console.log("[SWAP] 1. Iniciando swap...");
-            
+            console.log("[SWAP] 1. Iniciando swap manual...");
             const client = new SuiClient({ url: getFullnodeUrl('testnet') });
-            const sdk = initCetusSDK({ network: 'testnet' });
-            sdk.senderAddress = account.address;
-
-            console.log("[SWAP] 2. SDK inicializado.");
+            const tx = new Transaction();
 
             const amountInBaseUnits = new BN(quoteResult.amount);
             const estimatedAmountOut = new BN(quoteResult.estimatedAmountOut);
-            const slippage = Percentage.fromDecimal(new Decimal(0.05));
+            const slippage = Percentage.fromDecimal(new Decimal(0.05)); // 5%
             const amountLimit = adjustForSlippage(estimatedAmountOut, slippage, false);
+
+            // --- PASO 1: PREPARAR LA MONEDA DE PAGO (SUI) ---
+            const { data: suiCoins } = await client.getCoins({ owner: account.address, coinType: fromCoinType });
+            const [primaryCoin, ...otherCoins] = suiCoins;
+
+            if (!primaryCoin) throw new Error("No SUI coins found in your wallet.");
+
+            const primaryCoinInput = tx.object(primaryCoin.coinObjectId);
+            if (otherCoins.length > 0) {
+                tx.mergeCoins(primaryCoinInput, otherCoins.map(c => tx.object(c.coinObjectId)));
+            }
+            const [paymentCoin] = tx.splitCoins(primaryCoinInput, [tx.pure.u64(amountInBaseUnits.toString())]);
             
-            const payloadParams = {
-                pool_id: quoteResult.poolAddress,
-                coinTypeA: quoteResult.coinTypeA,
-                coinTypeB: quoteResult.coinTypeB,
-                a2b: quoteResult.aToB,
-                by_amount_in: true,
-                amount: amountInBaseUnits.toString(),
-                amount_limit: amountLimit.toString(),
-            };
-            console.log("[SWAP] 3. Parámetros para crear el payload:", payloadParams);
+            // --- PASO 2: CONSTRUIR LA LLAMADA AL CONTRATO DE SWAP ---
+            const sdk = initCetusSDK({ network: 'testnet' }); // Solo para obtener IDs
+            if (!sdk.sdkOptions.clmm_pool?.config) throw new Error("Cetus SDK options not initialized.");
             
-            // --- LA CORRECCIÓN DEFINITIVA ESTÁ AQUÍ ---
-            const swapPayload = await sdk.Swap.createSwapTransactionPayload(
-                payloadParams,
-                client // Pasamos el cliente como segundo argumento
-            );
-            console.log("[SWAP] 4. Payload de transacción creado.", swapPayload);
+            const swapTarget = `${sdk.sdkOptions.clmm_pool.config.pool_router_id}::router::swap`;
+            
+            tx.moveCall({
+                target: swapTarget,
+                typeArguments: [quoteResult.coinTypeA, quoteResult.coinTypeB],
+                arguments: [
+                    tx.object(quoteResult.poolAddress),
+                    paymentCoin,
+                    tx.pure.bool(quoteResult.aToB),
+                    tx.pure.bool(true), // by_amount_in
+                    tx.pure.u64(amountLimit.toString()),
+                    tx.object("0x6") // Clock
+                ],
+            });
+
+            console.log("[SWAP] 2. Payload de transacción manual creado.");
 
             signAndExecuteTransaction(
-                { transaction: swapPayload },
+                { transaction: tx },
                 {
                     onSuccess: (result) => {
-                        console.log("[SWAP] 5. Transacción exitosa:", result.digest);
-                        toast({ 
-                            title: "✅ Swap Successful!", 
-                            description: `You received ~${toAmount} ${toCoinSymbol}.` 
-                        });
+                        console.log("[SWAP] 3. Transacción exitosa:", result.digest);
+                        toast({ title: "✅ Swap Successful!", description: `You received ~${toAmount} ${toCoinSymbol}.` });
                         onSwapSuccess();
                         getUserBalance();
                     },
                     onError: (error) => {
-                        console.error("[SWAP] 5. Error en la transacción:", error);
-                        toast({ 
-                            variant: "destructive", 
-                            title: "❌ Swap Failed", 
-                            description: error.message || "Transaction failed." 
-                        });
+                        console.error("[SWAP] 3. Error en la transacción:", error);
+                        toast({ variant: "destructive", title: "❌ Swap Failed", description: error.message || "Transaction failed." });
                     }
                 }
             );
         } catch (error: any) {
-            console.error("[SWAP] 5. Error crítico en handleSwap:", error);
-            toast({ 
-                variant: "destructive", 
-                title: "❌ Swap Failed", 
-                description: error.message || "Unknown error occurred" 
-            });
+            console.error("[SWAP] 3. Error crítico en handleSwap:", error);
+            toast({ variant: "destructive", title: "❌ Swap Failed", description: error.message || "Unknown error occurred" });
         }
     };
 
