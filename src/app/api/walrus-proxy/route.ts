@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 segundos de timeout total
 
-// Aumenta el tiempo de espera máximo de la función a 60 segundos
-export const maxDuration = 60;
-
-// Lista de aggregators públicos de Walrus para la Testnet.
 const WALRUS_AGGREGATORS = [
     'https://aggregator.testnet.walrus.atalma.io',
     'https://aggregator.walrus-testnet.h2o-nodes.com',
@@ -14,7 +11,6 @@ const WALRUS_AGGREGATORS = [
 ];
 
 async function handler(req: NextRequest) {
-  // Leemos las cabeceras personalizadas que nos envía el frontend
   const targetUrlHeader = req.headers.get('X-Walrus-Target-URL');
   const forcedContentType = req.headers.get('X-Content-Type');
 
@@ -24,12 +20,11 @@ async function handler(req: NextRequest) {
   console.log(`[PROXY]   - Content-Type Forzado (para GET): ${forcedContentType}`);
 
   if (!targetUrlHeader) {
-    return NextResponse.json({ error: 'Missing X-Walrus-Target-URL header' }, { status: 400 });
+    return new Response(JSON.stringify({ error: 'Missing X-Walrus-Target-URL header' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
   }
 
   // --- LÓGICA PARA OBTENER IMÁGENES (GET) ---
   if (req.method === 'GET') {
-    // Iteramos sobre nuestra lista de aggregators para tener redundancia
     for (const [index, aggregator] of WALRUS_AGGREGATORS.entries()) {
       const blobPath = new URL(targetUrlHeader).pathname;
       const targetUrl = `${aggregator}${blobPath}`;
@@ -37,14 +32,14 @@ async function handler(req: NextRequest) {
       try {
         console.log(`[PROXY GET] 2. Intento #${index + 1}: Contactando a ${aggregator}`);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout por intento
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout por intento
 
         const walrusResponse = await fetch(targetUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
 
         if (!walrusResponse.ok) {
           console.warn(`[PROXY] Aggregator ${aggregator} respondió con error ${walrusResponse.status}.`);
-          continue; // Si falla, pasa al siguiente aggregator
+          continue;
         }
         
         console.log(`[PROXY] 3. ¡Éxito con ${aggregator}!`);
@@ -52,9 +47,7 @@ async function handler(req: NextRequest) {
         console.log(`[PROXY] 4. Buffer de imagen descargado. Tamaño: ${imageBuffer.byteLength} bytes.`);
         
         const headers = new Headers();
-        // Añadimos la cabecera CORS para darle permiso explícito al navegador
         headers.set('Access-Control-Allow-Origin', '*');
-        // Forzamos el Content-Type que nos envió el frontend para que el navegador renderice la imagen
         headers.set('Content-Type', forcedContentType || 'application/octet-stream');
         headers.set('Content-Length', imageBuffer.byteLength.toString());
 
@@ -62,20 +55,19 @@ async function handler(req: NextRequest) {
           'Content-Type': headers.get('Content-Type'),
           'Content-Length': headers.get('Content-Length'),
         });
-
-        // Si tenemos éxito, devolvemos la imagen y terminamos la función.
-        return new NextResponse(imageBuffer, { status: 200, headers });
+        
+        // --- CORRECCIÓN FINAL: Usamos el `Response` estándar para mayor fiabilidad ---
+        return new Response(imageBuffer, { status: 200, headers });
 
       } catch (error: any) {
-        console.warn(`[PROXY] Falló el aggregator ${aggregator}: ${error.name === 'AbortError' ? 'Timeout de 10s' : error.message}.`);
+        console.warn(`[PROXY] Falló el aggregator ${aggregator}: ${error.name === 'AbortError' ? 'Timeout de 15s' : error.message}.`);
       }
     }
 
-    // Si el bucle termina y ningún aggregator funcionó, devolvemos un error final.
     console.error('[PROXY] 6. Todos los aggregators para GET fallaron.');
-    return NextResponse.json({ error: 'All Walrus aggregators failed to respond.' }, { status: 504 });
+    return new Response(JSON.stringify({ error: 'All Walrus aggregators failed to respond.' }), { status: 504, headers: { 'Content-Type': 'application/json' } });
   }
-
+  
   // --- LÓGICA PARA SUBIR ARCHIVOS (POST / PUT) ---
   else {
     console.log(`[PROXY ${req.method}] Reenviando subida a: ${targetUrlHeader}`);
@@ -95,6 +87,7 @@ async function handler(req: NextRequest) {
         
         const responseJson = await walrusResponse.json();
         console.log(`[PROXY ${req.method}] Éxito en la subida.`);
+        // Usamos NextResponse aquí porque sabemos que la respuesta es JSON
         return NextResponse.json(responseJson, { status: walrusResponse.status });
 
     } catch (error: any) {
