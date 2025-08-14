@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { suiConfig } from '@/config/sui';
 
-// --- INTERFACES FINALES Y CORRECTAS ---
+// --- INTERFACES FINALES Y CORREGIDAS ---
+// Basadas en la estructura real que nos mostró el log de la consola.
 interface Attribute {
   key: string;
   value: string;
 }
 interface NftFromListing {
   id: string; 
-  image_blob_object_id: string; // Mantenemos este por si lo necesitamos en el futuro
+  image_blob_object_id: string;
   name: string;
   description: string;
   attributes: Attribute[];
@@ -36,19 +37,18 @@ export interface NftListing {
     id: string;
     name: string;
     description: string;
-    imageUrl: string; // Esta será la URL del aggregator con el blobId
-    contentType: string; // El tipo de contenido del archivo
+    imageUrl: string;
+    contentType: string;
     provider_address: string;
   };
 }
 
 const SUI_TESTNET_GRAPHQL_URL = 'https://sui-testnet.mystenlabs.com/graphql';
-// Usamos el aggregator que sabemos que responde
-const WALRUS_AGGREGATOR_URL = 'https://aggregator.testnet.walrus.atalma.io'; 
+const WALRUS_AGGREGATOR_URL = 'https://aggregator.testnet.walrus.atalma.io';
 
 export function useGetListings() {
   return useQuery({
-    queryKey: ['get-all-listings-final-definitive', suiConfig.packageId],
+    queryKey: ['get-all-listings-definitive', suiConfig.packageId],
     queryFn: async (): Promise<NftListing[]> => {
       const GQL_QUERY = `
         query getListings($listingType: String!) {
@@ -90,18 +90,21 @@ export function useGetListings() {
                 console.warn(`[useGetListings] 4. ¡OMITIENDO Nodo #${index} por estructura inválida o no estar disponible!`);
                 return null; 
             }
-            
-            // --- LÓGICA FINAL DE URL (Según el ejemplo oficial) ---
-            // El ejemplo que encontraste usa el BLOB ID, no el object id.
-            const finalImageUrl = `${WALRUS_AGGREGATOR_URL}/v1/blobs/by-object-id/${imageBlobObjectId}`;
 
+            const imageBlobObjectId = fields.nft.image_blob_object_id;
             
+            // Lógica final para construir la URL que funciona para renderizar
+            const finalImageUrl = imageBlobObjectId 
+              ? `${WALRUS_AGGREGATOR_URL}/v1/blobs/by-object-id/${imageBlobObjectId}`
+              : '';
+            
+            console.log(`[useGetListings]   - Atributos para Nodo #${index}:`, fields.nft.attributes);
             const contentTypeAttr = Array.isArray(fields.nft.attributes) 
               ? fields.nft.attributes.find(attr => attr?.key === 'content-type') 
               : undefined;
+            
             const contentType = contentTypeAttr ? contentTypeAttr.value : 'application/octet-stream';
-            console.log(`[useGetListings]   - Content-Type para Nodo #${index}: ${contentType}`);
-            console.log(`[useGetListings]   - URL generada para Nodo #${index}: ${finalImageUrl}`);
+            console.log(`[useGetListings]   - Content-Type encontrado para Nodo #${index}: ${contentType}`);
 
             return {
               listingId: node.objectId,
