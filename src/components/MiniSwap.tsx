@@ -126,7 +126,7 @@ export function MiniSwap({
             
             // La función `createSwapTransactionPayload` se llama con un solo argumento.
             // El `dapp-kit` se encargará de proveer los fondos necesarios.
-            const swapPayload = sdk.Swap.createSwapTransactionPayload(payloadParams);
+            const swapPayload = await sdk.Swap.createSwapTransactionPayload(payloadParams);
             console.log("[SWAP] 4. Payload de transacción creado.", swapPayload);
 
             signAndExecuteTransaction(
