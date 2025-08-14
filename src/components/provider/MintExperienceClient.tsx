@@ -76,31 +76,25 @@ export default function MintExperienceClient() {
     }
     setIsMinting(true);
     try {
-        // --- 1. PROCESO DE WALRUS (Subida de archivo con metadatos) ---
-        toast({ title: "1/4: Uploading file with metadata..." });
+        // --- PASO 1: Subida a Walrus para obtener IDs ---
+        toast({ title: "1/5: Subiendo archivo a Walrus..." });
         const imageArrayBuffer = await imageFile.arrayBuffer();
         const uint8Array = new Uint8Array(imageArrayBuffer);
 
-        const mimeType = imageFile.type || 'application/octet-stream';
-        console.log(`[MINT] File MIME Type detected: ${mimeType}`);
-
-        // --- LA CORRECCIÓN DEFINITIVA ESTÁ AQUÍ ---
         const flow = walrusClient.writeFilesFlow({
             files: [ WalrusFile.from({ 
                 contents: uint8Array, 
                 identifier: imageFile.name,
-                // Añadimos la etiqueta 'content-type' para que Walrus la guarde en el objeto Blob
-                tags: { 'content-type': mimeType }
+                tags: { 'content-type': imageFile.type || 'application/octet-stream' }
             }) ],
         });
         
         await flow.encode();
         
-        toast({ title: "2/4: Registering file on-chain..." });
+        toast({ title: "2/5: Registrando archivo en la blockchain..." });
         const registerTx = flow.register({ epochs: 5, owner: account.address, deletable: false });
         const registerResult = await signAndExecuteTx({ transaction: registerTx, account });
         
-        // --- 2. CAPTURAR EL ID DEL OBJETO BLOB ---
         const txResultRegister = await suiClient.waitForTransaction({ 
             digest: registerResult.digest, 
             options: { showObjectChanges: true } 
@@ -112,28 +106,51 @@ export default function MintExperienceClient() {
             throw new Error("Could not find the Blob Object ID after registration.");
         }
         const imageBlobObjectId = createdBlobObject.objectId;
-        console.log('✅ [MINT] Blob Object ID captured:', imageBlobObjectId);
+        console.log('✅ [MINT] Blob Object ID capturado:', imageBlobObjectId);
 
-        // --- CONTINUACIÓN DEL PROCESO DE WALRUS ---
-        toast({ title: "3/4: Transferring data..." });
+        toast({ title: "3/5: Transfiriendo datos..." });
         await flow.upload({ digest: registerResult.digest });
         
-        toast({ title: "4/4: Certifying file..." });
+        toast({ title: "4/5: Certificando archivo..." });
         const certifyTx = flow.certify();
         await signAndExecuteTx({ transaction: certifyTx, account });
+        
+        const [createdFile] = await flow.listFiles();
+        const blobId = createdFile.blobId;
+        console.log(`✅ [MINT] Archivo subido. Blob ID: ${blobId}`);
 
-        const files = await flow.listFiles();
-        const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`; // Esta URL es de referencia
+        // --- PASO 2: PUBLICAR EL BLOB COMO UN "SITE" ---
+        toast({ title: "Publicando imagen como Site..." });
+        
+        const publishTx = await walrusClient.publishSite({
+            files: [{ path: 'media', blobId: blobId }] // Usamos 'media' como ruta genérica
+        });
+        const publishResult = await signAndExecuteTx({ transaction: publishTx, account });
+        const txResultPublish = await suiClient.waitForTransaction({ 
+            digest: publishResult.digest, 
+            options: { showObjectChanges: true }
+        });
+        
+        const siteObject = txResultPublish.objectChanges?.find(
+            (change) => change.type === 'created' && change.objectType.includes('::site::Site')
+        );
+        if (!siteObject || !('objectId' in siteObject)) {
+            throw new Error("No se pudo crear el Walrus Site.");
+        }
+        const siteId = siteObject.objectId;
+        
+        // --- ESTA ES LA URL QUE SÍ FUNCIONA PARA RENDERIZAR ---
+        const finalImageUrl = `https://${siteId}.walrus.site/media`;
+        console.log('✅ [MINT] Site publicado. URL final y funcional:', finalImageUrl);
 
-        // --- 3. CONSTRUIR LA TRANSACCIÓN FINAL ---
-        toast({ title: "Preparing mint transaction..." });
+        // --- PASO 3: MINTEAR EL NFT CON LA NUEVA URL ---
+        toast({ title: "5/5: Preparando minteo del NFT..." });
         const tx = new Transaction();
 
         const contentType = imageFile.type || 'application/octet-stream';
-        const attributesForContract: Attribute[] = [{ key: "Example", value: "Value" }];
+        // (El resto de la preparación de datos se mantiene igual)
         const attributeKeys = attributesForContract.map(attr => attr.key);
         const attributeValues = attributesForContract.map(attr => attr.value);
-        
         const ruleTriggerTypes = evolutionRules.map(rule => Number(rule.trigger_type));
         const ruleTriggerValues = evolutionRules.map(rule => rule.trigger_value.toString());
         const ruleNewImageUrls = evolutionRules.map(rule => rule.new_image_url);
@@ -146,9 +163,9 @@ export default function MintExperienceClient() {
                 tx.object(providerProfile.data.objectId),
                 tx.pure.string(name),
                 tx.pure.string(description),
-                tx.pure.string(finalImageUrl),
-                tx.object(imageBlobObjectId),
-                tx.pure.string(contentType),
+                tx.pure.string(finalImageUrl), // <-- Pasamos la nueva URL del Site
+                tx.object(imageBlobObjectId),   // <-- Pasamos el ID del Blob como lo espera el contrato
+                tx.pure.string(contentType),    // <-- Pasamos el contentType como lo espera el contrato
                 tx.pure.string(eventName),
                 tx.pure.string(eventCity),
                 tx.pure.string(validityDetails),
