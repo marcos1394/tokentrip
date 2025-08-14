@@ -76,13 +76,21 @@ export default function MintExperienceClient() {
     }
     setIsMinting(true);
     try {
-        // --- 1. PROCESO DE WALRUS (Subida de archivo) ---
-        toast({ title: "1/4: Uploading file..." });
+        // --- 1. PROCESO DE WALRUS (Subida de archivo con metadatos) ---
+        toast({ title: "1/4: Uploading file with metadata..." });
         const imageArrayBuffer = await imageFile.arrayBuffer();
         const uint8Array = new Uint8Array(imageArrayBuffer);
+
+        // --- LA CORRECCIÓN DEFINITIVA ESTÁ AQUÍ ---
         const flow = walrusClient.writeFilesFlow({
-            files: [ WalrusFile.from({ contents: uint8Array, identifier: imageFile.name }) ],
+            files: [ WalrusFile.from({ 
+                contents: uint8Array, 
+                identifier: imageFile.name,
+                // Añadimos la etiqueta 'content-type' para que Walrus la guarde en el objeto Blob
+                tags: { 'content-type': imageFile.type || 'application/octet-stream' }
+            }) ],
         });
+        
         await flow.encode();
         
         toast({ title: "2/4: Registering file on-chain..." });
@@ -112,7 +120,7 @@ export default function MintExperienceClient() {
         await signAndExecuteTx({ transaction: certifyTx, account });
 
         const files = await flow.listFiles();
-        const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`; // Esta URL es de referencia
+        const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`; // Esta URL es solo de referencia
 
         // --- 3. CONSTRUIR LA TRANSACCIÓN FINAL ---
         toast({ title: "Preparing mint transaction..." });
@@ -123,10 +131,10 @@ export default function MintExperienceClient() {
         const attributeKeys = attributesForContract.map(attr => attr.key);
         const attributeValues = attributesForContract.map(attr => attr.value);
         
+        // NOTA: Asegúrate de que la lógica para subir las imágenes de evolución y obtener sus Blob IDs esté implementada
         const ruleTriggerTypes = evolutionRules.map(rule => Number(rule.trigger_type));
         const ruleTriggerValues = evolutionRules.map(rule => rule.trigger_value.toString());
         const ruleNewImageUrls = evolutionRules.map(rule => rule.new_image_url);
-        // NOTA: Aquí también necesitarás los Blob Object IDs para las imágenes de evolución
         const ruleNewImageBlobObjectIds = evolutionRules.map(rule => rule.new_image_blob_object_id);
         const ruleNewDescriptions = evolutionRules.map(rule => rule.new_description);
         
@@ -137,8 +145,8 @@ export default function MintExperienceClient() {
                 tx.pure.string(name),
                 tx.pure.string(description),
                 tx.pure.string(finalImageUrl),
-                tx.object(imageBlobObjectId), // <-- Argumento 1/3 (El ID del Blob)
-                tx.pure.string(contentType),   // <-- Argumento 2/3 (El tipo de contenido)
+                tx.object(imageBlobObjectId),
+                tx.pure.string(contentType),
                 tx.pure.string(eventName),
                 tx.pure.string(eventCity),
                 tx.pure.string(validityDetails),
@@ -153,7 +161,7 @@ export default function MintExperienceClient() {
                 tx.pure.vector('u8', ruleTriggerTypes),
                 tx.pure.vector('u64', ruleTriggerValues),
                 tx.pure.vector('string', ruleNewImageUrls),
-                tx.pure.vector('address', ruleNewImageBlobObjectIds), // <-- Argumento 3/3 (IDs para evoluciones)
+                tx.pure.vector('address', ruleNewImageBlobObjectIds),
                 tx.pure.vector('string', ruleNewDescriptions),
             ],
         });
