@@ -104,7 +104,6 @@ export function MiniSwap({
         } finally {
             setIsFetchingQuote(false);
         }
-    // --- CORRECCIÓN CLAVE: AÑADIR `fromAmount` A LAS DEPENDENCIAS ---
     }, [fromAmount, account, poolId, fromCoinType, toCoinType, fromCoinDecimals, toCoinDecimals]);
 
     useEffect(() => {
@@ -114,18 +113,27 @@ export function MiniSwap({
     }, [fromAmount, getQuote, getUserBalance]);
 
     const handleSwap = async () => {
-        if (!account || !quoteResult) return;
+        if (!account || !quoteResult) {
+            console.error("[SWAP] Faltan datos para el swap (cuenta o cotización)");
+            return;
+        }
 
         try {
+            console.log("[SWAP] 1. Iniciando swap...");
+            // --- CORRECCIÓN CLAVE AQUÍ ---
+            const client = new SuiClient({ url: getFullnodeUrl('testnet') });
             const sdk = initCetusSDK({ network: 'testnet' });
             sdk.senderAddress = account.address;
+            sdk.suiClient = client; // <-- Asignamos el cliente al SDK
+
+            console.log("[SWAP] 2. SDK inicializado con SuiClient.");
 
             const amountInBaseUnits = new BN(quoteResult.amount);
             const estimatedAmountOut = new BN(quoteResult.estimatedAmountOut);
             const slippage = Percentage.fromDecimal(new Decimal(0.05)); // 5%
             const amountLimit = adjustForSlippage(estimatedAmountOut, slippage, false);
             
-            const swapPayload = await sdk.Swap.createSwapTransactionPayload({
+            const payloadParams = {
                 pool_id: quoteResult.poolAddress,
                 coinTypeA: quoteResult.coinTypeA,
                 coinTypeB: quoteResult.coinTypeB,
@@ -133,12 +141,17 @@ export function MiniSwap({
                 by_amount_in: true,
                 amount: amountInBaseUnits.toString(),
                 amount_limit: amountLimit.toString(),
-            });
+            };
+            console.log("[SWAP] 3. Parámetros para crear el payload:", payloadParams);
+            
+            const swapPayload = await sdk.Swap.createSwapTransactionPayload(payloadParams);
+            console.log("[SWAP] 4. Payload de transacción creado.", swapPayload);
 
             signAndExecuteTransaction(
                 { transaction: swapPayload },
                 {
                     onSuccess: (result) => {
+                        console.log("[SWAP] 5. Transacción exitosa:", result.digest);
                         toast({ 
                             title: "✅ Swap Successful!", 
                             description: `You received ~${toAmount} ${toCoinSymbol}.` 
@@ -147,6 +160,7 @@ export function MiniSwap({
                         getUserBalance();
                     },
                     onError: (error) => {
+                        console.error("[SWAP] 5. Error en la transacción:", error);
                         toast({ 
                             variant: "destructive", 
                             title: "❌ Swap Failed", 
@@ -156,6 +170,7 @@ export function MiniSwap({
                 }
             );
         } catch (error: any) {
+            console.error("[SWAP] 5. Error crítico en handleSwap:", error);
             toast({ 
                 variant: "destructive", 
                 title: "❌ Swap Failed", 
