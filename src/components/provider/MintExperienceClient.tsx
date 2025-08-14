@@ -81,13 +81,16 @@ export default function MintExperienceClient() {
         const imageArrayBuffer = await imageFile.arrayBuffer();
         const uint8Array = new Uint8Array(imageArrayBuffer);
 
+        const mimeType = imageFile.type || 'application/octet-stream';
+        console.log(`[MINT] File MIME Type detected: ${mimeType}`);
+
         // --- LA CORRECCIÓN DEFINITIVA ESTÁ AQUÍ ---
         const flow = walrusClient.writeFilesFlow({
             files: [ WalrusFile.from({ 
                 contents: uint8Array, 
                 identifier: imageFile.name,
                 // Añadimos la etiqueta 'content-type' para que Walrus la guarde en el objeto Blob
-                tags: { 'content-type': imageFile.type || 'application/octet-stream' }
+                tags: { 'content-type': mimeType }
             }) ],
         });
         
@@ -120,7 +123,7 @@ export default function MintExperienceClient() {
         await signAndExecuteTx({ transaction: certifyTx, account });
 
         const files = await flow.listFiles();
-        const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`; // Esta URL es solo de referencia
+        const finalImageUrl = `https://gateway.walrus.space/blobs/${files[0].blobId}`; // Esta URL es de referencia
 
         // --- 3. CONSTRUIR LA TRANSACCIÓN FINAL ---
         toast({ title: "Preparing mint transaction..." });
@@ -131,7 +134,6 @@ export default function MintExperienceClient() {
         const attributeKeys = attributesForContract.map(attr => attr.key);
         const attributeValues = attributesForContract.map(attr => attr.value);
         
-        // NOTA: Asegúrate de que la lógica para subir las imágenes de evolución y obtener sus Blob IDs esté implementada
         const ruleTriggerTypes = evolutionRules.map(rule => Number(rule.trigger_type));
         const ruleTriggerValues = evolutionRules.map(rule => rule.trigger_value.toString());
         const ruleNewImageUrls = evolutionRules.map(rule => rule.new_image_url);
@@ -186,7 +188,6 @@ export default function MintExperienceClient() {
         setIsMinting(false);
     }
 };
-
     if (isLoadingProfile) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>
     }
