@@ -17,12 +17,15 @@ export async function POST(request: Request) {
         toCoinDecimals 
     } = await request.json();
 
+    console.log('[API QUOTE] 1. Petición recibida:', { poolId, fromCoinType, toCoinType, amount });
+
     if (!poolId || !fromCoinType || !toCoinType || !amount) {
         throw new Error("Missing required parameters for quote API.");
     }
 
     const sdk = initCetusSDK({ network: 'testnet' });
     
+    console.log(`[API QUOTE] 2. Buscando pool con ID: ${poolId}`);
     const pool = await sdk.Pool.getPool(poolId);
     if (!pool) {
       throw new Error(`Cetus pool with ID ${poolId} not found.`);
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
 
     const preswapParams = {
         pool: pool,
-        currentSqrtPrice: pool.current_sqrt_price, // <-- La corrección final
+        currentSqrtPrice: pool.current_sqrt_price,
         coinTypeA: pool.coinTypeA,
         coinTypeB: pool.coinTypeB,
         decimalsA: a2b ? fromCoinDecimals : toCoinDecimals,
@@ -43,12 +46,26 @@ export async function POST(request: Request) {
         amount: amountInMist.toString(),
     };
     
+    console.log('[API QUOTE] 3. Parámetros enviados a preswap:', preswapParams);
+
     const preswapResult = await sdk.Swap.preswap(preswapParams);
     if (!preswapResult) {
       throw new Error("Preswap did not return a valid result.");
     }
+
+    console.log('[API QUOTE] 4. Resultado recibido de preswap:', preswapResult);
     
-    return NextResponse.json(preswapResult);
+    // --- LA CORRECCIÓN CLAVE ESTÁ AQUÍ ---
+    // Creamos una nueva respuesta que incluye los datos del preswap Y los coin_types del pool.
+    const responsePayload = {
+      ...preswapResult,
+      coinTypeA: pool.coinTypeA,
+      coinTypeB: pool.coinTypeB,
+    };
+
+    console.log('[API QUOTE] 5. Enviando respuesta completa al frontend:', responsePayload);
+
+    return NextResponse.json(responsePayload);
 
   } catch (error: any) {
     console.error("[API QUOTE] Error:", error.message);
