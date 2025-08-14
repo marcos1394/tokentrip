@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import { Skeleton } from './ui/skeleton';
 
 interface SafeWalrusImageProps {
-  src: string; // La URL original de Walrus
+  src: string;
   alt: string;
-  contentType: string; // <-- 1. AÑADIMOS LA NUEVA PROP
+  contentType: string;
   className?: string;
 }
 
@@ -15,46 +15,53 @@ export function SafeWalrusImage({ src, alt, contentType, className }: SafeWalrus
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    // Reseteamos el estado si la src cambia
     setObjectUrl(null);
     setError(false);
     let tempUrl: string | null = null;
 
+    console.log(`[SafeWalrusImage] 1. useEffect activado. Recibiendo props:`, { src, contentType });
+
     if (!src) {
-        setError(true);
-        return;
+      console.warn('[SafeWalrusImage] src está vacío. No se hará fetch.');
+      setError(true);
+      return;
     };
 
-    // Hacemos la petición a NUESTRA API proxy
+    console.log('[SafeWalrusImage] 2. Iniciando fetch a /api/walrus-proxy...');
     fetch('/api/walrus-proxy', {
       headers: {
         'X-Walrus-Target-URL': src,
-        'X-Content-Type': contentType // <-- 2. ENVIAMOS EL CONTENT-TYPE AL PROXY
+        'X-Content-Type': contentType
       }
     })
       .then(res => {
+        console.log('[SafeWalrusImage] 3. Respuesta recibida del proxy:', res);
         if (!res.ok) {
           throw new Error(`Proxy failed with status: ${res.status} ${res.statusText}`);
         }
         return res.blob();
       })
       .then(blob => {
-        // Creamos una URL local para el navegador a partir de los datos recibidos
+        console.log('[SafeWalrusImage] 4. Respuesta convertida a blob:', blob);
+        if (blob.size === 0) {
+          console.error('[SafeWalrusImage] Error: El blob recibido del proxy está vacío.');
+          throw new Error("Received empty blob from proxy.");
+        }
         tempUrl = URL.createObjectURL(blob);
+        console.log(`[SafeWalrusImage] 5. URL de blob creada: ${tempUrl}`);
         setObjectUrl(tempUrl);
       })
       .catch(err => {
-        console.error(`Failed to load image via proxy. Original src: ${src}`, err);
+        console.error(`[SafeWalrusImage] 6. Fallo en el proceso de fetch:`, err);
         setError(true);
       });
 
-    // Función de limpieza para liberar memoria
     return () => {
       if (tempUrl) {
         URL.revokeObjectURL(tempUrl);
       }
     };
-  }, [src, contentType]); // <-- 3. AÑADIMOS contentType A LAS DEPENDENCIAS
+  }, [src, contentType]);
 
   if (error) {
     return <div className={`${className} bg-muted flex items-center justify-center`}><p className="text-xs text-muted-foreground">Image Error</p></div>;
