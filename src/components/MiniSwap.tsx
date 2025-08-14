@@ -120,11 +120,14 @@ export function MiniSwap({
 
         try {
             console.log("[SWAP] 1. Iniciando swap...");
-            // --- CORRECCIÓN CLAVE AQUÍ ---
+            
+            // --- LA CORRECCIÓN ESTÁ AQUÍ ---
             const client = new SuiClient({ url: getFullnodeUrl('testnet') });
-            const sdk = initCetusSDK({ network: 'testnet' });
+            const sdk = initCetusSDK({
+                network: 'testnet',
+                suiClient: client // Pasamos el cliente durante la inicialización
+            });
             sdk.senderAddress = account.address;
-            sdk.suiClient = client; // <-- Asignamos el cliente al SDK
 
             console.log("[SWAP] 2. SDK inicializado con SuiClient.");
 
