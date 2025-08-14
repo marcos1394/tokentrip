@@ -36,6 +36,7 @@ export function MiniSwap({
 }: MiniSwapProps) {
     const account = useCurrentAccount();
     const { toast } = useToast();
+    // Usamos el hook useSuiClient que nos provee el Dapp-Kit
     const suiClient = useSuiClient();
     const { mutate: signAndExecuteTransaction, isPending } = useSignAndExecuteTransaction();
 
@@ -48,8 +49,7 @@ export function MiniSwap({
     const getUserBalance = useCallback(async () => {
         if (!account) return;
         try {
-            const client = new SuiClient({ url: getFullnodeUrl('testnet') });
-            const balanceResponse = await client.getBalance({
+            const balanceResponse = await suiClient.getBalance({
                 owner: account.address,
                 coinType: fromCoinType,
             });
@@ -58,7 +58,7 @@ export function MiniSwap({
             console.error('❌ Error fetching balance:', error);
             setUserBalance(null);
         }
-    }, [account, fromCoinType]);
+    }, [account, fromCoinType, suiClient]);
 
     const getQuote = useCallback(async () => {
         if (parseFloat(fromAmount) <= 0 || !account) {
@@ -97,45 +97,55 @@ export function MiniSwap({
     }, [fromAmount, getQuote, getUserBalance]);
 
     const handleSwap = async () => {
-        if (!account || !quoteResult || !suiClient) return;
+        if (!account || !quoteResult) return;
 
         try {
+            console.log("[SWAP] 1. Iniciando swap...");
+            // --- CORRECCIÓN DEFINITIVA ---
+            // Inicializamos el SDK de forma simple. No necesita el cliente aquí.
             const sdk = initCetusSDK({ network: 'testnet' });
             sdk.senderAddress = account.address;
+
+            console.log("[SWAP] 2. SDK inicializado.");
 
             const amountInBaseUnits = new BN(quoteResult.amount);
             const estimatedAmountOut = new BN(quoteResult.estimatedAmountOut);
             const slippage = Percentage.fromDecimal(new Decimal(0.05)); // 5%
             const amountLimit = adjustForSlippage(estimatedAmountOut, slippage, false);
             
-            // --- LA SOLUCIÓN DEFINITIVA: USAR LA FUNCIÓN DE ALTO NIVEL CORRECTAMENTE ---
-            const swapPayload = await sdk.Swap.createSwapTransactionPayload(
-                {
-                    pool_id: quoteResult.poolAddress,
-                    coinTypeA: quoteResult.coinTypeA, // Usar el coinTypeA del pool
-                    coinTypeB: quoteResult.coinTypeB, // Usar el coinTypeB del pool
-                    a2b: quoteResult.aToB,
-                    by_amount_in: true,
-                    amount: amountInBaseUnits.toString(),
-                    amount_limit: amountLimit.toString(),
-                },
-                suiClient // Pasamos el cliente que ya tenemos del hook `useSuiClient`
-            );
+            const payloadParams = {
+                pool_id: quoteResult.poolAddress,
+                coinTypeA: quoteResult.coinTypeA,
+                coinTypeB: quoteResult.coinTypeB,
+                a2b: quoteResult.aToB,
+                by_amount_in: true,
+                amount: amountInBaseUnits.toString(),
+                amount_limit: amountLimit.toString(),
+            };
+            console.log("[SWAP] 3. Parámetros para crear el payload:", payloadParams);
+            
+            // La función `createSwapTransactionPayload` se llama con un solo argumento.
+            // El `dapp-kit` se encargará de proveer los fondos necesarios.
+            const swapPayload = sdk.Swap.createSwapTransactionPayload(payloadParams);
+            console.log("[SWAP] 4. Payload de transacción creado.", swapPayload);
 
             signAndExecuteTransaction(
                 { transaction: swapPayload },
                 {
                     onSuccess: (result) => {
+                        console.log("[SWAP] 5. Transacción exitosa:", result.digest);
                         toast({ title: "✅ Swap Successful!", description: `You received ~${toAmount} ${toCoinSymbol}.` });
                         onSwapSuccess();
                         getUserBalance();
                     },
                     onError: (error) => {
+                        console.error("[SWAP] 5. Error en la transacción:", error);
                         toast({ variant: "destructive", title: "❌ Swap Failed", description: error.message || "Transaction failed." });
                     }
                 }
             );
         } catch (error: any) {
+            console.error("[SWAP] 5. Error crítico en handleSwap:", error);
             toast({ variant: "destructive", title: "❌ Swap Failed", description: error.message || "Unknown error occurred" });
         }
     };
