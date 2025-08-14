@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60; // 60 segundos de timeout total
 
+// Aumenta el tiempo de espera máximo de la función a 60 segundos
+export const maxDuration = 60;
+
+// Lista de aggregators públicos de Walrus para la Testnet.
 const WALRUS_AGGREGATORS = [
     'https://aggregator.testnet.walrus.atalma.io',
     'https://aggregator.walrus-testnet.h2o-nodes.com',
@@ -11,6 +14,7 @@ const WALRUS_AGGREGATORS = [
 ];
 
 async function handler(req: NextRequest) {
+  // Leemos las cabeceras personalizadas que nos envía el frontend
   const targetUrlHeader = req.headers.get('X-Walrus-Target-URL');
   const forcedContentType = req.headers.get('X-Content-Type');
 
@@ -20,10 +24,10 @@ async function handler(req: NextRequest) {
   console.log(`[PROXY]   - Content-Type Forzado (para GET): ${forcedContentType}`);
 
   if (!targetUrlHeader) {
-    return new Response(JSON.stringify({ error: 'Missing X-Walrus-Target-URL header' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    return NextResponse.json({ error: 'Missing X-Walrus-Target-URL header' }, { status: 400 });
   }
 
-  // --- LÓGICA PARA OBTENER IMÁGENES (GET) ---
+  // --- LÓGICA PARA OBTENER IMÁGENES (GET) CON BASE64 ---
   if (req.method === 'GET') {
     for (const [index, aggregator] of WALRUS_AGGREGATORS.entries()) {
       const blobPath = new URL(targetUrlHeader).pathname;
@@ -46,18 +50,17 @@ async function handler(req: NextRequest) {
         const imageBuffer = await walrusResponse.arrayBuffer();
         console.log(`[PROXY] 4. Buffer de imagen descargado. Tamaño: ${imageBuffer.byteLength} bytes.`);
         
-        const headers = new Headers();
-        headers.set('Access-Control-Allow-Origin', '*');
-        headers.set('Content-Type', forcedContentType || 'application/octet-stream');
-        headers.set('Content-Length', imageBuffer.byteLength.toString());
-
-        console.log('[PROXY] 5. Enviando respuesta al cliente con cabeceras:', {
-          'Content-Type': headers.get('Content-Type'),
-          'Content-Length': headers.get('Content-Length'),
-        });
+        // --- CAMBIO CLAVE: CONVERTIMOS EL BUFFER A BASE64 ---
+        const base64Image = Buffer.from(imageBuffer).toString('base64');
+        const contentType = forcedContentType || 'application/octet-stream';
         
-        // --- CORRECCIÓN FINAL: Usamos el `Response` estándar para mayor fiabilidad ---
-        return new Response(imageBuffer, { status: 200, headers });
+        console.log(`[PROXY] 5. Imagen codificada a Base64. (Primeros 50 caracteres: ${base64Image.substring(0, 50)}...)`);
+
+        // Devolvemos un JSON con la imagen codificada y su tipo
+        return NextResponse.json({
+            imageData: base64Image,
+            contentType: contentType,
+        });
 
       } catch (error: any) {
         console.warn(`[PROXY] Falló el aggregator ${aggregator}: ${error.name === 'AbortError' ? 'Timeout de 15s' : error.message}.`);
@@ -65,10 +68,10 @@ async function handler(req: NextRequest) {
     }
 
     console.error('[PROXY] 6. Todos los aggregators para GET fallaron.');
-    return new Response(JSON.stringify({ error: 'All Walrus aggregators failed to respond.' }), { status: 504, headers: { 'Content-Type': 'application/json' } });
+    return NextResponse.json({ error: 'All Walrus aggregators failed to respond.' }, { status: 504 });
   }
   
-  // --- LÓGICA PARA SUBIR ARCHIVOS (POST / PUT) ---
+  // --- LÓGICA PARA SUBIR ARCHIVOS (POST / PUT) - SIN CAMBIOS ---
   else {
     console.log(`[PROXY ${req.method}] Reenviando subida a: ${targetUrlHeader}`);
     try {
@@ -87,7 +90,6 @@ async function handler(req: NextRequest) {
         
         const responseJson = await walrusResponse.json();
         console.log(`[PROXY ${req.method}] Éxito en la subida.`);
-        // Usamos NextResponse aquí porque sabemos que la respuesta es JSON
         return NextResponse.json(responseJson, { status: walrusResponse.status });
 
     } catch (error: any) {
