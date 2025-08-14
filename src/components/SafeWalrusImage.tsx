@@ -4,25 +4,25 @@ import { useEffect, useState } from 'react';
 import { Skeleton } from './ui/skeleton';
 
 interface SafeWalrusImageProps {
-  src: string;
+  src: string; // La URL original de Walrus que le pasaremos al proxy
   alt: string;
   contentType: string;
   className?: string;
 }
 
 export function SafeWalrusImage({ src, alt, contentType, className }: SafeWalrusImageProps) {
-  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    setObjectUrl(null);
+    // Reseteamos el estado cada vez que las props cambian
+    setDataUrl(null);
     setError(false);
-    let tempUrl: string | null = null;
 
     console.log(`[SafeWalrusImage] 1. useEffect activado. Recibiendo props:`, { src, contentType });
 
-    if (!src) {
-      console.warn('[SafeWalrusImage] src está vacío. No se hará fetch.');
+    if (!src || !contentType) {
+      console.warn('[SafeWalrusImage] src o contentType están vacíos. No se hará fetch.');
       setError(true);
       return;
     };
@@ -39,37 +39,36 @@ export function SafeWalrusImage({ src, alt, contentType, className }: SafeWalrus
         if (!res.ok) {
           throw new Error(`Proxy failed with status: ${res.status} ${res.statusText}`);
         }
-        return res.blob();
+        // --- CAMBIO CLAVE 1: Ahora esperamos una respuesta JSON ---
+        return res.json();
       })
-      .then(blob => {
-        console.log('[SafeWalrusImage] 4. Respuesta convertida a blob:', blob);
-        if (blob.size === 0) {
-          console.error('[SafeWalrusImage] Error: El blob recibido del proxy está vacío.');
-          throw new Error("Received empty blob from proxy.");
+      .then(data => {
+        console.log('[SafeWalrusImage] 4. Respuesta JSON recibida:', data);
+        if (!data.imageData || !data.contentType) {
+            throw new Error("El JSON recibido del proxy no tiene el formato esperado.");
         }
-        tempUrl = URL.createObjectURL(blob);
-        console.log(`[SafeWalrusImage] 5. URL de blob creada: ${tempUrl}`);
-        setObjectUrl(tempUrl);
+        // --- CAMBIO CLAVE 2: Construimos una `data:` URL ---
+        const url = `data:${data.contentType};base64,${data.imageData}`;
+        console.log(`[SafeWalrusImage] 5. URL de datos (data:) creada.`);
+        setDataUrl(url);
       })
       .catch(err => {
         console.error(`[SafeWalrusImage] 6. Fallo en el proceso de fetch:`, err);
         setError(true);
       });
 
-    return () => {
-      if (tempUrl) {
-        URL.revokeObjectURL(tempUrl);
-      }
-    };
+    // Ya no se necesita una función de limpieza para `data:` URLs
+
   }, [src, contentType]);
 
   if (error) {
     return <div className={`${className} bg-muted flex items-center justify-center`}><p className="text-xs text-muted-foreground">Image Error</p></div>;
   }
   
-  if (!objectUrl) {
+  if (!dataUrl) {
     return <Skeleton className={className} />;
   }
 
-  return <img src={objectUrl} alt={alt} className={className} />;
+  // --- CAMBIO CLAVE 3: Usamos la nueva dataUrl en el src ---
+  return <img src={dataUrl} alt={alt} className={className} />;
 }
