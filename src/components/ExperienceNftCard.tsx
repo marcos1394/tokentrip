@@ -10,7 +10,7 @@ interface ExperienceNftCardProps {
     nftId: string;
     name: string;
     imageUrl: string;
-    contentType: string; // <-- AÑADIDO
+    contentType: string;
     price?: number;
     currency?: 'SUI' | 'TKT';
 }
@@ -19,11 +19,15 @@ export function ExperienceNftCard({
     nftId, 
     name, 
     imageUrl, 
-    contentType, // <-- AÑADIDO
+    contentType,
     price, 
     currency = 'SUI', 
     listingId 
 }: ExperienceNftCardProps) {
+
+    // --- LOG DETALLADO ---
+    // Verificamos las props que recibe esta tarjeta al ser renderizada
+    console.log(`[ExperienceNftCard] Renderizando tarjeta para "${name}"`, { imageUrl, contentType });
 
     const targetUrl = `/es/experience/${listingId || nftId}`;
 
@@ -35,7 +39,7 @@ export function ExperienceNftCard({
                         <SafeWalrusImage 
                             src={imageUrl} 
                             alt={name} 
-                            contentType={contentType} // <-- AÑADIDO
+                            contentType={contentType}
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                         />
                     </div>
