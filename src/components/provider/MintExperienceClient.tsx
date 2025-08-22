@@ -33,11 +33,41 @@ export default function MintExperienceClient() {
         if (suiClient && account) {
             const activeChain = account.chains[0];
             if (activeChain === 'sui:testnet' || activeChain === 'sui:mainnet') {
-                const client = new WalrusClient({
-                    suiClient,
-                    network: activeChain.slice(4) as 'testnet' | 'mainnet',
-                });
-                setWalrusClient(client);
+                try {
+                    // Opción 1: Cliente con Upload Relay (recomendado)
+                    const clientWithRelay = new WalrusClient({
+                        suiClient,
+                        network: activeChain.slice(4) as 'testnet' | 'mainnet',
+                        // Configurar upload relay para testnet
+                        uploadRelay: activeChain === 'sui:testnet' ? {
+                            host: 'https://upload-relay.testnet.walrus.space',
+                            sendTip: {
+                                max: 10_000, // máximo 10k MIST como tip
+                            },
+                        } : undefined,
+                        storageNodeClientOptions: {
+                            timeout: 60_000,
+                            onError: (error) => {
+                                console.warn('Storage node error:', error);
+                            }
+                        }
+                    });
+                    setWalrusClient(clientWithRelay);
+                    console.log('✅ WalrusClient inicializado con upload relay');
+                } catch (error) {
+                    console.error('Error inicializando WalrusClient:', error);
+                    // Fallback sin upload relay
+                    const basicClient = new WalrusClient({
+                        suiClient,
+                        network: activeChain.slice(4) as 'testnet' | 'mainnet',
+                        storageNodeClientOptions: {
+                            timeout: 60_000,
+                            onError: (error) => console.warn('Storage node error:', error)
+                        }
+                    });
+                    setWalrusClient(basicClient);
+                    console.log('⚠️ WalrusClient inicializado sin upload relay');
+                }
             }
         } else {
             setWalrusClient(null);
@@ -115,7 +145,38 @@ export default function MintExperienceClient() {
             console.log('✅ [MINT] Blob Object ID capturado:', imageBlobObjectId);
 
             toast({ title: "3/4: Transfiriendo datos a nodos de almacenamiento..." });
-            await flow.upload({ digest: registerResult.digest });
+            
+            // Intentar subida con reintentos
+            let uploadSuccess = false;
+            let uploadAttempt = 0;
+            const maxAttempts = 3;
+            
+            while (!uploadSuccess && uploadAttempt < maxAttempts) {
+                try {
+                    uploadAttempt++;
+                    console.log(`Intento de subida ${uploadAttempt}/${maxAttempts}`);
+                    
+                    await flow.upload({ digest: registerResult.digest });
+                    uploadSuccess = true;
+                    console.log('✅ Upload exitoso');
+                    
+                } catch (uploadError: any) {
+                    console.error(`❌ Upload falló (intento ${uploadAttempt}):`, uploadError.message);
+                    
+                    if (uploadAttempt < maxAttempts) {
+                        console.log('⏳ Esperando antes del siguiente intento...');
+                        await new Promise(resolve => setTimeout(resolve, 3000)); // Esperar 3 segundos
+                        
+                        // Reset client en caso de errores de caché
+                        if (uploadError.message?.includes('RetryableWalrusClientError')) {
+                            walrusClient.reset();
+                            console.log('🔄 Cliente Walrus reseteado');
+                        }
+                    } else {
+                        throw new Error(`Upload falló después de ${maxAttempts} intentos: ${uploadError.message}`);
+                    }
+                }
+            }
             
             toast({ title: "4/4: Certificando disponibilidad..." });
             const certifyTx = flow.certify();
@@ -123,12 +184,22 @@ export default function MintExperienceClient() {
             
             const [createdFile] = await flow.listFiles();
             const blobId = createdFile.blobId;
-            console.log(`✅ [MINT] Archivo subido. Blob ID: ${blobId}`);
+            console.log(`✅ [MINT] Archivo subido. Blob ID (raw): ${blobId}`);
+            console.log(`✅ [MINT] Blob ID type: ${typeof blobId}`);
+            console.log(`✅ [MINT] Blob ID length: ${blobId?.toString().length}`);
 
             // --- CONSTRUIR LA URL CORRECTA PARA EL AGREGADOR ---
-            // Según la documentación, debemos usar el blob ID con el agregador HTTP
+            // Usar el blob ID (no el object ID) con el agregador HTTP
             const imageUrl = `https://aggregator.testnet.walrus.atalma.io/v1/blobs/${blobId}`;
             console.log('✅ [MINT] URL del agregador construida:', imageUrl);
+            
+            // Prueba la URL para ver si funciona
+            try {
+                const testResponse = await fetch(imageUrl, { method: 'HEAD' });
+                console.log('✅ [MINT] Test URL status:', testResponse.status);
+            } catch (error) {
+                console.log('❌ [MINT] Test URL failed:', error);
+            }
 
             // --- MINTEAR EL NFT ---
             toast({ title: "Preparando minteo del NFT..." });
