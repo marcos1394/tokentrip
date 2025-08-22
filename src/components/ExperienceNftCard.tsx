@@ -2,6 +2,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { ShoppingCart } from "lucide-react";
 import Link from 'next/link';
+import { useState } from 'react';
 
 // Interfaz actualizada para recibir contentType
 interface ExperienceNftCardProps {
@@ -23,28 +24,84 @@ export function ExperienceNftCard({
     currency = 'SUI', 
     listingId 
 }: ExperienceNftCardProps) {
-
+    const [imageError, setImageError] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    
     const targetUrl = `/es/experience/${listingId || nftId}`;
-    const isMediaViewable = contentType.startsWith("image/") || contentType.startsWith("video/");
+    const isImage = contentType.startsWith("image/");
+    const isVideo = contentType.startsWith("video/");
+
+    const handleImageLoad = () => {
+        setIsLoading(false);
+        setImageError(false);
+    };
+
+    const handleImageError = () => {
+        setIsLoading(false);
+        setImageError(true);
+        console.error('Error loading image from Walrus:', imageUrl);
+    };
 
     return (
         <Link href={targetUrl} className="group block h-full">
             <Card className="glass-card card-hover h-full flex flex-col overflow-hidden">
                 <CardHeader className="p-0">
-                    <div className="aspect-video overflow-hidden bg-muted">
-                        {/* --- LA SOLUCIÓN FINAL: USAR LA ETIQUETA <object> --- */}
-                        <object 
-                            type={isMediaViewable ? contentType : ''} 
-                            data={isMediaViewable ? imageUrl : ''} 
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                        >
-                            {/* Fallback por si el navegador no puede renderizar el objeto */}
+                    <div className="aspect-video overflow-hidden bg-muted relative">
+                        {isImage && (
+                            <>
+                                {isLoading && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                                        <div className="animate-pulse text-sm text-muted-foreground">Loading...</div>
+                                    </div>
+                                )}
+                                
+                                <img 
+                                    src={imageUrl}
+                                    alt={name}
+                                    className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-110 ${
+                                        isLoading ? 'opacity-0' : 'opacity-100'
+                                    }`}
+                                    onLoad={handleImageLoad}
+                                    onError={handleImageError}
+                                    crossOrigin="anonymous"
+                                />
+                                
+                                {imageError && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                                        <div className="text-center p-4">
+                                            <p className="text-xs text-muted-foreground mb-2">Image not available</p>
+                                            <p className="text-xs text-muted-foreground opacity-70">
+                                                Check blob ID or network connection
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        
+                        {isVideo && (
+                            <video 
+                                src={imageUrl}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                                controls={false}
+                                muted
+                                loop
+                                playsInline
+                                onError={handleImageError}
+                            />
+                        )}
+                        
+                        {!isImage && !isVideo && (
                             <div className="w-full h-full flex items-center justify-center">
-                                <p className="text-xs text-muted-foreground">Media not available</p>
+                                <div className="text-center p-4">
+                                    <p className="text-xs text-muted-foreground mb-1">Media type: {contentType}</p>
+                                    <p className="text-xs text-muted-foreground">Preview not available</p>
+                                </div>
                             </div>
-                        </object>
+                        )}
                     </div>
                 </CardHeader>
+                
                 <CardContent className="p-4 flex-grow">
                     <CardTitle className="text-lg text-foreground line-clamp-2 leading-tight h-[56px]">{name}</CardTitle>
                 </CardContent>
