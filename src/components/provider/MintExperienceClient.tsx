@@ -66,145 +66,145 @@ export default function MintExperienceClient() {
     const providerProfile = providerData?.data?.[0] as ProviderProfile | undefined;
     
     const handleMint = async () => {
-    if (!account || !providerProfile || !walrusClient) {
-        toast({ variant: 'destructive', title: "Error", description: "Wallet not connected or client not ready." });
-        return;
-    }
-    if (!name || !description || !imageFile) {
-        toast({ variant: 'destructive', title: "Incomplete Form", description: "Please fill in the name, description, and select an image." });
-        return;
-    }
-    setIsMinting(true);
-    try {
-        // --- PASO 1: Subida a Walrus para obtener IDs ---
-        toast({ title: "1/5: Subiendo archivo a Walrus..." });
-        const imageArrayBuffer = await imageFile.arrayBuffer();
-        const uint8Array = new Uint8Array(imageArrayBuffer);
-
-        const flow = walrusClient.writeFilesFlow({
-            files: [ WalrusFile.from({ 
-                contents: uint8Array, 
-                identifier: imageFile.name,
-                tags: { 'content-type': imageFile.type || 'application/octet-stream' }
-            }) ],
-        });
-        
-        await flow.encode();
-        
-        toast({ title: "2/5: Registrando archivo en la blockchain..." });
-        const registerTx = flow.register({ epochs: 5, owner: account.address, deletable: false });
-        const registerResult = await signAndExecuteTx({ transaction: registerTx, account });
-        
-        const txResultRegister = await suiClient.waitForTransaction({ 
-            digest: registerResult.digest, 
-            options: { showObjectChanges: true } 
-        });
-        const createdBlobObject = txResultRegister.objectChanges?.find(
-            (change) => change.type === 'created' && change.objectType.includes('::blob::Blob')
-        );
-        if (!createdBlobObject || !('objectId' in createdBlobObject)) {
-            throw new Error("Could not find the Blob Object ID after registration.");
+        if (!account || !providerProfile || !walrusClient) {
+            toast({ variant: 'destructive', title: "Error", description: "Wallet not connected or client not ready." });
+            return;
         }
-        const imageBlobObjectId = createdBlobObject.objectId;
-        console.log('✅ [MINT] Blob Object ID capturado:', imageBlobObjectId);
-
-        toast({ title: "3/5: Transfiriendo datos..." });
-        await flow.upload({ digest: registerResult.digest });
-        
-        toast({ title: "4/5: Certificando archivo..." });
-        const certifyTx = flow.certify();
-        await signAndExecuteTx({ transaction: certifyTx, account });
-        
-        const [createdFile] = await flow.listFiles();
-        const blobId = createdFile.blobId;
-        console.log(`✅ [MINT] Archivo subido. Blob ID: ${blobId}`);
-
-        // --- PASO 2: PUBLICAR EL BLOB COMO UN "SITE" ---
-        toast({ title: "Publicando imagen como Site..." });
-        
-        const publishTx = await walrusClient.publishSite({
-            files: [{ path: 'media', blobId: blobId }] // Usamos 'media' como ruta genérica
-        });
-        const publishResult = await signAndExecuteTx({ transaction: publishTx, account });
-        const txResultPublish = await suiClient.waitForTransaction({ 
-            digest: publishResult.digest, 
-            options: { showObjectChanges: true }
-        });
-        
-        const siteObject = txResultPublish.objectChanges?.find(
-            (change) => change.type === 'created' && change.objectType.includes('::site::Site')
-        );
-        if (!siteObject || !('objectId' in siteObject)) {
-            throw new Error("No se pudo crear el Walrus Site.");
+        if (!name || !description || !imageFile) {
+            toast({ variant: 'destructive', title: "Incomplete Form", description: "Please fill in the name, description, and select an image." });
+            return;
         }
-        const siteId = siteObject.objectId;
         
-        // --- ESTA ES LA URL QUE SÍ FUNCIONA PARA RENDERIZAR ---
-        const finalImageUrl = `https://${siteId}.walrus.site/media`;
-        console.log('✅ [MINT] Site publicado. URL final y funcional:', finalImageUrl);
+        setIsMinting(true);
+        
+        try {
+            // --- PASO 1: Subida a Walrus usando el flujo correcto ---
+            toast({ title: "1/4: Preparando archivo para Walrus..." });
+            
+            const imageArrayBuffer = await imageFile.arrayBuffer();
+            const uint8Array = new Uint8Array(imageArrayBuffer);
 
-        // --- PASO 3: MINTEAR EL NFT CON LA NUEVA URL ---
-        toast({ title: "5/5: Preparando minteo del NFT..." });
-        const tx = new Transaction();
+            const flow = walrusClient.writeFilesFlow({
+                files: [ WalrusFile.from({ 
+                    contents: uint8Array, 
+                    identifier: imageFile.name,
+                    tags: { 'content-type': imageFile.type || 'application/octet-stream' }
+                }) ],
+            });
+            
+            await flow.encode();
+            
+            toast({ title: "2/4: Registrando archivo en la blockchain..." });
+            const registerTx = flow.register({ epochs: 5, owner: account.address, deletable: false });
+            const registerResult = await signAndExecuteTx({ transaction: registerTx, account });
+            
+            const txResultRegister = await suiClient.waitForTransaction({ 
+                digest: registerResult.digest, 
+                options: { showObjectChanges: true } 
+            });
+            
+            const createdBlobObject = txResultRegister.objectChanges?.find(
+                (change) => change.type === 'created' && change.objectType.includes('::blob::Blob')
+            );
+            
+            if (!createdBlobObject || !('objectId' in createdBlobObject)) {
+                throw new Error("Could not find the Blob Object ID after registration.");
+            }
+            
+            const imageBlobObjectId = createdBlobObject.objectId;
+            console.log('✅ [MINT] Blob Object ID capturado:', imageBlobObjectId);
 
-        const contentType = imageFile.type || 'application/octet-stream';
-        // (El resto de la preparación de datos se mantiene igual)
-        const attributeKeys = attributesForContract.map(attr => attr.key);
-        const attributeValues = attributesForContract.map(attr => attr.value);
-        const ruleTriggerTypes = evolutionRules.map(rule => Number(rule.trigger_type));
-        const ruleTriggerValues = evolutionRules.map(rule => rule.trigger_value.toString());
-        const ruleNewImageUrls = evolutionRules.map(rule => rule.new_image_url);
-        const ruleNewImageBlobObjectIds = evolutionRules.map(rule => rule.new_image_blob_object_id);
-        const ruleNewDescriptions = evolutionRules.map(rule => rule.new_description);
-        
-        tx.moveCall({
-            target: `${suiConfig.packageId}::experience_nft::provider_mint_experience`,
-            arguments: [
-                tx.object(providerProfile.data.objectId),
-                tx.pure.string(name),
-                tx.pure.string(description),
-                tx.pure.string(finalImageUrl), // <-- Pasamos la nueva URL del Site
-                tx.object(imageBlobObjectId),   // <-- Pasamos el ID del Blob como lo espera el contrato
-                tx.pure.string(contentType),    // <-- Pasamos el contentType como lo espera el contrato
-                tx.pure.string(eventName),
-                tx.pure.string(eventCity),
-                tx.pure.string(validityDetails),
-                tx.pure.string(experienceType),
-                tx.pure.string(tier),
-                tx.pure.u64(Number(serialNumber)),
-                tx.pure.string(collectionName),
-                tx.pure.vector('string', attributeKeys),
-                tx.pure.vector('string', attributeValues),
-                tx.pure.bool(isRedeemable),
-                tx.pure.u64((expiration?.getTime() || 0).toString()),
-                tx.pure.vector('u8', ruleTriggerTypes),
-                tx.pure.vector('u64', ruleTriggerValues),
-                tx.pure.vector('string', ruleNewImageUrls),
-                tx.pure.vector('address', ruleNewImageBlobObjectIds),
-                tx.pure.vector('string', ruleNewDescriptions),
-            ],
-        });
-        
-        toast({ title: "Please approve the final transaction in your wallet." });
-        const mintResult = await signAndExecuteTx({ transaction: tx, account });
-        
-        const txResult = await suiClient.waitForTransaction({
-            digest: mintResult.digest,
-            options: { showEffects: true }
-        });
+            toast({ title: "3/4: Transfiriendo datos a nodos de almacenamiento..." });
+            await flow.upload({ digest: registerResult.digest });
+            
+            toast({ title: "4/4: Certificando disponibilidad..." });
+            const certifyTx = flow.certify();
+            await signAndExecuteTx({ transaction: certifyTx, account });
+            
+            const [createdFile] = await flow.listFiles();
+            const blobId = createdFile.blobId;
+            console.log(`✅ [MINT] Archivo subido. Blob ID: ${blobId}`);
 
-        if (txResult.effects?.status.status === 'success') {
-            toast({ title: "✅ Experience Minted Successfully!" });
-        } else {
-            throw new Error("The minting transaction failed on-chain.");
+            // --- CONSTRUIR LA URL CORRECTA PARA EL AGREGADOR ---
+            // Según la documentación, debemos usar el blob ID con el agregador HTTP
+            const imageUrl = `https://aggregator.testnet.walrus.atalma.io/v1/blobs/${blobId}`;
+            console.log('✅ [MINT] URL del agregador construida:', imageUrl);
+
+            // --- MINTEAR EL NFT ---
+            toast({ title: "Preparando minteo del NFT..." });
+            const tx = new Transaction();
+
+            const contentType = imageFile.type || 'application/octet-stream';
+            
+            // Construir atributos para el contrato
+            const attributes: Attribute[] = [
+                { key: 'Event Name', value: eventName },
+                { key: 'Event City', value: eventCity },
+                { key: 'Validity Details', value: validityDetails },
+                { key: 'Experience Type', value: experienceType },
+                { key: 'Tier', value: tier },
+                { key: 'Serial Number', value: serialNumber },
+                { key: 'Collection', value: collectionName },
+            ].filter(attr => attr.value.trim() !== '');
+            
+            const attributeKeys = attributes.map(attr => attr.key);
+            const attributeValues = attributes.map(attr => attr.value);
+            const ruleTriggerTypes = evolutionRules.map(rule => Number(rule.trigger_type));
+            const ruleTriggerValues = evolutionRules.map(rule => rule.trigger_value.toString());
+            const ruleNewImageUrls = evolutionRules.map(rule => rule.new_image_url);
+            const ruleNewImageBlobObjectIds = evolutionRules.map(rule => rule.new_image_blob_object_id);
+            const ruleNewDescriptions = evolutionRules.map(rule => rule.new_description);
+            
+            tx.moveCall({
+                target: `${suiConfig.packageId}::experience_nft::provider_mint_experience`,
+                arguments: [
+                    tx.object(providerProfile.data.objectId),
+                    tx.pure.string(name),
+                    tx.pure.string(description),
+                    tx.pure.string(imageUrl),              // URL del agregador HTTP
+                    tx.object(imageBlobObjectId),          // ID del Blob Object en Sui
+                    tx.pure.string(contentType),           // Content type del archivo
+                    tx.pure.string(eventName),
+                    tx.pure.string(eventCity),
+                    tx.pure.string(validityDetails),
+                    tx.pure.string(experienceType),
+                    tx.pure.string(tier),
+                    tx.pure.u64(Number(serialNumber)),
+                    tx.pure.string(collectionName),
+                    tx.pure.vector('string', attributeKeys),
+                    tx.pure.vector('string', attributeValues),
+                    tx.pure.bool(isRedeemable),
+                    tx.pure.u64((expiration?.getTime() || 0).toString()),
+                    tx.pure.vector('u8', ruleTriggerTypes),
+                    tx.pure.vector('u64', ruleTriggerValues),
+                    tx.pure.vector('string', ruleNewImageUrls),
+                    tx.pure.vector('address', ruleNewImageBlobObjectIds),
+                    tx.pure.vector('string', ruleNewDescriptions),
+                ],
+            });
+            
+            toast({ title: "Please approve the final transaction in your wallet." });
+            const mintResult = await signAndExecuteTx({ transaction: tx, account });
+            
+            const txResult = await suiClient.waitForTransaction({
+                digest: mintResult.digest,
+                options: { showEffects: true }
+            });
+
+            if (txResult.effects?.status.status === 'success') {
+                toast({ title: "✅ Experience Minted Successfully!", description: `Image available at: ${imageUrl}` });
+            } else {
+                throw new Error("The minting transaction failed on-chain.");
+            }
+            
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "❌ Minting Failed", description: error.message || "An unexpected error occurred." });
+            console.error("❌ [MINT] Process failed:", error);
+        } finally {
+            setIsMinting(false);
         }
-    } catch (error: any) {
-        toast({ variant: "destructive", title: "❌ Minting Failed", description: error.message || "An unexpected error occurred." });
-        console.error("❌ [MINT] Process failed:", error);
-    } finally {
-        setIsMinting(false);
-    }
-};
+    };
+
     if (isLoadingProfile) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>
     }
