@@ -95,205 +95,204 @@ export default function MintExperienceClient() {
     const { data: providerData, isLoading: isLoadingProfile } = useSuiClientQuery('getOwnedObjects', { owner: account?.address!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ProviderProfile` }, limit: 1, options: {showContent: true} }, { enabled: !!account });
     const providerProfile = providerData?.data?.[0] as ProviderProfile | undefined;
     
-    const handleMint = async () => {
-        if (!account || !providerProfile || !walrusClient) {
-            toast({ variant: 'destructive', title: "Error", description: "Wallet not connected or client not ready." });
-            return;
-        }
-        if (!name || !description || !imageFile) {
-            toast({ variant: 'destructive', title: "Incomplete Form", description: "Please fill in the name, description, and select an image." });
-            return;
+   const handleMint = async () => {
+    if (!account || !providerProfile || !walrusClient) {
+        toast({ variant: 'destructive', title: "Error", description: "Wallet not connected or client not ready." });
+        return;
+    }
+    if (!name || !description || !imageFile) {
+        toast({ variant: 'destructive', title: "Incomplete Form", description: "Please fill in the name, description, and select an image." });
+        return;
+    }
+    
+    setIsMinting(true);
+    
+    try {
+        // --- DECLARACIÓN MOVIDA A SU POSICIÓN CORRECTA ---
+        const contentType = imageFile.type || 'application/octet-stream';
+
+        // --- PASO 1: Subida a Walrus usando el flujo correcto ---
+        toast({ title: "1/4: Preparando archivo para Walrus..." });
+        
+        const imageArrayBuffer = await imageFile.arrayBuffer();
+        const uint8Array = new Uint8Array(imageArrayBuffer);
+
+        const flow = walrusClient.writeFilesFlow({
+            files: [ WalrusFile.from({ 
+                contents: uint8Array, 
+                identifier: imageFile.name,
+                tags: { 'content-type': contentType }
+            }) ],
+        });
+        
+        await flow.encode();
+        
+        toast({ title: "2/4: Registrando archivo en la blockchain..." });
+        const registerTx = flow.register({ epochs: 5, owner: account.address, deletable: false });
+        const registerResult = await signAndExecuteTx({ transaction: registerTx, account });
+        
+        const txResultRegister = await suiClient.waitForTransaction({ 
+            digest: registerResult.digest, 
+            options: { showObjectChanges: true } 
+        });
+        
+        const createdBlobObject = txResultRegister.objectChanges?.find(
+            (change) => change.type === 'created' && change.objectType.includes('::blob::Blob')
+        );
+        
+        if (!createdBlobObject || !('objectId' in createdBlobObject)) {
+            throw new Error("Could not find the Blob Object ID after registration.");
         }
         
-        setIsMinting(true);
+        const imageBlobObjectId = createdBlobObject.objectId;
+        console.log('✅ [MINT] Blob Object ID capturado:', imageBlobObjectId);
+
+        toast({ title: "3/4: Transfiriendo datos a nodos de almacenamiento..." });
         
-        try {
-            // --- PASO 1: Subida a Walrus usando el flujo correcto ---
-            toast({ title: "1/4: Preparando archivo para Walrus..." });
-            
-            const imageArrayBuffer = await imageFile.arrayBuffer();
-            const uint8Array = new Uint8Array(imageArrayBuffer);
-
-            const flow = walrusClient.writeFilesFlow({
-                files: [ WalrusFile.from({ 
-                    contents: uint8Array, 
-                    identifier: imageFile.name,
-                    tags: { 'content-type': imageFile.type || 'application/octet-stream' }
-                }) ],
-            });
-            
-            await flow.encode();
-            
-            toast({ title: "2/4: Registrando archivo en la blockchain..." });
-            const registerTx = flow.register({ epochs: 5, owner: account.address, deletable: false });
-            const registerResult = await signAndExecuteTx({ transaction: registerTx, account });
-            
-            const txResultRegister = await suiClient.waitForTransaction({ 
-                digest: registerResult.digest, 
-                options: { showObjectChanges: true } 
-            });
-            
-            const createdBlobObject = txResultRegister.objectChanges?.find(
-                (change) => change.type === 'created' && change.objectType.includes('::blob::Blob')
-            );
-            
-            if (!createdBlobObject || !('objectId' in createdBlobObject)) {
-                throw new Error("Could not find the Blob Object ID after registration.");
-            }
-            
-            const imageBlobObjectId = createdBlobObject.objectId;
-            console.log('✅ [MINT] Blob Object ID capturado:', imageBlobObjectId);
-
-            toast({ title: "3/4: Transfiriendo datos a nodos de almacenamiento..." });
-            
-            // Intentar subida con reintentos
-            let uploadSuccess = false;
-            let uploadAttempt = 0;
-            const maxAttempts = 3;
-            
-            while (!uploadSuccess && uploadAttempt < maxAttempts) {
-                try {
-                    uploadAttempt++;
-                    console.log(`Intento de subida ${uploadAttempt}/${maxAttempts}`);
-                    
-                    await flow.upload({ digest: registerResult.digest });
-                    uploadSuccess = true;
-                    console.log('✅ Upload exitoso');
-                    
-                } catch (uploadError: any) {
-                    console.error(`❌ Upload falló (intento ${uploadAttempt}):`, uploadError.message);
-                    
-                    if (uploadAttempt < maxAttempts) {
-                        console.log('⏳ Esperando antes del siguiente intento...');
-                        await new Promise(resolve => setTimeout(resolve, 3000)); // Esperar 3 segundos
-                        
-                        // Reset client en caso de errores de caché
-                        if (uploadError.message?.includes('RetryableWalrusClientError')) {
-                            walrusClient.reset();
-                            console.log('🔄 Cliente Walrus reseteado');
-                        }
-                    } else {
-                        throw new Error(`Upload falló después de ${maxAttempts} intentos: ${uploadError.message}`);
-                    }
-                }
-            }
-            
-            toast({ title: "4/4: Certificando disponibilidad..." });
-            const certifyTx = flow.certify();
-            await signAndExecuteTx({ transaction: certifyTx, account });
-            
-            const [createdFile] = await flow.listFiles();
-            const blobId = createdFile.blobId;
-            console.log(`✅ [MINT] Archivo subido. Blob ID (raw): ${blobId}`);
-            console.log(`✅ [MINT] Blob ID type: ${typeof blobId}`);
-            console.log(`✅ [MINT] Blob ID length: ${blobId?.toString().length}`);
-
-            // --- CONSTRUIR LA URL CORRECTA PARA MOSTRAR IMÁGENES ---
-            // Como Walrus Sites portal no está funcionando en testnet, 
-            // usaremos el agregador directo con un wrapper personalizado
-            const imageUrlDirect = `https://aggregator.testnet.walrus.atalma.io/v1/blobs/${blobId}`;
-            
-            console.log('✅ [MINT] Blob ID:', blobId);
-            console.log('✅ [MINT] URL del agregador:', imageUrlDirect);
-            
-            // Usaremos la URL directa del agregador
-            const imageUrl = imageUrlDirect;
-            
-            // Verificar que los datos estén disponibles
+        // Intentar subida con reintentos
+        let uploadSuccess = false;
+        let uploadAttempt = 0;
+        const maxAttempts = 3;
+        
+        while (!uploadSuccess && uploadAttempt < maxAttempts) {
             try {
-                const testResponse = await fetch(imageUrl, { method: 'GET' });
-                console.log('✅ [MINT] Test URL status:', testResponse.status);
+                uploadAttempt++;
+                console.log(`Intento de subida ${uploadAttempt}/${maxAttempts}`);
                 
-                if (testResponse.ok) {
-                    const arrayBuffer = await testResponse.arrayBuffer();
-                    console.log('✅ [MINT] Datos recibidos, tamaño:', arrayBuffer.byteLength, 'bytes');
+                await flow.upload({ digest: registerResult.digest });
+                uploadSuccess = true;
+                console.log('✅ Upload exitoso');
+                
+            } catch (uploadError: any) {
+                console.error(`❌ Upload falló (intento ${uploadAttempt}):`, uploadError.message);
+                
+                if (uploadAttempt < maxAttempts) {
+                    console.log('⏳ Esperando antes del siguiente intento...');
+                    await new Promise(resolve => setTimeout(resolve, 3000)); // Esperar 3 segundos
                     
-                    // Verificar que es una imagen válida creando un blob URL temporal
-                    const blob = new Blob([arrayBuffer], { type: contentType });
-                    const tempUrl = URL.createObjectURL(blob);
-                    console.log('✅ [MINT] URL temporal creada para verificación:', tempUrl);
-                    
-                    // Limpiar la URL temporal después de un momento
-                    setTimeout(() => URL.revokeObjectURL(tempUrl), 5000);
+                    // Reset client en caso de errores de caché
+                    if (uploadError.message?.includes('RetryableWalrusClientError')) {
+                        walrusClient.reset();
+                        console.log('🔄 Cliente Walrus reseteado');
+                    }
+                } else {
+                    throw new Error(`Upload falló después de ${maxAttempts} intentos: ${uploadError.message}`);
                 }
-            } catch (error) {
-                console.log('❌ [MINT] Error verificando datos:', error);
             }
-
-            // --- MINTEAR EL NFT ---
-            toast({ title: "Preparando minteo del NFT..." });
-            const tx = new Transaction();
-
-            const contentType = imageFile.type || 'application/octet-stream';
-            
-            // Construir atributos para el contrato
-            const attributes: Attribute[] = [
-                { key: 'Event Name', value: eventName },
-                { key: 'Event City', value: eventCity },
-                { key: 'Validity Details', value: validityDetails },
-                { key: 'Experience Type', value: experienceType },
-                { key: 'Tier', value: tier },
-                { key: 'Serial Number', value: serialNumber },
-                { key: 'Collection', value: collectionName },
-            ].filter(attr => attr.value.trim() !== '');
-            
-            const attributeKeys = attributes.map(attr => attr.key);
-            const attributeValues = attributes.map(attr => attr.value);
-            const ruleTriggerTypes = evolutionRules.map(rule => Number(rule.trigger_type));
-            const ruleTriggerValues = evolutionRules.map(rule => rule.trigger_value.toString());
-            const ruleNewImageUrls = evolutionRules.map(rule => rule.new_image_url);
-            const ruleNewImageBlobObjectIds = evolutionRules.map(rule => rule.new_image_blob_object_id);
-            const ruleNewDescriptions = evolutionRules.map(rule => rule.new_description);
-            
-            tx.moveCall({
-                target: `${suiConfig.packageId}::experience_nft::provider_mint_experience`,
-                arguments: [
-                    tx.object(providerProfile.data.objectId),
-                    tx.pure.string(name),
-                    tx.pure.string(description),
-                    tx.pure.string(imageUrl),              // URL del agregador HTTP
-                    tx.object(imageBlobObjectId),          // ID del Blob Object en Sui
-                    tx.pure.string(contentType),           // Content type del archivo
-                    tx.pure.string(eventName),
-                    tx.pure.string(eventCity),
-                    tx.pure.string(validityDetails),
-                    tx.pure.string(experienceType),
-                    tx.pure.string(tier),
-                    tx.pure.u64(Number(serialNumber)),
-                    tx.pure.string(collectionName),
-                    tx.pure.vector('string', attributeKeys),
-                    tx.pure.vector('string', attributeValues),
-                    tx.pure.bool(isRedeemable),
-                    tx.pure.u64((expiration?.getTime() || 0).toString()),
-                    tx.pure.vector('u8', ruleTriggerTypes),
-                    tx.pure.vector('u64', ruleTriggerValues),
-                    tx.pure.vector('string', ruleNewImageUrls),
-                    tx.pure.vector('address', ruleNewImageBlobObjectIds),
-                    tx.pure.vector('string', ruleNewDescriptions),
-                ],
-            });
-            
-            toast({ title: "Please approve the final transaction in your wallet." });
-            const mintResult = await signAndExecuteTx({ transaction: tx, account });
-            
-            const txResult = await suiClient.waitForTransaction({
-                digest: mintResult.digest,
-                options: { showEffects: true }
-            });
-
-            if (txResult.effects?.status.status === 'success') {
-                toast({ title: "✅ Experience Minted Successfully!", description: `Image available at: ${imageUrl}` });
-            } else {
-                throw new Error("The minting transaction failed on-chain.");
-            }
-            
-        } catch (error: any) {
-            toast({ variant: "destructive", title: "❌ Minting Failed", description: error.message || "An unexpected error occurred." });
-            console.error("❌ [MINT] Process failed:", error);
-        } finally {
-            setIsMinting(false);
         }
-    };
+        
+        toast({ title: "4/4: Certificando disponibilidad..." });
+        const certifyTx = flow.certify();
+        await signAndExecuteTx({ transaction: certifyTx, account });
+        
+        const [createdFile] = await flow.listFiles();
+        const blobId = createdFile.blobId;
+        console.log(`✅ [MINT] Archivo subido. Blob ID (raw): ${blobId}`);
+        console.log(`✅ [MINT] Blob ID type: ${typeof blobId}`);
+        console.log(`✅ [MINT] Blob ID length: ${blobId?.toString().length}`);
+
+        // --- CONSTRUIR LA URL CORRECTA PARA MOSTRAR IMÁGENES ---
+        const imageUrlDirect = `https://aggregator.testnet.walrus.atalma.io/v1/blobs/${blobId}`;
+        
+        console.log('✅ [MINT] Blob ID:', blobId);
+        console.log('✅ [MINT] URL del agregador:', imageUrlDirect);
+        
+        // Usaremos la URL directa del agregador
+        const imageUrl = imageUrlDirect;
+        
+        // Verificar que los datos estén disponibles
+        try {
+            const testResponse = await fetch(imageUrl, { method: 'GET' });
+            console.log('✅ [MINT] Test URL status:', testResponse.status);
+            
+            if (testResponse.ok) {
+                const arrayBuffer = await testResponse.arrayBuffer();
+                console.log('✅ [MINT] Datos recibidos, tamaño:', arrayBuffer.byteLength, 'bytes');
+                
+                // Verificar que es una imagen válida creando un blob URL temporal
+                const blob = new Blob([arrayBuffer], { type: contentType });
+                const tempUrl = URL.createObjectURL(blob);
+                console.log('✅ [MINT] URL temporal creada para verificación:', tempUrl);
+                
+                // Limpiar la URL temporal después de un momento
+                setTimeout(() => URL.revokeObjectURL(tempUrl), 5000);
+            }
+        } catch (error) {
+            console.log('❌ [MINT] Error verificando datos:', error);
+        }
+
+        // --- MINTEAR EL NFT ---
+        toast({ title: "Preparando minteo del NFT..." });
+        const tx = new Transaction();
+        
+        // Construir atributos para el contrato
+        const attributes: Attribute[] = [
+            { key: 'Event Name', value: eventName },
+            { key: 'Event City', value: eventCity },
+            { key: 'Validity Details', value: validityDetails },
+            { key: 'Experience Type', value: experienceType },
+            { key: 'Tier', value: tier },
+            { key: 'Serial Number', value: serialNumber },
+            { key: 'Collection', value: collectionName },
+        ].filter(attr => attr.value.trim() !== '');
+        
+        const attributeKeys = attributes.map(attr => attr.key);
+        const attributeValues = attributes.map(attr => attr.value);
+        const ruleTriggerTypes = evolutionRules.map(rule => Number(rule.trigger_type));
+        const ruleTriggerValues = evolutionRules.map(rule => rule.trigger_value.toString());
+        const ruleNewImageUrls = evolutionRules.map(rule => rule.new_image_url);
+        const ruleNewImageBlobObjectIds = evolutionRules.map(rule => rule.new_image_blob_object_id);
+        const ruleNewDescriptions = evolutionRules.map(rule => rule.new_description);
+        
+        tx.moveCall({
+            target: `${suiConfig.packageId}::experience_nft::provider_mint_experience`,
+            arguments: [
+                tx.object(providerProfile.data.objectId),
+                tx.pure.string(name),
+                tx.pure.string(description),
+                tx.pure.string(imageUrl),           // URL del agregador HTTP
+                tx.object(imageBlobObjectId),       // ID del Blob Object en Sui
+                tx.pure.string(contentType),        // Content type del archivo
+                tx.pure.string(eventName),
+                tx.pure.string(eventCity),
+                tx.pure.string(validityDetails),
+                tx.pure.string(experienceType),
+                tx.pure.string(tier),
+                tx.pure.u64(Number(serialNumber)),
+                tx.pure.string(collectionName),
+                tx.pure.vector('string', attributeKeys),
+                tx.pure.vector('string', attributeValues),
+                tx.pure.bool(isRedeemable),
+                tx.pure.u64((expiration?.getTime() || 0).toString()),
+                tx.pure.vector('u8', ruleTriggerTypes),
+                tx.pure.vector('u64', ruleTriggerValues),
+                tx.pure.vector('string', ruleNewImageUrls),
+                tx.pure.vector('address', ruleNewImageBlobObjectIds),
+                tx.pure.vector('string', ruleNewDescriptions),
+            ],
+        });
+        
+        toast({ title: "Please approve the final transaction in your wallet." });
+        const mintResult = await signAndExecuteTx({ transaction: tx, account });
+        
+        const txResult = await suiClient.waitForTransaction({
+            digest: mintResult.digest,
+            options: { showEffects: true }
+        });
+
+        if (txResult.effects?.status.status === 'success') {
+            toast({ title: "✅ Experience Minted Successfully!", description: `Image available at: ${imageUrl}` });
+        } else {
+            throw new Error("The minting transaction failed on-chain.");
+        }
+        
+    } catch (error: any) {
+        toast({ variant: "destructive", title: "❌ Minting Failed", description: error.message || "An unexpected error occurred." });
+        console.error("❌ [MINT] Process failed:", error);
+    } finally {
+        setIsMinting(false);
+    }
+};
 
     if (isLoadingProfile) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>
