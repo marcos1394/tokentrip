@@ -1,10 +1,10 @@
-// src/components/ListableNftCard.tsx
 'use client';
 
 import { useState } from 'react';
 import { useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { suiConfig } from '@/config/sui';
+import Link from 'next/link';
 
 // Componentes
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,52 +15,46 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
-import { ListPlus, Loader, Edit, Gavel, MoreVertical, Key, Landmark } from 'lucide-react';
+import { ListPlus, Loader, Edit, Gavel, Key, Landmark } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePicker } from './ui/date-picker';
 
+// Interfaz de props corregida y simplificada
 interface ListableNftCardProps {
     nft: {
         objectId: string;
-        display?: {
-            data: {
-                name: string;
-                image_url: string;
-                description: string;
-            }
-        }
+        name: string;
+        description: string;
+        imageUrl: string;
     };
     providerProfileId?: string;
     onActionSuccess: () => void;
-    
-    // --- LÍNEAS AÑADIDAS ---
-    isListing?: boolean;      // Opcional: true si el NFT ya está listado
-    listingData?: any;        // Opcional: para pasar los datos del objeto Listing
-    isFraction?: boolean; // <-- AÑADIDO: Para saber si es una fracción
-
+    isListing?: boolean;
+    listingData?: any;
+    isFraction?: boolean;
 }
 
 const SUI_SYSTEM_CLOCK_OBJECT_ID = "0x6";
 
 export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isListing, listingData, isFraction }: ListableNftCardProps) {    
+    // Estados para controlar la apertura de los modales
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isAuctionOpen, setIsAuctionOpen] = useState(false);
     const [isListOpen, setIsListOpen] = useState(false);
-     // --- ESTADOS PARA EL MODAL DE ALQUILER ---
     const [isRentOpen, setIsRentOpen] = useState(false);
+    const [isLoanRequestOpen, setIsLoanRequestOpen] = useState(false);
+
+    // Estados para los datos de los formularios en los modales
     const [rentPrice, setRentPrice] = useState('');
     const [rentCurrency, setRentCurrency] = useState<'SUI' | 'TKT'>('SUI');
     const [rentStartDate, setRentStartDate] = useState<Date>();
     const [rentEndDate, setRentEndDate] = useState<Date>();
-    
     const [price, setPrice] = useState('');
     const [currency, setCurrency] = useState<'SUI' | 'TKT'>('SUI');
-    const [newDescription, setNewDescription] = useState(nft.display?.data?.description || '');
+    const [newDescription, setNewDescription] = useState(nft.description || '');
     const [startPrice, setStartPrice] = useState('');
-    const [duration, setDuration] = useState('86400000'); // 1 day in ms
-    // --- AÑADIR ESTOS ESTADOS PARA EL MODAL DE SOLICITUD DE PRÉSTAMO ---
-    const [isLoanRequestOpen, setIsLoanRequestOpen] = useState(false);
+    const [duration, setDuration] = useState('86400000'); // 1 día en ms
     const [principalAmount, setPrincipalAmount] = useState('');
     const [repaymentAmount, setRepaymentAmount] = useState('');
     const [loanDuration, setLoanDuration] = useState('2592000000'); // 30 días en ms
@@ -69,14 +63,13 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isLis
     const { toast } = useToast();
     const { mutateAsync: execute, isPending } = useSignAndExecuteTransaction();
 
-     // --- FUNCIÓN PARA LISTAR EN ALQUILER ---
     const handleListForRent = async () => {
         const rentPriceNum = parseFloat(rentPrice);
         if (isNaN(rentPriceNum) || rentPriceNum <= 0) {
-             toast({ variant: 'destructive', title: 'Invalid Price' }); return;
+            toast({ variant: 'destructive', title: 'Invalid Price' }); return;
         }
         if (!rentStartDate || !rentEndDate || rentEndDate <= rentStartDate) {
-             toast({ variant: 'destructive', title: 'Invalid Dates', description: 'Please select a valid start and end date for the rental.' }); return;
+            toast({ variant: 'destructive', title: 'Invalid Dates', description: 'Please select a valid start and end date for the rental.' }); return;
         }
 
         const tx = new Transaction();
@@ -90,7 +83,6 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isLis
             tx.pure.u64(rentEndDate.getTime().toString()),
         ];
         
-        // Los listados de NFTs completos necesitan el Clock para la verificación de expiración
         if (!isFraction) {
             args.push(tx.object(SUI_SYSTEM_CLOCK_OBJECT_ID));
         }
@@ -144,14 +136,11 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isLis
         }
     };
 
-
     const handleListForSale = async () => {
-        // --- CORRECCIÓN: Se añade esta verificación al principio ---
         if (!providerProfileId) {
             toast({ variant: 'destructive', title: 'Error', description: 'Provider profile ID is missing. Cannot list item.' });
             return;
         }
-
         const priceAsNumber = parseFloat(price);
         if (isNaN(priceAsNumber) || priceAsNumber <= 0) { 
             toast({ variant: 'destructive', title: 'Invalid Price' }); 
@@ -161,7 +150,6 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isLis
         const tx = new Transaction();
         const functionName = currency === 'TKT' ? 'list_for_sale_with_tkt' : 'list_for_sale';
         
-        // Ahora TypeScript sabe que providerProfileId es un string.
         tx.moveCall({
             target: `${suiConfig.packageId}::experience_nft::${functionName}`,
             arguments: [
@@ -181,27 +169,24 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isLis
         }
     }
 
-   const handleUpdateDescription = async () => {
-        // --- CORRECCIÓN: Se añade esta verificación al principio ---
+    const handleUpdateDescription = async () => {
         if (!providerProfileId) {
             toast({ variant: 'destructive', title: 'Error', description: 'Provider profile ID is missing.' });
             return;
         }
-
         if (!newDescription.trim()) { 
             toast({ variant: 'destructive', title: 'Description cannot be empty.' }); 
             return; 
         }
 
         const tx = new Transaction();
-        // Ahora TypeScript sabe que `providerProfileId` es un string y no dará error.
         tx.moveCall({
             target: `${suiConfig.packageId}::experience_nft::update_nft_description`,
             arguments: [ 
                 tx.object(providerProfileId), 
                 tx.object(nft.objectId), 
                 tx.pure.string(newDescription),
-                tx.object("0x6") // La función necesita el Clock
+                tx.object(SUI_SYSTEM_CLOCK_OBJECT_ID)
             ]
         });
 
@@ -216,12 +201,10 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isLis
     }
 
     const handleCreateAuction = async () => {
-        // --- CORRECCIÓN: Se añade esta verificación al principio ---
         if (!providerProfileId) {
             toast({ variant: 'destructive', title: 'Error', description: 'Provider profile ID is missing for this action.' });
             return;
         }
-
         const startPriceNum = parseFloat(startPrice);
         if (isNaN(startPriceNum) || startPriceNum <= 0) { 
             toast({ variant: 'destructive', title: 'Invalid start price' }); 
@@ -229,8 +212,6 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isLis
         }
 
         const tx = new Transaction();
-
-        // Ahora TypeScript sabe que providerProfileId es un string
         tx.moveCall({
             target: `${suiConfig.auctionsPackageId}::auctions::create_auction`,
             arguments: [
@@ -252,156 +233,161 @@ export function ListableNftCard({ nft, providerProfileId, onActionSuccess, isLis
         }
     }
     
-     const name = nft.display?.data?.name ?? 'Untitled Experience';
-    const imageUrl = nft.display?.data?.image_url ?? 'https://placehold.co/400x400?text=No+Image';
-
+    // Acceso directo y seguro a los datos del NFT
+    const name = nft.name || 'Untitled Experience';
+    const imageUrl = nft.imageUrl || 'https://placehold.co/400x400?text=No+Image';
+    const targetUrl = `/es/experience/${listingData?.data?.objectId || nft.objectId}`;
 
     return (
-        <Card className="glass-card card-hover flex flex-col group">
-            <CardHeader className="p-0">
-                <div className="aspect-video overflow-hidden rounded-t-lg">
-                    <img src={imageUrl} alt={name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
-                </div>
-            </CardHeader>
-            <CardContent className="p-4 flex-grow">
-                <CardTitle className="line-clamp-2 text-foreground h-[56px] leading-tight">{name}</CardTitle>
-            </CardContent>
-            
-            <CardFooter className="p-2 border-t">
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button className="w-full btn-sui" disabled={isPending}>
-                            {isPending ? <Loader className="w-4 h-4 animate-spin"/> : null}
-                            <span className="mx-2">Actions</span>
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-56 glass-effect">
-                        <Dialog open={isListOpen} onOpenChange={setIsListOpen}>
-                           <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><ListPlus className="mr-2 h-4 w-4" />List for Sale</DropdownMenuItem></DialogTrigger>
-                           <DialogContent>
-                               <DialogHeader><DialogTitle>List Experience for Sale</DialogTitle></DialogHeader>
-                               <div className="py-4 space-y-4">
-                                   <RadioGroup defaultValue="SUI" onValueChange={(value: 'SUI' | 'TKT') => setCurrency(value)}>
-                                        <div className="flex items-center space-x-2"><RadioGroupItem value="SUI" id="r-sui"/><Label htmlFor="r-sui">List in SUI</Label></div>
-                                        <div className="flex items-center space-x-2"><RadioGroupItem value="TKT" id="r-tkt"/><Label htmlFor="r-tkt">List in TKT</Label></div>
-                                   </RadioGroup>
-                                   <div><Label htmlFor="price">Price ({currency})</Label><Input id="price" type="number" placeholder="e.g., 50" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
-                               </div>
-                               <DialogFooter><Button onClick={handleListForSale} disabled={isPending} className="w-full btn-sui">Confirm Listing</Button></DialogFooter>
-                           </DialogContent>
-                        </Dialog>
-                        <Dialog open={isAuctionOpen} onOpenChange={setIsAuctionOpen}>
-                            <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Gavel className="mr-2 h-4 w-4" />Start Auction</DropdownMenuItem></DialogTrigger>
-                             <DialogContent>
-                                <DialogHeader><DialogTitle>Create Auction</DialogTitle><DialogDescription>Set the initial conditions for your auction.</DialogDescription></DialogHeader>
-                                <div className="grid gap-6 py-4">
-                                    <div className="space-y-2"><Label htmlFor="start-price">Starting Price (SUI)</Label><Input id="start-price" type="number" value={startPrice} onChange={(e) => setStartPrice(e.target.value)} placeholder="e.g., 50" /></div>
-                                    <div className="space-y-2"><Label htmlFor="duration">Duration</Label>
-                                        <Select onValueChange={setDuration} defaultValue={duration}>
-                                            <SelectTrigger><SelectValue placeholder="Select duration" /></SelectTrigger>
-                                            <SelectContent><SelectItem value="3600000">1 Hour</SelectItem><SelectItem value="86400000">1 Day</SelectItem><SelectItem value="259200000">3 Days</SelectItem><SelectItem value="604800000">7 Days</SelectItem></SelectContent>
-                                        </Select>
+        <Link href={targetUrl} className="group block h-full">
+            <Card className="glass-card card-hover h-full flex flex-col overflow-hidden">
+                <CardHeader className="p-0">
+                    <div className="aspect-video overflow-hidden rounded-t-lg bg-muted">
+                        <img 
+                            src={imageUrl} 
+                            alt={name} 
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" 
+                            crossOrigin="anonymous"
+                        />
+                    </div>
+                </CardHeader>
+                <CardContent className="p-4 flex-grow">
+                    <CardTitle className="line-clamp-2 text-foreground h-[56px] leading-tight">{name}</CardTitle>
+                </CardContent>
+                
+                <CardFooter className="p-2 border-t mt-auto">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button className="w-full btn-sui" disabled={isPending}>
+                                {isPending ? <Loader className="w-4 h-4 animate-spin"/> : <span className="mx-2">Actions</span>}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56 glass-effect">
+                            <Dialog open={isListOpen} onOpenChange={setIsListOpen}>
+                                <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><ListPlus className="mr-2 h-4 w-4" />List for Sale</DropdownMenuItem></DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader><DialogTitle>List Experience for Sale</DialogTitle></DialogHeader>
+                                    <div className="py-4 space-y-4">
+                                        <RadioGroup defaultValue="SUI" onValueChange={(value: 'SUI' | 'TKT') => setCurrency(value)}>
+                                            <div className="flex items-center space-x-2"><RadioGroupItem value="SUI" id="r-sui"/><Label htmlFor="r-sui">List in SUI</Label></div>
+                                            <div className="flex items-center space-x-2"><RadioGroupItem value="TKT" id="r-tkt"/><Label htmlFor="r-tkt">List in TKT</Label></div>
+                                        </RadioGroup>
+                                        <div><Label htmlFor="price">Price ({currency})</Label><Input id="price" type="number" placeholder="e.g., 50" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
                                     </div>
-                                </div>
-                                <DialogFooter><Button onClick={handleCreateAuction} disabled={isPending} className="w-full btn-sui">Start Auction</Button></DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                        {/* --- AÑADIDO: Diálogo para Solicitud de Préstamo --- */}
-                        <Dialog open={isLoanRequestOpen} onOpenChange={setIsLoanRequestOpen}>
-                            <DialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                    <Landmark className="mr-2 h-4 w-4" /> Request Loan
-                                </DropdownMenuItem>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Request a P2P Loan</DialogTitle>
-                                    <DialogDescription>Use this NFT as collateral to request a loan from other users.</DialogDescription>
-                                </DialogHeader>
-                                <div className="py-4 space-y-4">
-                                    <RadioGroup defaultValue="SUI" value={loanCurrency} onValueChange={(value: 'SUI' | 'TKT') => setLoanCurrency(value)}>
-                                        <div className="flex items-center space-x-2"><RadioGroupItem value="SUI" id="r-sui-loan"/><Label htmlFor="r-sui-loan">Request in SUI</Label></div>
-                                        <div className="flex items-center space-x-2"><RadioGroupItem value="TKT" id="r-tkt-loan"/><Label htmlFor="r-tkt-loan">Request in TKT</Label></div>
-                                    </RadioGroup>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="principal">Borrow Amount</Label>
-                                            <Input id="principal" type="number" placeholder="e.g., 100" value={principalAmount} onChange={(e) => setPrincipalAmount(e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="repayment">Repayment Amount</Label>
-                                            <Input id="repayment" type="number" placeholder="e.g., 110" value={repaymentAmount} onChange={(e) => setRepaymentAmount(e.target.value)} />
+                                    <DialogFooter><Button onClick={handleListForSale} disabled={isPending} className="w-full btn-sui">Confirm Listing</Button></DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                            <Dialog open={isAuctionOpen} onOpenChange={setIsAuctionOpen}>
+                                <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Gavel className="mr-2 h-4 w-4" />Start Auction</DropdownMenuItem></DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader><DialogTitle>Create Auction</DialogTitle><DialogDescription>Set the initial conditions for your auction.</DialogDescription></DialogHeader>
+                                    <div className="grid gap-6 py-4">
+                                        <div className="space-y-2"><Label htmlFor="start-price">Starting Price (SUI)</Label><Input id="start-price" type="number" value={startPrice} onChange={(e) => setStartPrice(e.target.value)} placeholder="e.g., 50" /></div>
+                                        <div className="space-y-2"><Label htmlFor="duration">Duration</Label>
+                                            <Select onValueChange={setDuration} defaultValue={duration}>
+                                                <SelectTrigger><SelectValue placeholder="Select duration" /></SelectTrigger>
+                                                <SelectContent><SelectItem value="3600000">1 Hour</SelectItem><SelectItem value="86400000">1 Day</SelectItem><SelectItem value="259200000">3 Days</SelectItem><SelectItem value="604800000">7 Days</SelectItem></SelectContent>
+                                            </Select>
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="duration-loan">Loan Duration</Label>
-                                        <Select onValueChange={setLoanDuration} defaultValue={loanDuration}>
-                                            <SelectTrigger><SelectValue placeholder="Select duration" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="604800000">7 Days</SelectItem>
-                                                <SelectItem value="1209600000">14 Days</SelectItem>
-                                                <SelectItem value="2592000000">30 Days</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button onClick={handleCreateLoanRequest} disabled={isPending} className="w-full btn-sui">
-                                        Create Loan Request
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                        {/* --- AÑADIDO: Diálogo para Alquiler --- */}
-                        <Dialog open={isRentOpen} onOpenChange={setIsRentOpen}>
-                            <DialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                    <Key className="mr-2 h-4 w-4" /> List for Rent
-                                </DropdownMenuItem>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>List Asset for Rent</DialogTitle>
-                                    <DialogDescription>Set the price and duration for the rental period.</DialogDescription>
-                                </DialogHeader>
-                                <div className="py-4 space-y-4">
-                                    <RadioGroup defaultValue="SUI" value={rentCurrency} onValueChange={(value: 'SUI' | 'TKT') => setRentCurrency(value)}>
-                                        <div className="flex items-center space-x-2"><RadioGroupItem value="SUI" id="r-sui-rent"/><Label htmlFor="r-sui-rent">Rent in SUI</Label></div>
-                                        <div className="flex items-center space-x-2"><RadioGroupItem value="TKT" id="r-tkt-rent"/><Label htmlFor="r-tkt-rent">Rent in TKT</Label></div>
-                                    </RadioGroup>
-                                    <div>
-                                        <Label htmlFor="rent-price">Price ({rentCurrency})</Label>
-                                        <Input id="rent-price" type="number" placeholder="e.g., 10" value={rentPrice} onChange={(e) => setRentPrice(e.target.value)} />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Rental Start Date</Label>
-                                            <DatePicker date={rentStartDate} setDate={setRentStartDate} />
+                                    <DialogFooter><Button onClick={handleCreateAuction} disabled={isPending} className="w-full btn-sui">Start Auction</Button></DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                            <Dialog open={isLoanRequestOpen} onOpenChange={setIsLoanRequestOpen}>
+                                <DialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                        <Landmark className="mr-2 h-4 w-4" /> Request Loan
+                                    </DropdownMenuItem>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Request a P2P Loan</DialogTitle>
+                                        <DialogDescription>Use this NFT as collateral to request a loan from other users.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="py-4 space-y-4">
+                                        <RadioGroup defaultValue="SUI" value={loanCurrency} onValueChange={(value: 'SUI' | 'TKT') => setLoanCurrency(value)}>
+                                            <div className="flex items-center space-x-2"><RadioGroupItem value="SUI" id="r-sui-loan"/><Label htmlFor="r-sui-loan">Request in SUI</Label></div>
+                                            <div className="flex items-center space-x-2"><RadioGroupItem value="TKT" id="r-tkt-loan"/><Label htmlFor="r-tkt-loan">Request in TKT</Label></div>
+                                        </RadioGroup>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="principal">Borrow Amount</Label>
+                                                <Input id="principal" type="number" placeholder="e.g., 100" value={principalAmount} onChange={(e) => setPrincipalAmount(e.target.value)} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="repayment">Repayment Amount</Label>
+                                                <Input id="repayment" type="number" placeholder="e.g., 110" value={repaymentAmount} onChange={(e) => setRepaymentAmount(e.target.value)} />
+                                            </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <Label>Rental End Date</Label>
-                                            <DatePicker date={rentEndDate} setDate={setRentEndDate} />
+                                            <Label htmlFor="duration-loan">Loan Duration</Label>
+                                            <Select onValueChange={setLoanDuration} defaultValue={loanDuration}>
+                                                <SelectTrigger><SelectValue placeholder="Select duration" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="604800000">7 Days</SelectItem>
+                                                    <SelectItem value="1209600000">14 Days</SelectItem>
+                                                    <SelectItem value="2592000000">30 Days</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                     </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button onClick={handleListForRent} disabled={isPending} className="w-full btn-sui">
-                                        Confirm Rental Listing
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                            <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Edit className="mr-2 h-4 w-4" />Edit Details</DropdownMenuItem></DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader><DialogTitle>Edit Description</DialogTitle></DialogHeader>
-                                <div className="py-4"><Label htmlFor="desc">New Description</Label><Textarea id="desc" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={5} /></div>
-                                <DialogFooter><Button onClick={handleUpdateDescription} disabled={isPending} className="w-full btn-sui">Update Description</Button></DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </CardFooter>
-        </Card>
+                                    <DialogFooter>
+                                        <Button onClick={handleCreateLoanRequest} disabled={isPending} className="w-full btn-sui">
+                                            Create Loan Request
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                            <Dialog open={isRentOpen} onOpenChange={setIsRentOpen}>
+                                <DialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                        <Key className="mr-2 h-4 w-4" /> List for Rent
+                                    </DropdownMenuItem>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>List Asset for Rent</DialogTitle>
+                                        <DialogDescription>Set the price and duration for the rental period.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="py-4 space-y-4">
+                                        <RadioGroup defaultValue="SUI" value={rentCurrency} onValueChange={(value: 'SUI' | 'TKT') => setRentCurrency(value)}>
+                                            <div className="flex items-center space-x-2"><RadioGroupItem value="SUI" id="r-sui-rent"/><Label htmlFor="r-sui-rent">Rent in SUI</Label></div>
+                                            <div className="flex items-center space-x-2"><RadioGroupItem value="TKT" id="r-tkt-rent"/><Label htmlFor="r-tkt-rent">Rent in TKT</Label></div>
+                                        </RadioGroup>
+                                        <div>
+                                            <Label htmlFor="rent-price">Price ({rentCurrency})</Label>
+                                            <Input id="rent-price" type="number" placeholder="e.g., 10" value={rentPrice} onChange={(e) => setRentPrice(e.target.value)} />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label>Rental Start Date</Label>
+                                                <DatePicker date={rentStartDate} setDate={setRentStartDate} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Rental End Date</Label>
+                                                <DatePicker date={rentEndDate} setDate={setRentEndDate} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button onClick={handleListForRent} disabled={isPending} className="w-full btn-sui">
+                                            Confirm Rental Listing
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                                <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><Edit className="mr-2 h-4 w-4" />Edit Details</DropdownMenuItem></DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader><DialogTitle>Edit Description</DialogTitle></DialogHeader>
+                                    <div className="py-4"><Label htmlFor="desc">New Description</Label><Textarea id="desc" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={5} /></div>
+                                    <DialogFooter><Button onClick={handleUpdateDescription} disabled={isPending} className="w-full btn-sui">Update Description</Button></DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </CardFooter>
+            </Card>
+        </Link>
     )
 }
