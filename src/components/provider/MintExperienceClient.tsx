@@ -188,17 +188,36 @@ export default function MintExperienceClient() {
             console.log(`✅ [MINT] Blob ID type: ${typeof blobId}`);
             console.log(`✅ [MINT] Blob ID length: ${blobId?.toString().length}`);
 
-            // --- CONSTRUIR LA URL CORRECTA PARA EL AGREGADOR ---
-            // Usar el blob ID (no el object ID) con el agregador HTTP
-            const imageUrl = `https://aggregator.testnet.walrus.atalma.io/v1/blobs/${blobId}`;
-            console.log('✅ [MINT] URL del agregador construida:', imageUrl);
+            // --- CONSTRUIR LA URL CORRECTA PARA MOSTRAR IMÁGENES ---
+            // Como Walrus Sites portal no está funcionando en testnet, 
+            // usaremos el agregador directo con un wrapper personalizado
+            const imageUrlDirect = `https://aggregator.testnet.walrus.atalma.io/v1/blobs/${blobId}`;
             
-            // Prueba la URL para ver si funciona
+            console.log('✅ [MINT] Blob ID:', blobId);
+            console.log('✅ [MINT] URL del agregador:', imageUrlDirect);
+            
+            // Usaremos la URL directa del agregador
+            const imageUrl = imageUrlDirect;
+            
+            // Verificar que los datos estén disponibles
             try {
-                const testResponse = await fetch(imageUrl, { method: 'HEAD' });
+                const testResponse = await fetch(imageUrl, { method: 'GET' });
                 console.log('✅ [MINT] Test URL status:', testResponse.status);
+                
+                if (testResponse.ok) {
+                    const arrayBuffer = await testResponse.arrayBuffer();
+                    console.log('✅ [MINT] Datos recibidos, tamaño:', arrayBuffer.byteLength, 'bytes');
+                    
+                    // Verificar que es una imagen válida creando un blob URL temporal
+                    const blob = new Blob([arrayBuffer], { type: contentType });
+                    const tempUrl = URL.createObjectURL(blob);
+                    console.log('✅ [MINT] URL temporal creada para verificación:', tempUrl);
+                    
+                    // Limpiar la URL temporal después de un momento
+                    setTimeout(() => URL.revokeObjectURL(tempUrl), 5000);
+                }
             } catch (error) {
-                console.log('❌ [MINT] Test URL failed:', error);
+                console.log('❌ [MINT] Error verificando datos:', error);
             }
 
             // --- MINTEAR EL NFT ---
