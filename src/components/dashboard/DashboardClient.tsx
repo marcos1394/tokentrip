@@ -81,11 +81,25 @@ function UserDashboard({ nfts, poes, receipts, rentedReceipts, myLoanRequests, m
                 </TabsList>
                 <TabsContent value="collection" className="mt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {nfts.filter(nft => nft.data?.display).map((nft) => (
-                            <ListableNftCard key={nft.data.objectId} nft={nft.data} onActionSuccess={handleActionSuccess} isFraction={false} />
-                        ))}
-                    </div>
-                    {nfts.length === 0 && <EmptyState icon={Inbox} title="Your Collection is Empty" description="Purchase an experience NFT from the marketplace to see it here." />}
+    {nfts.filter(nft => nft.data?.display).map((nft) => (
+        <ListableNftCard 
+            key={nft.data.objectId}
+            
+            // --- CORRECCIÓN AQUÍ ---
+            // Transformamos el objeto 'nft.data' a la nueva estructura que el componente espera.
+            nft={{
+                objectId: nft.data.objectId,
+                name: nft.data.display?.data?.name || 'Untitled Experience',
+                description: nft.data.display?.data?.description || '',
+                imageUrl: nft.data.display?.data?.image_url || ''
+            }}
+            // --------------------
+
+            onActionSuccess={handleActionSuccess} 
+            isFraction={false} 
+        />
+    ))}
+</div>
                 </TabsContent>
                 <TabsContent value="memories" className="mt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{poes.map((poe) => ( <ProofOfExperienceCard key={poe.data.objectId} poe={poe.data} /> ))}</div>
