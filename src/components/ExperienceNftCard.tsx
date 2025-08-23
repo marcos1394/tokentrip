@@ -26,10 +26,56 @@ export function ExperienceNftCard({
 }: ExperienceNftCardProps) {
     const [imageError, setImageError] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [processedImageUrl, setProcessedImageUrl] = useState<string>('');
     
     const targetUrl = `/es/experience/${listingId || nftId}`;
     const isImage = contentType.startsWith("image/");
     const isVideo = contentType.startsWith("video/");
+
+    // Función para procesar URLs de Walrus y convertirlas a blob URLs
+    useEffect(() => {
+        const processWalrusUrl = async () => {
+            if (!imageUrl || !isImage) {
+                setProcessedImageUrl(imageUrl);
+                return;
+            }
+
+            // Si es una URL del agregador de Walrus, convertir a blob URL
+            if (imageUrl.includes('aggregator.testnet.walrus.atalma.io/v1/blobs/')) {
+                try {
+                    console.log('🔄 Procesando URL de Walrus:', imageUrl);
+                    
+                    const response = await fetch(imageUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const arrayBuffer = await response.arrayBuffer();
+                    const blob = new Blob([arrayBuffer], { 
+                        type: contentType || 'image/png' 
+                    });
+                    
+                    const blobUrl = URL.createObjectURL(blob);
+                    setProcessedImageUrl(blobUrl);
+                    
+                    console.log('✅ Blob URL creada para imagen de Walrus');
+                    
+                    // Cleanup function para liberar la URL cuando el componente se desmonte
+                    return () => {
+                        URL.revokeObjectURL(blobUrl);
+                    };
+                    
+                } catch (error) {
+                    console.error('❌ Error procesando URL de Walrus:', error);
+                    setProcessedImageUrl(imageUrl); // Fallback a la URL original
+                }
+            } else {
+                setProcessedImageUrl(imageUrl);
+            }
+        };
+
+        processWalrusUrl();
+    }, [imageUrl, contentType, isImage]);
 
     const handleImageLoad = () => {
         setIsLoading(false);
@@ -39,7 +85,14 @@ export function ExperienceNftCard({
     const handleImageError = () => {
         setIsLoading(false);
         setImageError(true);
-        console.error('Error loading image from Walrus:', imageUrl);
+        console.error('Error loading image:', processedImageUrl);
+        
+        // Log para debugging
+        if (imageUrl.includes('by-object-id')) {
+            console.log('💡 Tip: La URL usa Object ID, necesitas el Blob ID');
+        } else if (imageUrl.includes('aggregator')) {
+            console.log('💡 Tip: Error con URL del agregador, verificar conectividad');
+        }
     };
 
     return (
@@ -56,7 +109,7 @@ export function ExperienceNftCard({
                                 )}
                                 
                                 <img 
-                                    src={imageUrl}
+                                    src={processedImageUrl}
                                     alt={name}
                                     className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-110 ${
                                         isLoading ? 'opacity-0' : 'opacity-100'
@@ -81,7 +134,7 @@ export function ExperienceNftCard({
                         
                         {isVideo && (
                             <video 
-                                src={imageUrl}
+                                src={processedImageUrl}
                                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                                 controls={false}
                                 muted
