@@ -184,21 +184,24 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
                 </TabsList>
 
                 <TabsContent value="listings" className="mt-6">
-                    {myActiveListings.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {myActiveListings.map((listing) => (
-                                <ListableNftCard 
-                                    key={listing.listingId} 
-                                    nft={listing.nft} 
-                                    listingData={{ data: { objectId: listing.listingId, content: { fields: { price: (listing.price * (10**9)).toString(), is_available: true, seller: listing.seller, nft: listing.nft } } } }} 
-                                    onActionSuccess={handleActionSuccess} 
-                                    isListing 
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <EmptyState icon={PackageOpen} title="You have no active listings" description="List an item from your inventory to get started!" />
-                    )}
+                    {myActiveListings.map((listing) => (
+    <ListableNftCard 
+        key={listing.listingId} 
+        
+        // --- CORRECCIÓN AQUÍ ---
+        // Creamos un nuevo objeto que incluye todas las propiedades de listing.nft
+        // y le añadimos la propiedad 'objectId' que el componente espera, usando el valor de 'listing.nft.id'.
+        nft={{
+            ...listing.nft,
+            objectId: listing.nft.id 
+        }}
+        // --------------------
+        
+        listingData={{ data: { objectId: listing.listingId, content: { fields: { price: (listing.price * (10**9)).toString(), is_available: true, seller: listing.seller, nft: listing.nft } } } }} 
+        onActionSuccess={handleActionSuccess} 
+        isListing 
+    />
+))}
                 </TabsContent>
 
                 <TabsContent value="inventory" className="mt-6">
