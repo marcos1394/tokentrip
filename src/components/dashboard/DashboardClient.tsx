@@ -16,13 +16,14 @@ import { ProofOfExperienceCard } from '@/components/ProofOfExperienceCard';
 import { PurchaseReceiptCard } from '@/components/PurchaseReceiptCard';
 import { ManageableRentalCard } from '@/components/dashboard/ManageableRentalCard';
 import { RentedReceiptCard } from '@/components/dashboard/RentedReceiptCard';
-import { Loader2, Store, BadgeCheck, PackageOpen, Inbox, History, Edit, Star, BarChart2, Coins, Key, Landmark } from 'lucide-react';
+import { Loader2, Store, PackageOpen, Inbox, History, Edit, Star, BarChart2, Coins, Key, Landmark } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useGetLoanRequests, LoanRequest } from '@/hooks/useGetLoanRequest';
 import { useGetActiveLoans, ActiveLoan } from '@/hooks/useGetActiveLoans';
 import { LoanRequestManagementCard } from '@/components/LoanRequestManagementCard';
 import { ActiveLoanCard } from '@/components/ActiveLoanCard';
+import { useGetListings, NftListing } from '@/hooks/useGetListings'; // Hook para todos los listings
 
 // Interfaces
 interface SuiObject { data: { objectId: string; content: { fields: any; }; display?: any; }; }
@@ -40,7 +41,6 @@ function StatCard({ title, value, icon: Icon }: { title: string, value: string |
 function EmptyState({ icon: Icon, title, description }: { icon: React.ElementType, title: string, description: string }) {
     return (<div className="text-center text-muted-foreground py-16 flex flex-col items-center gap-4 border-2 border-dashed rounded-lg"><Icon className="w-12 h-12" /><p className="text-lg font-semibold">{title}</p><p>{description}</p></div>);
 }
-
 function LoadingSkeletonGrid() {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -65,6 +65,7 @@ function UserDashboard({ nfts, poes, receipts, rentedReceipts, myLoanRequests, m
         queryClient.invalidateQueries({ queryKey: ['getOwnedObjects'] });
         queryClient.invalidateQueries({ queryKey: ['get-loan-requests-graphql'] });
         queryClient.invalidateQueries({ queryKey: ['get-active-loans-graphql'] });
+        queryClient.invalidateQueries({ queryKey: ['get-all-listings-definitive'] });
     };
 
     return (
@@ -78,7 +79,6 @@ function UserDashboard({ nfts, poes, receipts, rentedReceipts, myLoanRequests, m
                     <TabsTrigger value="loans">My Loans</TabsTrigger>
                     <TabsTrigger value="reviews">Pending Reviews</TabsTrigger>
                 </TabsList>
-
                 <TabsContent value="collection" className="mt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {nfts.filter(nft => nft.data?.display).map((nft) => (
@@ -87,8 +87,6 @@ function UserDashboard({ nfts, poes, receipts, rentedReceipts, myLoanRequests, m
                     </div>
                     {nfts.length === 0 && <EmptyState icon={Inbox} title="Your Collection is Empty" description="Purchase an experience NFT from the marketplace to see it here." />}
                 </TabsContent>
-                
-                {/* --- SECCIÓN RESTAURADA DE USUARIO --- */}
                 <TabsContent value="memories" className="mt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{poes.map((poe) => ( <ProofOfExperienceCard key={poe.data.objectId} poe={poe.data} /> ))}</div>
                     {poes.length === 0 && <EmptyState icon={History} title="You have no Memories yet" description="Redeem an experience NFT after you attend to collect a permanent, on-chain memento." />}
@@ -128,8 +126,6 @@ function UserDashboard({ nfts, poes, receipts, rentedReceipts, myLoanRequests, m
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{receipts.map((receipt) => ( <PurchaseReceiptCard key={receipt.data.objectId} receipt={receipt.data} /> ))}</div>
                     {receipts.length === 0 && <EmptyState icon={Edit} title="No Pending Reviews" description="After you purchase an experience, you'll find a receipt here to leave a review." />}
                 </TabsContent>
-                {/* --- FIN SECCIÓN RESTAURADA --- */}
-
             </Tabs>
             <Card className="glass-card text-center mt-12">
                 <CardHeader><CardTitle className="text-2xl">Want to Sell Experiences?</CardTitle><CardDescription>Become a provider to tokenize and sell your unique offerings.</CardDescription></CardHeader>
@@ -139,45 +135,29 @@ function UserDashboard({ nfts, poes, receipts, rentedReceipts, myLoanRequests, m
     );
 }
 
-function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListings, rentedReceipts, myLoanRequests, myBorrowedLoans, myLendedLoans }: { 
+// --- Componente para el Dashboard de PROVEEDOR (Simplificado) ---
+function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListings, rentedReceipts, myActiveListings, myLoanRequests, myBorrowedLoans, myLendedLoans }: { 
     providerProfile: ProviderProfile, 
     nfts: ExperienceNFT[], 
     poes: ProofOfExperience[], 
     receipts: PurchaseReceipt[], 
     rentalListings: RentalListing[], 
     rentedReceipts: RentalReceipt[],
+    myActiveListings: NftListing[], // Recibe la lista filtrada
     myLoanRequests: LoanRequest[],
     myBorrowedLoans: ActiveLoan[],
     myLendedLoans: ActiveLoan[]
 }) {
     const queryClient = useQueryClient();
-    
     const providerProfileFields = providerProfile?.data?.content?.fields;
-
-    // --- LOG #1: VERIFICA QUE EL PERFIL DEL PROVEEDOR LLEGUE CORRECTAMENTE ---
-    console.log('1. Perfil de Proveedor:', providerProfileFields);
 
     if (!providerProfileFields) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>;
     }
-
-    const activeListingIds = providerProfileFields.active_listings || [];
-
-    // --- LOG #2: INSPECCIONA EL ARRAY DE IDs DE LOS LISTADOS ---
-    console.log('2. IDs de Listados Activos:', activeListingIds);
-
-    const { data: activeListings, isLoading: isLoadingActiveListings } = useSuiClientQuery('multiGetObjects', { 
-        ids: activeListingIds, 
-        options: { showContent: true } 
-    }, { 
-        enabled: activeListingIds.length > 0 
-    });
-    
-    // --- LOG #3: REVISA LOS DATOS FINALES OBTENIDOS DE multiGetObjects ---
-    console.log('3. Datos Completos de Listados (multiGetObjects):', activeListings);
     
     const handleActionSuccess = () => { 
-        queryClient.invalidateQueries({ queryKey: ['getOwnedObjects', 'multiGetObjects'] });
+        queryClient.invalidateQueries({ queryKey: ['getOwnedObjects'] });
+        queryClient.invalidateQueries({ queryKey: ['get-all-listings-definitive'] }); // Invalida la query principal
         queryClient.invalidateQueries({ queryKey: ['get-loan-requests-graphql'] });
         queryClient.invalidateQueries({ queryKey: ['get-active-loans-graphql'] });
     };
@@ -189,7 +169,7 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
         <div className="space-y-8">
             <h1 className="text-4xl md:text-5xl font-bold mb-8 text-foreground">Provider Dashboard</h1>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <StatCard title="Active Listings" value={activeListingIds.length} icon={Store} />
+                <StatCard title="Active Listings" value={myActiveListings.length} icon={Store} />
                 <StatCard title="Total Reviews" value={totalReviews} icon={Star} />
                 <StatCard title="Average Rating" value={averageRating} icon={BarChart2} />
                 <StatCard title="Lifetime Sales (SUI)" value="Coming Soon" icon={Coins} />
@@ -204,24 +184,23 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
                 </TabsList>
 
                 <TabsContent value="listings" className="mt-6">
-                    {isLoadingActiveListings && <LoadingSkeletonGrid />}
-                    {activeListings && activeListings.length > 0 ? (
+                    {myActiveListings.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {activeListings.map((listing: any) => (
-                                listing?.data?.content && 
+                            {myActiveListings.map((listing) => (
                                 <ListableNftCard 
-                                    key={listing.data.objectId} 
-                                    nft={listing.data.content.fields.nft} 
-                                    listingData={listing.data} 
+                                    key={listing.listingId} 
+                                    nft={listing.nft} 
+                                    listingData={{ data: { objectId: listing.listingId, content: { fields: { price: (listing.price * (10**9)).toString(), is_available: true, seller: listing.seller, nft: listing.nft } } } }} 
                                     onActionSuccess={handleActionSuccess} 
                                     isListing 
                                 />
                             ))}
                         </div>
-                    ) : (!isLoadingActiveListings && <EmptyState icon={PackageOpen} title="You have no active listings" description="List an item from your inventory to get started!" />)}
+                    ) : (
+                        <EmptyState icon={PackageOpen} title="You have no active listings" description="List an item from your inventory to get started!" />
+                    )}
                 </TabsContent>
 
-                {/* --- PESTAÑA "MY INVENTORY" CORREGIDA --- */}
                 <TabsContent value="inventory" className="mt-6">
                     {nfts.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -255,7 +234,6 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
                     </div>
                 </TabsContent>
                 
-                {/* --- SECCIÓN DE PRÉSTAMOS RESTAURADA --- */}
                 <TabsContent value="loans" className="mt-6">
                     <div className="space-y-8">
                         <div>
@@ -284,12 +262,6 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
                     </div>
                 </TabsContent>
                 
-                {/* --- SECCIÓN DE "MEMORIES" TAMBIÉN RESTAURADA --- */}
-                <TabsContent value="memories" className="mt-6">
-                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{poes.map((poe) => ( <ProofOfExperienceCard key={poe.data.objectId} poe={poe.data} /> ))}</div>
-                   {poes.length === 0 && <EmptyState icon={History} title="You have no Memories yet" description="Redeem an experience NFT after a customer attends to add to your collection." />}
-                </TabsContent>
-
                 <TabsContent value="reviews" className="mt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{receipts.map((receipt) => ( <PurchaseReceiptCard key={receipt.data.objectId} receipt={receipt.data} /> ))}</div>
                     {receipts.length === 0 && <EmptyState icon={Edit} title="No Pending Reviews" description="After a customer buys from you, their receipt will appear here until they leave a review." />}
@@ -300,40 +272,35 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
 }
 
 
-// --- COMPONENTE CLIENTE CORREGIDO ---
+// --- COMPONENTE CLIENTE FINAL CON TODA LA LÓGICA INTEGRADA ---
 export default function DashboardClient() {
     const account = useCurrentAccount();
     const ownerAddress = account?.address;
 
-    // --- LA CORRECCIÓN ESTÁ AQUÍ ---
-    // 1. Llamamos a TODOS los hooks de forma incondicional en la parte superior.
-    // 2. Usamos la opción `enabled: !!ownerAddress` para que las queries solo se activen
-    //    cuando la dirección del usuario esté disponible.
-    
-    const { data: providerData, isLoading: isLoadingProfile } = useSuiClientQuery(
-        'getOwnedObjects', 
-        { owner: ownerAddress!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ProviderProfile` }, limit: 1, options: { showContent: true } }, 
-        { enabled: !!ownerAddress }
-    );
-    const { data: nftsData, isLoading: isLoadingNfts } = useSuiClientQuery(
-        'getOwnedObjects', 
-        { owner: ownerAddress!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ExperienceNFT` }, options: { showContent: true, showDisplay: true } }, 
-        { enabled: !!ownerAddress }
-    );
+    // --- QUERIES PARA TODOS LOS DATOS ---
+    const { data: providerData, isLoading: isLoadingProfile } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ProviderProfile` }, limit: 1, options: { showContent: true } }, { enabled: !!ownerAddress });
+    const { data: nftsData, isLoading: isLoadingNfts } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ExperienceNFT` }, options: { showContent: true, showDisplay: true } }, { enabled: !!ownerAddress });
     const { data: poesData, isLoading: isLoadingPoes } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress!, filter: { StructType: `${suiConfig.packageId}::experience_nft::ProofOfExperience` }, options: { showContent: true } }, { enabled: !!ownerAddress });
     const { data: receiptsData, isLoading: isLoadingReceipts } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress!, filter: { StructType: `${suiConfig.packageId}::experience_nft::PurchaseReceipt` }, options: { showContent: true } }, { enabled: !!ownerAddress });
     const { data: rentalListingsData, isLoading: isLoadingListings } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress!, filter: { StructType: `${suiConfig.rentalPackageId}::rental_market::RentalListing` }, options: { showContent: true } }, { enabled: !!ownerAddress });
     const { data: rentedReceiptsData, isLoading: isLoadingReceiptsRental } = useSuiClientQuery('getOwnedObjects', { owner: ownerAddress!, filter: { StructType: `${suiConfig.rentalPackageId}::rental_market::RentalReceipt` }, options: { showContent: true } }, { enabled: !!ownerAddress });
-
     const { data: allLoanRequests, isLoading: isLoadingRequests } = useGetLoanRequests();
     const { data: allActiveLoans, isLoading: isLoadingLoans } = useGetActiveLoans();
+    const { data: allListings, isLoading: isLoadingAllListings } = useGetListings();
 
-    // El estado de carga ahora funciona correctamente porque los hooks siempre están presentes.
-    const isLoading = (!!ownerAddress && (isLoadingProfile || isLoadingNfts || isLoadingPoes || isLoadingReceipts || isLoadingListings || isLoadingReceiptsRental || isLoadingRequests || isLoadingLoans));
+    const isLoading = (!!ownerAddress && (isLoadingProfile || isLoadingNfts || isLoadingPoes || isLoadingReceipts || isLoadingListings || isLoadingReceiptsRental || isLoadingRequests || isLoadingLoans || isLoadingAllListings));
 
     const isProvider = useMemo(() => !!providerData?.data && providerData.data.length > 0, [providerData]);
     
+    // --- PROCESAMIENTO Y FILTRADO DE DATOS ---
     const providerProfile = providerData?.data?.[0] as ProviderProfile | undefined;
+    const providerId = providerProfile?.data?.objectId;
+
+    const myActiveListings = useMemo(() => {
+        if (!providerId || !allListings) return [];
+        return allListings.filter(listing => listing.providerId === providerId);
+    }, [allListings, providerId]);
+
     const nfts = (nftsData?.data?.filter(obj => obj.data) as ExperienceNFT[]) ?? [];
     const poes = (poesData?.data?.filter(obj => obj.data) as ProofOfExperience[]) ?? [];
     const receipts = (receiptsData?.data?.filter(obj => obj.data) as PurchaseReceipt[]) ?? [];
@@ -344,7 +311,6 @@ export default function DashboardClient() {
     const myBorrowedLoans = useMemo(() => allActiveLoans?.filter(loan => loan.borrower === ownerAddress) ?? [], [allActiveLoans, ownerAddress]);
     const myLendedLoans = useMemo(() => allActiveLoans?.filter(loan => loan.lender === ownerAddress) ?? [], [allActiveLoans, ownerAddress]);
     
-    // 3. La lógica de renderizado condicional ahora solo afecta al JSX.
     return (
         <div className="min-h-screen pt-24 pb-12 bg-background">
             <AnimatedBackground />
@@ -354,13 +320,25 @@ export default function DashboardClient() {
                 ) : (
                     isProvider && providerProfile ? 
                         <ProviderDashboard 
-                            providerProfile={providerProfile} nfts={nfts} poes={poes} receipts={receipts} 
-                            rentalListings={rentalListings} rentedReceipts={rentedReceipts} 
-                            myLoanRequests={myLoanRequests} myBorrowedLoans={myBorrowedLoans} myLendedLoans={myLendedLoans}
+                            providerProfile={providerProfile} 
+                            nfts={nfts} 
+                            poes={poes} 
+                            receipts={receipts} 
+                            rentalListings={rentalListings} 
+                            rentedReceipts={rentedReceipts} 
+                            myActiveListings={myActiveListings} 
+                            myLoanRequests={myLoanRequests} 
+                            myBorrowedLoans={myBorrowedLoans} 
+                            myLendedLoans={myLendedLoans}
                         /> : 
                         <UserDashboard 
-                            nfts={nfts} poes={poes} receipts={receipts} rentedReceipts={rentedReceipts}
-                            myLoanRequests={myLoanRequests} myBorrowedLoans={myBorrowedLoans} myLendedLoans={myLendedLoans}
+                            nfts={nfts} 
+                            poes={poes} 
+                            receipts={receipts} 
+                            rentedReceipts={rentedReceipts}
+                            myLoanRequests={myLoanRequests} 
+                            myBorrowedLoans={myBorrowedLoans} 
+                            myLendedLoans={myLendedLoans}
                         />
                 )}
             </div>
