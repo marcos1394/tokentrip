@@ -152,18 +152,19 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
 }) {
     const queryClient = useQueryClient();
     
-    
-    // Acceso seguro a los campos del perfil para evitar errores con 'undefined'.
     const providerProfileFields = providerProfile?.data?.content?.fields;
 
-    // Si los campos del perfil no están listos, muestra un estado de carga.
-    // Esta es la verificación de seguridad principal que previene el crash.
+    // --- LOG #1: VERIFICA QUE EL PERFIL DEL PROVEEDOR LLEGUE CORRECTAMENTE ---
+    console.log('1. Perfil de Proveedor:', providerProfileFields);
+
     if (!providerProfileFields) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-10 w-10" /></div>;
     }
 
-    // Aseguramos que 'active_listings' sea un array antes de usarlo.
     const activeListingIds = providerProfileFields.active_listings || [];
+
+    // --- LOG #2: INSPECCIONA EL ARRAY DE IDs DE LOS LISTADOS ---
+    console.log('2. IDs de Listados Activos:', activeListingIds);
 
     const { data: activeListings, isLoading: isLoadingActiveListings } = useSuiClientQuery('multiGetObjects', { 
         ids: activeListingIds, 
@@ -171,6 +172,9 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
     }, { 
         enabled: activeListingIds.length > 0 
     });
+    
+    // --- LOG #3: REVISA LOS DATOS FINALES OBTENIDOS DE multiGetObjects ---
+    console.log('3. Datos Completos de Listados (multiGetObjects):', activeListings);
     
     const handleActionSuccess = () => { 
         queryClient.invalidateQueries({ queryKey: ['getOwnedObjects', 'multiGetObjects'] });
