@@ -218,23 +218,33 @@ function ProviderDashboard({ providerProfile, nfts, poes, receipts, rentalListin
 ))}
                 </TabsContent>
 
-                <TabsContent value="inventory" className="mt-6">
-                    {nfts.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {nfts.map((nft) => (
-                                <ListableNftCard 
-                                    key={nft.data.objectId} 
-                                    nft={nft.data} 
-                                    onActionSuccess={handleActionSuccess} 
-                                    providerProfileId={providerProfile.data.objectId}
-                                    isFraction={false}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <EmptyState icon={Inbox} title="Your inventory is empty" description="Mint a new experience to see it here." />
-                    )}
-                </TabsContent>
+              <TabsContent value="inventory" className="mt-6">
+    {nfts.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {nfts.map((nft) => (
+                <ListableNftCard 
+                    key={nft.data.objectId}
+                    
+                    // --- CORRECCIÓN AQUÍ ---
+                    // Transformamos el objeto 'nft.data' a la nueva estructura que el componente espera.
+                    nft={{
+                        objectId: nft.data.objectId,
+                        name: nft.data.display?.data?.name || 'Untitled Experience',
+                        description: nft.data.display?.data?.description || '',
+                        imageUrl: nft.data.display?.data?.image_url || ''
+                    }}
+                    // --------------------
+
+                    onActionSuccess={handleActionSuccess} 
+                    providerProfileId={providerProfile.data.objectId}
+                    isFraction={false}
+                />
+            ))}
+        </div>
+    ) : (
+        <EmptyState icon={Inbox} title="Your inventory is empty" description="Mint a new experience to see it here." />
+    )}
+</TabsContent>
                 
                 <TabsContent value="rentals" className="mt-6">
                     <div className="space-y-8">
