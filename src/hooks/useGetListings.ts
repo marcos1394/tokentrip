@@ -43,8 +43,8 @@ export interface NftListing {
   };
 }
 
-// Nota: Eliminamos SUI_TESTNET_GRAPHQL_URL de aquí porque ahora viene de suiConfig
-const WALRUS_AGGREGATOR_URL = 'https://aggregator.testnet.walrus.atalma.io';
+// Nota: Elimconst WALRUS_AGGREGATOR_URL = 'https://aggregator.walrus-testnet.walrus.space';inamos SUI_TESTNET_GRAPHQL_URL de aquí porque ahora viene de suiConfig
+const WALRUS_AGGREGATOR_URL = 'https://aggregator.walrus-testnet.walrus.space';
 
 export function useGetListings() {
   return useQuery({
