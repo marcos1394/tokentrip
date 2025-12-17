@@ -43,7 +43,7 @@ export interface NftListing {
   };
 }
 
-const SUI_TESTNET_GRAPHQL_URL = 'https://sui-testnet.mystenlabs.com/graphql';
+// Nota: Eliminamos SUI_TESTNET_GRAPHQL_URL de aquí porque ahora viene de suiConfig
 const WALRUS_AGGREGATOR_URL = 'https://aggregator.testnet.walrus.atalma.io';
 
 export function useGetListings() {
@@ -62,7 +62,10 @@ export function useGetListings() {
 
       try {
         console.log(`[useGetListings] Buscando listings para el packageId: ${suiConfig.packageId}`);
-        const response = await fetch(SUI_TESTNET_GRAPHQL_URL, {
+        
+        // --- CORRECCIÓN: Usamos la URL centralizada desde el config ---
+        // Esto previene errores de typo o falta de protocolo (https://)
+        const response = await fetch(suiConfig.graphqlUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
