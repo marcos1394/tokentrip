@@ -28,6 +28,5 @@ export const suiConfig = {
   // IDs de Pools de Liquidez (asumiendo que los pools no se han vuelto a crear)
   cetusSuiWalPoolId: "0x72eaf5b60fadc6a7f0ecd81b067824fda96844a049a3c1ddb4bbca00c22fa992",
   suiTktPoolId: "0x97a0b6e8b06106887c7f85afce869a07f87bf05ebb94ea5ed63a0cbfebfd7590",
-  graphqlUrl: "https://sui-testnet.mystenlabs.com/graphql",
-
+  graphqlUrl: "https://graphql.testnet.sui.io/graphql",
 };
