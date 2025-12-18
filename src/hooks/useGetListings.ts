@@ -43,29 +43,26 @@ export interface NftListing {
   };
 }
 
-const WALRUS_AGGREGATOR_URL = 'https://aggregator.walrus-testnet.walrus.space';
+// --- CAMBIO 1: Usamos un Agregador Público Alternativo (NodeInfra) ---
+// El oficial de Mysten Labs estaba dando errores SSL en tu entorno.
+const WALRUS_AGGREGATOR_URL = 'https://walrus-testnet-aggregator.nodeinfra.com';
 
-// --- FUNCIÓN AUXILIAR CRÍTICA: Convierte u256 Decimal a Base64URL ---
-// Esto soluciona el error SSL/Connection Closed al transformar el ID numérico
-// al formato que Walrus espera (ej: "M4hsZG...").
+// --- CAMBIO 2: Función de conversión mejorada (con Padding) ---
 function u256ToBlobId(u256Str: string): string {
   try {
-    // 1. Convertir string decimal a BigInt
     const bigInt = BigInt(u256Str);
-    // 2. Convertir a Hexadecimal
     let hex = bigInt.toString(16);
-    // Asegurar que tenga longitud par para poder parsear bytes
-    if (hex.length % 2 !== 0) hex = '0' + hex;
     
-    // 3. Convertir Hex a Array de Bytes
+    // IMPORTANTE: Walrus requiere 32 bytes exactos (64 caracteres hex).
+    // Si el número es pequeño, rellenamos con ceros a la izquierda.
+    hex = hex.padStart(64, '0');
+    
     const bytes = new Uint8Array(hex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
     
-    // 4. Convertir Bytes a Base64 estándar
     let binary = '';
     bytes.forEach(b => binary += String.fromCharCode(b));
     const base64 = btoa(binary);
     
-    // 5. Convertir Base64 a Base64URL (Reemplazos estándar de URL-safe)
     return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   } catch (e) {
     console.error("Error convirtiendo Blob ID:", e);
@@ -104,7 +101,7 @@ export function useGetListings() {
       
       const rawNodes = result.data.objects.nodes;
 
-      // B. Recolectar IDs
+      // B. Recolectar IDs de objetos Blob
       const blobObjectIds = rawNodes
         .map((node: any) => node.asMoveObject?.contents?.json?.nft?.image_blob_object_id)
         .filter((id: string | undefined) => !!id);
@@ -121,6 +118,7 @@ export function useGetListings() {
         blobObjectsResponse.forEach((obj: SuiObjectResponse) => {
           if (obj.data?.objectId && obj.data.content?.dataType === 'moveObject') {
             const fields = obj.data.content.fields as any;
+            // El campo suele llamarse 'blob_id' en el contrato de Walrus
             if (fields.blob_id) {
               blobIdMap.set(obj.data.objectId, fields.blob_id);
             }
@@ -135,12 +133,11 @@ export function useGetListings() {
           if (!fields || !fields.is_available || !fields.nft) return null;
 
           const imageObjectId = fields.nft.image_blob_object_id;
-          const rawBlobId = blobIdMap.get(imageObjectId); // Esto devuelve el número "10156..."
+          const rawBlobId = blobIdMap.get(imageObjectId);
           
           let finalImageUrl = '/placeholder.png';
 
           if (rawBlobId) {
-            // AQUI USAMOS LA NUEVA FUNCIÓN DE CONVERSIÓN
             const correctBlobId = u256ToBlobId(rawBlobId);
             if (correctBlobId) {
                 finalImageUrl = `${WALRUS_AGGREGATOR_URL}/v1/blobs/${correctBlobId}`;
