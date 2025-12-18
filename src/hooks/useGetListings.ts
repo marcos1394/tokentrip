@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useSuiClient } from '@mysten/dapp-kit'; // Necesitamos el cliente para consultar objetos
+import { useSuiClient } from '@mysten/dapp-kit';
 import { suiConfig } from '@/config/sui';
 import { SuiObjectResponse } from '@mysten/sui/client';
 
@@ -45,14 +45,41 @@ export interface NftListing {
 
 const WALRUS_AGGREGATOR_URL = 'https://aggregator.walrus-testnet.walrus.space';
 
+// --- FUNCIÓN AUXILIAR CRÍTICA: Convierte u256 Decimal a Base64URL ---
+// Esto soluciona el error SSL/Connection Closed al transformar el ID numérico
+// al formato que Walrus espera (ej: "M4hsZG...").
+function u256ToBlobId(u256Str: string): string {
+  try {
+    // 1. Convertir string decimal a BigInt
+    const bigInt = BigInt(u256Str);
+    // 2. Convertir a Hexadecimal
+    let hex = bigInt.toString(16);
+    // Asegurar que tenga longitud par para poder parsear bytes
+    if (hex.length % 2 !== 0) hex = '0' + hex;
+    
+    // 3. Convertir Hex a Array de Bytes
+    const bytes = new Uint8Array(hex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+    
+    // 4. Convertir Bytes a Base64 estándar
+    let binary = '';
+    bytes.forEach(b => binary += String.fromCharCode(b));
+    const base64 = btoa(binary);
+    
+    // 5. Convertir Base64 a Base64URL (Reemplazos estándar de URL-safe)
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  } catch (e) {
+    console.error("Error convirtiendo Blob ID:", e);
+    return "";
+  }
+}
+
 export function useGetListings() {
-  // 1. Obtenemos el cliente de Sui del contexto
   const suiClient = useSuiClient();
 
   return useQuery({
     queryKey: ['get-all-listings-definitive', suiConfig.packageId],
     queryFn: async (): Promise<NftListing[]> => {
-      // A. Consulta GraphQL inicial (Obtiene los Listings)
+      // A. Consulta GraphQL
       const GQL_QUERY = `
         query getListings($listingType: String!) {
           objects(filter: { type: $listingType }) {
@@ -77,17 +104,15 @@ export function useGetListings() {
       
       const rawNodes = result.data.objects.nodes;
 
-      // B. Recolectar todos los IDs de los objetos Blob para consultarlos en lote
+      // B. Recolectar IDs
       const blobObjectIds = rawNodes
         .map((node: any) => node.asMoveObject?.contents?.json?.nft?.image_blob_object_id)
         .filter((id: string | undefined) => !!id);
 
-      // C. Consultar a Sui para traducir "Sui Object ID" -> "Walrus Blob ID"
-      // Esto es lo que soluciona el error SSL/Network del agregador
+      // C. Consultar a Sui para obtener el Blob ID numérico
       const blobIdMap = new Map<string, string>();
       
       if (blobObjectIds.length > 0) {
-        // Usamos multiGetObjects para eficiencia
         const blobObjectsResponse = await suiClient.multiGetObjects({
           ids: blobObjectIds,
           options: { showContent: true }
@@ -95,8 +120,6 @@ export function useGetListings() {
 
         blobObjectsResponse.forEach((obj: SuiObjectResponse) => {
           if (obj.data?.objectId && obj.data.content?.dataType === 'moveObject') {
-            // Buscamos el campo 'blob_id' dentro del objeto Blob de Sui
-            // La estructura usual es { fields: { blob_id: "..." } }
             const fields = obj.data.content.fields as any;
             if (fields.blob_id) {
               blobIdMap.set(obj.data.objectId, fields.blob_id);
@@ -105,19 +128,24 @@ export function useGetListings() {
         });
       }
 
-      // D. Construir la lista final usando los Blob IDs reales
+      // D. Construir lista final
       const listingsWithDetails: NftListing[] = rawNodes
         .map((node: any) => {
           const fields = node.asMoveObject?.contents?.json as ListingFields;
           if (!fields || !fields.is_available || !fields.nft) return null;
 
           const imageObjectId = fields.nft.image_blob_object_id;
-          const realBlobId = blobIdMap.get(imageObjectId);
+          const rawBlobId = blobIdMap.get(imageObjectId); // Esto devuelve el número "10156..."
           
-          // AHORA SI: Usamos el endpoint directo /v1/blobs/ que es robusto
-          const finalImageUrl = realBlobId 
-            ? `${WALRUS_AGGREGATOR_URL}/v1/blobs/${realBlobId}`
-            : '/placeholder.png'; // Fallback si no pudimos resolver el ID
+          let finalImageUrl = '/placeholder.png';
+
+          if (rawBlobId) {
+            // AQUI USAMOS LA NUEVA FUNCIÓN DE CONVERSIÓN
+            const correctBlobId = u256ToBlobId(rawBlobId);
+            if (correctBlobId) {
+                finalImageUrl = `${WALRUS_AGGREGATOR_URL}/v1/blobs/${correctBlobId}`;
+            }
+          }
 
           const contentTypeAttr = Array.isArray(fields.nft.attributes) 
             ? fields.nft.attributes.find(attr => attr?.key === 'content-type') 
