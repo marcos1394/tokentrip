@@ -11,92 +11,93 @@ import Image from 'next/image';
 
 export function ConnectModal() {
   const [isZkPending, setIsZkPending] = useState(false);
-  const suiClient = useSuiClient();
-
-  // Hooks para las billeteras tradicionales
-  const wallets = useWallets();
-  const { mutate: connect, isPending: isWalletConnectPending } = useConnectWallet();
-
-  const handleZkLogin = async (provider: 'google' | 'twitch' | 'facebook') => {
-    setIsZkPending(true);
-    try {
-      const { epoch } = await suiClient.getLatestSuiSystemState();
-      const maxEpoch = Number(epoch) + 2;
-      const ephemeralKeyPair = new Ed25519Keypair();
-      const randomness = generateRandomness();
-      const nonce = generateNonce(ephemeralKeyPair.getPublicKey(), maxEpoch, randomness);
-
-       // --- AÑADIDO: Log para depuración ---
-      console.log("--- zkLogin Data to be Saved .---");
-      console.log("maxEpoch:", maxEpoch);
-      console.log("randomness:", randomness);
-      console.log("Generated Nonce:", nonce);
-      console.log("---------------------------------");
-
-     localStorage.setItem('zk-ephemeral-secret', ephemeralKeyPair.getSecretKey());
-      localStorage.setItem('zk-login-data', JSON.stringify({ maxEpoch, randomness }));
-
-
-      const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
-      const REDIRECT_URI = window.location.origin + "/auth";
-
-      const params = new URLSearchParams({
-        client_id: GOOGLE_CLIENT_ID,
-        redirect_uri: REDIRECT_URI,
-        response_type: 'id_token',
-        scope: 'openid email profile',
-        nonce: nonce,
-      });
-
-      const loginUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-      window.location.href = loginUrl;
-
-    } catch (error) {
-      console.error(error);
-      setIsZkPending(false);
-    }
-  };
-
-  return (
-    <Dialog onOpenChange={() => setIsZkPending(false)}>
-      <DialogTrigger asChild>
-        <Button className="btn-sui">Sign In / Connect</Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md glass-effect">
-        <DialogHeader>
-            <DialogTitle className="text-center text-2xl font-bold">Join TokenTrip</DialogTitle>
-            <DialogDescription className="text-center">Use your social account or connect a wallet to continue.</DialogDescription>
-        </DialogHeader>
-        <div className="py-4 space-y-4">
-          <div className="space-y-3">
-            <Button className="w-full justify-center gap-3" variant="outline" onClick={() => handleZkLogin('google')} disabled={isZkPending}>
-              {isZkPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Chrome className="mr-2 h-5 w-5" />}
-              Sign In with Google
-            </Button>
-            {/* Aquí puedes añadir otros botones de zkLogin si los configuras */}
-          </div>
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or connect a wallet</span></div>
-          </div>
+    const suiClient = useSuiClient();
+    
+      // Hooks para las billeteras tradicionales
+        const wallets = useWallets();
+          const { mutate: connect, isPending: isWalletConnectPending } = useConnectWallet();
           
-          {/* --- CORRECCIÓN: Se renderiza la lista de billeteras --- */}
-          <div className="max-h-[200px] overflow-y-auto px-1 space-y-2">
-            {wallets.map((wallet) => (
-              <Button
-                key={wallet.name}
-                onClick={() => connect({ wallet })}
-                variant="outline"
-                className="w-full justify-start gap-3"
-                disabled={isWalletConnectPending}
-              >
-                <Image src={wallet.icon} alt={wallet.name} width={24} height={24} />
-                Connect {wallet.name}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
+            const handleZkLogin = async (provider: 'google' | 'twitch' | 'facebook') => {
+                setIsZkPending(true);
+                    try {
+                          const { epoch } = await suiClient.getLatestSuiSystemState();
+                                const maxEpoch = Number(epoch) + 2;
+                                      const ephemeralKeyPair = new Ed25519Keypair();
+                                            const randomness = generateRandomness();
+                                                  const nonce = generateNonce(ephemeralKeyPair.getPublicKey(), maxEpoch, randomness);
+                                                  
+                                                         // --- AÑADIDO: Log para depuración ---
+                                                               console.log("--- zkLogin Data to be Saved .---");
+                                                                     console.log("maxEpoch:", maxEpoch);
+                                                                           console.log("randomness:", randomness);
+                                                                                 console.log("Generated Nonce:", nonce);
+                                                                                       console.log("---------------------------------");
+                                                                                       
+                                                                                            localStorage.setItem('zk-ephemeral-secret', ephemeralKeyPair.getSecretKey());
+                                                                                                  localStorage.setItem('zk-login-data', JSON.stringify({ maxEpoch, randomness }));
+                                                                                                  
+                                                                                                  
+                                                                                                        const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
+                                                                                                              const REDIRECT_URI = window.location.origin + "/auth";
+                                                                                                              
+                                                                                                                    const params = new URLSearchParams({
+                                                                                                                            client_id: GOOGLE_CLIENT_ID,
+                                                                                                                                    redirect_uri: REDIRECT_URI,
+                                                                                                                                            response_type: 'id_token',
+                                                                                                                                                    scope: 'openid email profile',
+                                                                                                                                                            nonce: nonce,
+                                                                                                                                                                  });
+                                                                                                                                                                  
+                                                                                                                                                                        const loginUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+                                                                                                                                                                              window.location.href = loginUrl;
+                                                                                                                                                                              
+                                                                                                                                                                                  } catch (error) {
+                                                                                                                                                                                        console.error(error);
+                                                                                                                                                                                              setIsZkPending(false);
+                                                                                                                                                                                                  }
+                                                                                                                                                                                                    };
+                                                                                                                                                                                                    
+                                                                                                                                                                                                      return (
+                                                                                                                                                                                                          <Dialog onOpenChange={() => setIsZkPending(false)}>
+                                                                                                                                                                                                                <DialogTrigger asChild>
+                                                                                                                                                                                                                        <Button className="btn-sui">Sign In / Connect</Button>
+                                                                                                                                                                                                                              </DialogTrigger>
+                                                                                                                                                                                                                                    <DialogContent className="sm:max-w-md glass-effect">
+                                                                                                                                                                                                                                            <DialogHeader>
+                                                                                                                                                                                                                                                        <DialogTitle className="text-center text-2xl font-bold">Join TokenTrip</DialogTitle>
+                                                                                                                                                                                                                                                                    <DialogDescription className="text-center">Use your social account or connect a wallet to continue.</DialogDescription>
+                                                                                                                                                                                                                                                                            </DialogHeader>
+                                                                                                                                                                                                                                                                                    <div className="py-4 space-y-4">
+                                                                                                                                                                                                                                                                                              <div className="space-y-3">
+                                                                                                                                                                                                                                                                                                          <Button className="w-full justify-center gap-3" variant="outline" onClick={() => handleZkLogin('google')} disabled={isZkPending}>
+                                                                                                                                                                                                                                                                                                                        {isZkPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Chrome className="mr-2 h-5 w-5" />}
+                                                                                                                                                                                                                                                                                                                                      Sign In with Google
+                                                                                                                                                                                                                                                                                                                                                  </Button>
+                                                                                                                                                                                                                                                                                                                                                              {/* Aquí puedes añadir otros botones de zkLogin si los configuras */}
+                                                                                                                                                                                                                                                                                                                                                                        </div>
+                                                                                                                                                                                                                                                                                                                                                                                  <div className="relative my-6">
+                                                                                                                                                                                                                                                                                                                                                                                              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                                                                                                                                                                                                                                                                                                                                                                                                          <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or connect a wallet</span></div>
+                                                                                                                                                                                                                                                                                                                                                                                                                    </div>
+                                                                                                                                                                                                                                                                                                                                                                                                                              
+                                                                                                                                                                                                                                                                                                                                                                                                                                        {/* --- CORRECCIÓN: Se renderiza la lista de billeteras --- */}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                  <div className="max-h-[200px] overflow-y-auto px-1 space-y-2">
+                                                                                                                                                                                                                                                                                                                                                                                                                                                              {wallets.map((wallet) => (
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                            <Button
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            key={wallet.name}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            onClick={() => connect({ wallet })}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            variant="outline"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            className="w-full justify-start gap-3"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            disabled={isWalletConnectPending}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          >
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          <Image src={wallet.icon} alt={wallet.name} width={24} height={24} />
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          Connect {wallet.name}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        </Button>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ))}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              </div>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      </div>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            </DialogContent>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                </Dialog>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  );
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  

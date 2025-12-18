@@ -192,7 +192,13 @@ export default function MintExperienceClient() {
         console.log(`✅ [MINT] Blob ID length: ${blobId?.toString().length}`);
 
         // --- CONSTRUIR LA URL CORRECTA PARA MOSTRAR IMÁGENES ---
-        const imageUrlDirect = `https://aggregator.testnet.walrus.atalma.io/v1/blobs/${blobId}`;
+        // --- CORRECCIÓN CRÍTICA ---
+// Usamos el agregador de NodeInfra que sabemos que es estable en Testnet
+const WALRUS_AGGREGATOR = 'https://walrus-testnet-aggregator.nodeinfra.com';
+const imageUrlDirect = `${WALRUS_AGGREGATOR}/v1/blobs/${blobId}`;
+
+console.log('✅ [MINT] Blob ID:', blobId);
+console.log('✅ [MINT] URL generada:', imageUrlDirect);
         
         console.log('✅ [MINT] Blob ID:', blobId);
         console.log('✅ [MINT] URL del agregador:', imageUrlDirect);
